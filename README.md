@@ -1,36 +1,213 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PorteManía 🚐
 
-## Getting Started
+Plataforma web **responsive** de transporte y portes **on-demand** ("un Uber de furgonetas") para **Albacete capital**. Conecta a clientes que necesitan mover mercancía con conductores autónomos verificados.
 
-First, run the development server:
+- **Producción:** https://pontemania.vercel.app
+- **Estado:** portado, funcional y desplegado (2026-07-01). Preparado para ampliación.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 1. Contexto y objetivo del proyecto
+
+Este proyecto **nació en Base44** (un constructor de apps con IA). La versión original vive en https://portemania-on-demand.base44.app/ y su código fuente exportado (React + Vite) se conserva en la carpeta [`base44/`](./base44) **como referencia**.
+
+El objetivo fue **rehacerlo "como merece"**: código fuente propio, profesional y organizado, con un stack estándar y sostenible (Next.js + Supabase + Vercel), **sin depender de Base44 AI**, manteniendo el **diseño exactamente igual** al original y dejándolo **100% funcional** para poder **ampliarlo** después.
+
+Criterios de éxito que guiaron el trabajo:
+1. **Diseño idéntico** a la referencia.
+2. **Completamente funcional** (no solo fachada).
+3. **Código organizado**.
+4. **Probado**.
+
+> La carpeta `base44/` es SOLO referencia (diseño y comportamiento). No forma parte del build (está en `.vercelignore`). No se usa Base44 en tiempo de ejecución.
+
+---
+
+## 2. ¿Qué hace la aplicación?
+
+Servicio de portes **a pie de calle** dentro de Albacete capital (CP 02001–02008). Tres tipos de furgoneta con tarifa por 2h + horas extra + seguro opcional:
+
+| Vehículo | Capacidad | Base (2h) |
+|---|---|---|
+| L1H1 | hasta 5 m³ · 800 kg | 50 € |
+| L1H2 | hasta 7 m³ · 1.000 kg | 60 € |
+| L2H2 | hasta 12 m³ · 1.500 kg | 85 € |
+
+Hora extra: **15 €/h**. Seguro de mercancía: **12 €**. Pago con **tarjeta** (Stripe) o **efectivo** al conductor.
+
+### Roles y áreas
+- **Público**: landing, solicitud como invitado (sin cuenta), páginas legales.
+- **Cliente**: panel, nueva solicitud (asistente de 4 pasos con fotos), mis pedidos, detalle con **seguimiento en tiempo real + chat + mapa**, pago, perfil.
+- **Conductor**: panel, solicitudes disponibles, trabajo activo, historial, ganancias, perfil (documentación + fotos del vehículo).
+- **Admin**: dashboard, usuarios, conductores, pedidos, incidencias, ajustes, alta de trabajadores/conductores.
+
+### Ciclo de vida de un pedido
+`pending` → `accepted` → `in_transit` → `picked_up` → `delivered` (o `cancelled`).
+
+---
+
+## 3. Stack técnico
+
+- **Next.js 16** (App Router, JavaScript/JSX). ⚠️ Es una versión con cambios de convenciones — ver [`AGENTS.md`](./AGENTS.md) (p. ej. `middleware` → `proxy`). Consultar `node_modules/next/dist/docs/` antes de tocar convenciones del framework.
+- **Tailwind CSS v3.4** — fijado a v3 a propósito para replicar **exactamente** los tokens de la referencia (Next 16 trae Tailwind v4, que cambiaría el sistema de diseño).
+- **Supabase** — Auth, Postgres (con RLS), Realtime y Storage.
+- **Vercel** — hosting/deploy.
+- **Mapas**: **Leaflet + OpenStreetMap** (gratis, sin API key) + **Geolocation API** + **Supabase Realtime** para la posición del conductor en vivo. Se evitó Google Maps (de pago). Centro por defecto: Albacete (39.0, -1.86).
+- UI: **shadcn/ui** (Radix) + **framer-motion** + **lucide-react**. Datos: **@tanstack/react-query**. Pagos: **Stripe**.
+
+### Sistema de diseño (idéntico a la referencia)
+- Primario azul `hsl(217 91% 60%)`, radius `0.75rem`, tokens HSL en `src/app/globals.css`.
+- Fuentes: **Space Grotesk** (display/heading) e **Inter** (body).
+- Marca: Porte**Manía** (la segunda mitad en color primario).
+
+---
+
+## 4. Estructura del proyecto
+
+```
+pontemania/
+├─ base44/                    # 📁 REFERENCIA (export original de Base44 — no se despliega)
+├─ src/
+│  ├─ app/
+│  │  ├─ page.js              # Landing público
+│  │  ├─ layout.js            # Layout raíz + <Providers>
+│  │  ├─ globals.css          # Tokens de diseño (idénticos a la referencia)
+│  │  ├─ terminos|privacidad|cookies/   # Legales
+│  │  ├─ bienvenida|login|login-clientes|login-conductores/  # Auth
+│  │  ├─ register/            # Registro (page.jsx + RegisterContent.jsx por Suspense)
+│  │  ├─ forgot-password|reset-password/
+│  │  ├─ solicitar/           # Solicitud como INVITADO (GuestRequestContent.jsx)
+│  │  ├─ solicitud-enviada/
+│  │  └─ (app)/               # Grupo de rutas AUTENTICADAS
+│  │     ├─ layout.jsx        # Guard de sesión + AppLayout (sidebar por rol)
+│  │     ├─ dashboard | new-request | my-orders | order/[id] | payment/[id] | profile/   # Cliente
+│  │     ├─ driver | driver/requests | driver/job/[id] | driver/history | driver/earnings | driver/profile/
+│  │     └─ admin | admin/users | admin/drivers | admin/orders | admin/incidents | admin/settings | admin/workers/
+│  ├─ components/
+│  │  ├─ ui/                  # Primitivas shadcn (button, input, dialog, select, ...)
+│  │  ├─ common/              # Logo, VehicleCard, StatusBadge, Rating*, StatsCard, PhotoLightbox, DriverTrackingMap
+│  │  ├─ landing/             # LandingNavbar, HeroSection, HowItWorks, VehiclesSection, Footer
+│  │  ├─ layout/AppLayout.jsx # Shell con sidebar (cliente/conductor/admin)
+│  │  ├─ AuthLayout.jsx, GoogleIcon.jsx
+│  │  └─ Providers.jsx        # AuthProvider + QueryClient + Toasters
+│  ├─ lib/
+│  │  ├─ supabase/            # client.js, server.js, middleware.js, config.js
+│  │  ├─ entities.js          # Factory de entidades sobre Supabase (.list/.filter/.get/.create/.update/.delete/.subscribe)
+│  │  ├─ AuthContext.jsx      # Sesión Supabase + perfil/rol
+│  │  ├─ query-client.js
+│  │  └─ utils.js             # cn()
+│  ├─ api/base44Client.js     # 🔑 SHIM de compatibilidad Base44 → Supabase
+│  └─ proxy.js                # Refresco de sesión (Next 16: sustituye a middleware)
+├─ tailwind.config.js, postcss.config.mjs, next.config.mjs
+└─ .env.local                 # Variables (no versionado)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### La pieza clave: el shim `src/api/base44Client.js`
+Para portar las ~30 páginas **sin reescribir su lógica de datos**, se creó un objeto `base44` que **imita la API del SDK de Base44** pero funciona contra Supabase:
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+- `base44.entities.{TransportRequest, DriverProfile, ChatMessage, Incident, Worker, AppSettings, User}` → cada uno con `.list / .filter / .get / .create / .update / .delete / .subscribe` (Realtime).
+- `base44.integrations.Core.UploadFile` → sube a Supabase Storage y devuelve `{ file_url }`.
+- `base44.integrations.Core.SendEmail` → best-effort vía Edge Function (hoy no-op si no hay proveedor).
+- `base44.auth.{ me, logout, updateMe, loginViaEmailPassword, loginWithProvider, register, verifyOtp, resendOtp, resetPasswordRequest, resetPassword }`.
+- `base44.users.inviteUser(email, role)` → crea usuarios vía Edge Function con service role.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Así, las páginas portadas solo cambiaron: `react-router` → App Router de Next, y siguen usando `import { base44 } from "@/api/base44Client"`.
 
-## Learn More
+---
 
-To learn more about Next.js, take a look at the following resources:
+## 5. Base de datos (Supabase)
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Proyecto Supabase: **`pontemania`** (`onivkquggfshyjqfpuuw`, región eu-west-1).
+URL: `https://onivkquggfshyjqfpuuw.supabase.co`
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+**8 tablas** (todas con RLS activado):
 
-## Deploy on Vercel
+| Tabla | Descripción |
+|---|---|
+| `profiles` | Usuarios (1:1 con `auth.users`). Campos: role (`client`/`driver`/`admin`), full_name, phone, photo_url. |
+| `driver_profiles` | Datos del conductor: estado (verified…), vehículo, documentación, fotos, `current_lat/lng`, rating, viajes. |
+| `transport_requests` | Pedidos: ruta, coordenadas, carga+fotos, vehículo, precio, pago, estado, conductor, valoración, tiempos. |
+| `chat_messages` | Chat cliente↔conductor por pedido. |
+| `incidents` | Incidencias (tipo, prioridad, estado, resolución). |
+| `workers` | Trabajadores gestionados por admin. |
+| `app_settings` | Ajustes globales (key/value). |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+**Convenciones** (heredadas de Base44): cada fila tiene `id`, `created_date`, `updated_date`, `created_by`, `created_by_id`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+**Automatismos (triggers/functions):**
+- `handle_new_user` → crea el `profiles` automáticamente al registrarse (lee `role` de metadata).
+- `set_created_by` → rellena `created_by_id = auth.uid()` en cada insert (clave para que la RLS deje ver "lo mío").
+- `set_updated_date` → mantiene `updated_date`.
+- `is_admin()` → usada por las políticas RLS (rol admin o email maestro `renato.0550.calero@gmail.com`).
+
+**Realtime** activado en: `transport_requests`, `chat_messages`, `driver_profiles` (seguimiento en vivo + chat).
+
+**Storage** (buckets públicos): `cargo-photos`, `avatars`, `driver-docs`.
+
+**Edge Function** `invite-user`: crea usuarios (conductor/trabajador) con service role; incluye bootstrap para el admin maestro.
+
+> El detalle de las migraciones está en el historial de migraciones de Supabase (`init_portemania_schema`, `realtime_and_storage`, `auto_set_created_by`, `security_hardening`).
+
+---
+
+## 6. Puesta en marcha (local)
+
+```bash
+npm install
+npm run dev       # http://localhost:3000
+npm run build     # build de producción (32 rutas)
+```
+
+### Variables de entorno (`.env.local`)
+```
+NEXT_PUBLIC_SUPABASE_URL=https://onivkquggfshyjqfpuuw.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_dt7MUErNUBelCvijuPK9Dw_fu-nzoTi
+# Opcional para pago real:
+# NEXT_PUBLIC_STRIPE_PUBLIC_KEY=pk_...
+```
+> Nota: hay un **fallback embebido** de estas claves *publishable* (públicas por diseño; los datos están protegidos por RLS) en `src/lib/supabase/config.js`, para que el build funcione aunque falten las env vars. Los datos sensibles nunca están en el cliente.
+
+---
+
+## 7. Despliegue (Vercel)
+
+Desplegado en la cuenta **rodriguezmartinezlw** (team `luis-projects`). El CLI ya está autenticado en esta máquina.
+
+```bash
+npx vercel deploy --prod --yes
+```
+Producción: **https://pontemania.vercel.app**
+
+---
+
+## 8. Credenciales de prueba
+
+| Rol | Email | Contraseña |
+|---|---|---|
+| Admin | `renato.0550.calero@gmail.com` | `PorteMania2026!` |
+| Conductor | `conductor.test@portemania.es` | `Conductor2026!` |
+| Cliente | `cliente.test@portemania.es` | `Cliente2026!` |
+
+Flujo probado end-to-end (respetando RLS): cliente crea pedido → ve el suyo → conductor ve pendientes → acepta → chat → admin gestiona.
+
+---
+
+## 9. Pendiente de configurar (no bloquea el núcleo)
+
+Ajustes de dashboard/entorno para activar funciones secundarias:
+
+1. **Google OAuth** — activar el provider Google en Supabase Auth para los botones "Continuar con Google".
+2. **Registro por email** — o configurar la plantilla de "Confirm signup" con `{{ .Token }}` (para el OTP de 6 dígitos), o desactivar "Confirm email" para registro instantáneo.
+3. **Reset password** — añadir el dominio de producción a los *Redirect URLs* de Supabase Auth.
+4. **Stripe** — definir `NEXT_PUBLIC_STRIPE_PUBLIC_KEY` para pago real con tarjeta (sin ella, `/payment` funciona en modo prueba).
+5. **Emails a conductores** — `SendEmail` es hoy no-op; enchufar un proveedor (p. ej. Resend) en una Edge Function `send-email`.
+
+---
+
+## 10. Próximos pasos / ampliación
+
+- Geocoding y rutas reales (empezar gratis con **Nominatim + OSRM**; migrar a servicio de pago solo si el volumen lo exige).
+- Reemplazar la distancia simulada por cálculo real origen→destino.
+- Emails transaccionales (proveedor real).
+- Endurecer el flujo de pagos (webhook de Stripe, confirmación server-side).
+- Tests automatizados (unit/e2e).
