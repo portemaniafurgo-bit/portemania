@@ -103,16 +103,7 @@ export default function DriversMapSectionInner() {
   };
 
   return (
-    <section className="w-full">
-      <div className="max-w-5xl mx-auto px-6 pt-4 pb-6 text-center">
-        <h2 className="text-2xl sm:text-3xl font-display font-bold text-foreground">
-          Conductores en tu zona
-        </h2>
-        <p className="text-muted-foreground mt-2">
-          Furgonetas disponibles ahora mismo en Albacete capital. Toca un conductor para solicitar tu transporte.
-        </p>
-      </div>
-
+    <div className="w-full">
       <div className="relative w-full">
         <div className="absolute top-3 left-3 z-[1000] bg-white/90 backdrop-blur-sm rounded-xl px-3 py-1.5 text-xs font-medium text-foreground shadow flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -152,6 +143,6 @@ export default function DriversMapSectionInner() {
       </div>
 
       <AccessModal open={showModal} onClose={() => setShowModal(false)} />
-    </section>
+    </div>
   );
 }
