@@ -11,9 +11,10 @@ import { Search } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function AdminOrders() {
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
 
@@ -68,7 +69,7 @@ export default function AdminOrders() {
           </TableHeader>
           <TableBody>
             {filtered.map(order => (
-              <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => window.location.assign(`/admin/orders/${order.id}`)}>
+              <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/admin/orders/${order.id}`)}>
                 <TableCell className="font-medium">
                   <span className="mr-1">{vehicleData[order.vehicle_type]?.icon}</span>
                   {order.client_name || "—"}

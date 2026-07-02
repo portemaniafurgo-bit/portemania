@@ -41,9 +41,10 @@ export default function AdminOrderDetail() {
   const [showReassign, setShowReassign] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
-  const { data: order, isLoading } = useQuery({
+  const { data: order, isLoading, isError } = useQuery({
     queryKey: ["admin-order", id],
     queryFn: () => base44.entities.TransportRequest.get(id),
+    retry: 2,
   });
 
   const { data: messages = [] } = useQuery({
@@ -65,10 +66,21 @@ export default function AdminOrderDetail() {
     },
   });
 
-  if (isLoading || !order) {
+  if (isLoading) {
     return (
       <div className="flex justify-center py-16">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (isError || !order) {
+    return (
+      <div className="text-center py-16 space-y-3">
+        <p className="text-muted-foreground">No se pudo cargar el pedido.</p>
+        <Button variant="outline" className="rounded-xl" onClick={() => router.push("/admin/orders")}>
+          Volver a pedidos
+        </Button>
       </div>
     );
   }
