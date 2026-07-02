@@ -40,7 +40,7 @@ export default function ForgotPassword() {
     >
       {sent ? (
         <p className="text-sm text-foreground text-center">
-          If an account exists with that email, you'll receive a password reset link shortly.
+          Si existe una cuenta con ese email, recibirás en breve un enlace para restablecer la contraseña.
         </p>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">

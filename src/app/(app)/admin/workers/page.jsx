@@ -22,6 +22,11 @@ export default function AdminWorkers() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const loadWorkers = async () => {
+    const profiles = await base44.entities.DriverProfile.list();
+    setWorkers(profiles);
+  };
+
   useEffect(() => {
     if (user?.role !== "admin") {
       router.push("/dashboard");
@@ -29,11 +34,6 @@ export default function AdminWorkers() {
     }
     loadWorkers();
   }, [user]);
-
-  const loadWorkers = async () => {
-    const profiles = await base44.entities.DriverProfile.list();
-    setWorkers(profiles);
-  };
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
 

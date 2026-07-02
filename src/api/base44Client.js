@@ -15,12 +15,28 @@
 import { supabase, createEntity } from "@/lib/entities";
 
 // --- Entidades (nombre Base44 -> tabla Supabase) ---
-const TransportRequest = createEntity("transport_requests");
+const transportRequestsBase = createEntity("transport_requests");
+const TransportRequest = {
+  ...transportRequestsBase,
+  // Sin sesión (solicitud como invitado) el insert+returning choca con la RLS;
+  // se pasa por la RPC create_guest_request (security definer, solo campos del formulario).
+  async create(values) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session) return transportRequestsBase.create(values);
+    const { data, error } = await supabase.rpc("create_guest_request", {
+      payload: values,
+    });
+    if (error) throw error;
+    return data;
+  },
+};
 const DriverProfile = createEntity("driver_profiles");
 const ChatMessage = createEntity("chat_messages");
 const Incident = createEntity("incidents");
-const Worker = createEntity("workers");
-const AppSettings = createEntity("app_settings");
+// Candidaturas del formulario público "Quiero ser conductor" (solo las ve el admin).
+const DriverApplication = createEntity("driver_applications");
 
 // Entidad User -> tabla profiles, con helpers de Base44 (me / updateMyUserData)
 const User = {
@@ -214,8 +230,7 @@ export const base44 = {
     DriverProfile,
     ChatMessage,
     Incident,
-    Worker,
-    AppSettings,
+    DriverApplication,
     User,
   },
   integrations: {

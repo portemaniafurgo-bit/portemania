@@ -44,11 +44,11 @@ export default function HeroSection() {
           Solicitar transporte
           <ArrowRight className="w-4 h-4" />
         </Button>
-        <a href="mailto:Renato.0550.calero@gmail.com">
+        <Link href="/ser-conductor">
           <Button size="lg" variant="outline" className="rounded-full px-8 text-base font-semibold h-12 w-full sm:w-auto">
             Quiero ser conductor
           </Button>
-        </a>
+        </Link>
       </motion.div>
 
       {/* Modal de acceso */}

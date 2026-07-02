@@ -3,7 +3,8 @@
 Plataforma web **responsive** de transporte y portes **on-demand** ("un Uber de furgonetas") para **Albacete capital**. Conecta a clientes que necesitan mover mercancía con conductores autónomos verificados.
 
 - **Producción:** https://pontemania.vercel.app
-- **Estado:** portado, funcional y desplegado (2026-07-01). Preparado para ampliación.
+- **Repositorio:** https://github.com/portemaniafurgo-bit/portemania
+- **Estado:** portado, funcional y desplegado (2026-07-01); migrado a infraestructura propia (Supabase `dnehzwrqphqpkcdjwqfi` + repo oficial) el 2026-07-02. Preparado para ampliación.
 
 ---
 
@@ -19,7 +20,7 @@ Criterios de éxito que guiaron el trabajo:
 3. **Código organizado**.
 4. **Probado**.
 
-> La carpeta `base44/` es SOLO referencia (diseño y comportamiento). No forma parte del build (está en `.vercelignore`). No se usa Base44 en tiempo de ejecución.
+> La carpeta `base44/` es SOLO referencia local (diseño y comportamiento): no está en el repo (`.gitignore`) ni en el build (`.vercelignore`). No se usa Base44 en tiempo de ejecución.
 
 ---
 
@@ -36,7 +37,7 @@ Servicio de portes **a pie de calle** dentro de Albacete capital (CP 02001–020
 Hora extra: **15 €/h**. Seguro de mercancía: **12 €**. Pago con **tarjeta** (Stripe) o **efectivo** al conductor.
 
 ### Roles y áreas
-- **Público**: landing, solicitud como invitado (sin cuenta), páginas legales.
+- **Público**: landing, solicitud como invitado (sin cuenta), candidatura de conductor (`/ser-conductor`), páginas legales.
 - **Cliente**: panel, nueva solicitud (asistente de 4 pasos con fotos), mis pedidos, detalle con **seguimiento en tiempo real + chat + mapa**, pago, perfil.
 - **Conductor**: panel, solicitudes disponibles, trabajo activo, historial, ganancias, perfil (documentación + fotos del vehículo).
 - **Admin**: dashboard, usuarios, conductores, pedidos, incidencias, ajustes, alta de trabajadores/conductores.
@@ -66,7 +67,10 @@ Hora extra: **15 €/h**. Seguro de mercancía: **12 €**. Pago con **tarjeta**
 
 ```
 pontemania/
-├─ base44/                    # 📁 REFERENCIA (export original de Base44 — no se despliega)
+├─ base44/                    # 📁 REFERENCIA local (export original de Base44 — no está en el repo)
+├─ supabase/
+│  ├─ migrations/             # Esquema completo versionado (tablas, RLS, triggers, buckets)
+│  └─ functions/invite-user/  # Edge Function: alta de usuarios por el admin
 ├─ src/
 │  ├─ app/
 │  │  ├─ page.js              # Landing público
@@ -77,6 +81,7 @@ pontemania/
 │  │  ├─ register/            # Registro (page.jsx + RegisterContent.jsx por Suspense)
 │  │  ├─ forgot-password|reset-password/
 │  │  ├─ solicitar/           # Solicitud como INVITADO (GuestRequestContent.jsx)
+│  │  ├─ ser-conductor/       # Candidatura pública de conductor (furgoneta, autónomo, disponibilidad)
 │  │  ├─ solicitud-enviada/
 │  │  └─ (app)/               # Grupo de rutas AUTENTICADAS
 │  │     ├─ layout.jsx        # Guard de sesión + AppLayout (sidebar por rol)
@@ -105,7 +110,7 @@ pontemania/
 ### La pieza clave: el shim `src/api/base44Client.js`
 Para portar las ~30 páginas **sin reescribir su lógica de datos**, se creó un objeto `base44` que **imita la API del SDK de Base44** pero funciona contra Supabase:
 
-- `base44.entities.{TransportRequest, DriverProfile, ChatMessage, Incident, Worker, AppSettings, User}` → cada uno con `.list / .filter / .get / .create / .update / .delete / .subscribe` (Realtime).
+- `base44.entities.{TransportRequest, DriverProfile, ChatMessage, Incident, User}` → cada uno con `.list / .filter / .get / .create / .update / .delete / .subscribe` (Realtime).
 - `base44.integrations.Core.UploadFile` → sube a Supabase Storage y devuelve `{ file_url }`.
 - `base44.integrations.Core.SendEmail` → best-effort vía Edge Function (hoy no-op si no hay proveedor).
 - `base44.auth.{ me, logout, updateMe, loginViaEmailPassword, loginWithProvider, register, verifyOtp, resendOtp, resetPasswordRequest, resetPassword }`.
@@ -117,10 +122,12 @@ Así, las páginas portadas solo cambiaron: `react-router` → App Router de Nex
 
 ## 5. Base de datos (Supabase)
 
-Proyecto Supabase: **`pontemania`** (`onivkquggfshyjqfpuuw`, región eu-west-1).
-URL: `https://onivkquggfshyjqfpuuw.supabase.co`
+Proyecto Supabase: (`dnehzwrqphqpkcdjwqfi`, región eu-west-2, cuenta portemaniafurgo-bit).
+URL: `https://dnehzwrqphqpkcdjwqfi.supabase.co`
 
-**8 tablas** (todas con RLS activado):
+> El esquema completo está **versionado** en [`supabase/migrations/`](./supabase/migrations) y la Edge Function en [`supabase/functions/`](./supabase/functions) — la BD se puede recrear desde cero con ese SQL (Management API o SQL Editor). El proyecto original del port (`onivkquggfshyjqfpuuw`, eu-west-1) queda como copia histórica.
+
+**6 tablas** (todas con RLS activado):
 
 | Tabla | Descripción |
 |---|---|
@@ -129,8 +136,9 @@ URL: `https://onivkquggfshyjqfpuuw.supabase.co`
 | `transport_requests` | Pedidos: ruta, coordenadas, carga+fotos, vehículo, precio, pago, estado, conductor, valoración, tiempos. |
 | `chat_messages` | Chat cliente↔conductor por pedido. |
 | `incidents` | Incidencias (tipo, prioridad, estado, resolución). |
-| `workers` | Trabajadores gestionados por admin. |
-| `app_settings` | Ajustes globales (key/value). |
+| `driver_applications` | Candidaturas de `/ser-conductor` (alta vía RPC anónima; las gestiona el admin en Conductores). |
+
+> Las entidades `Worker` y `AppSettings` del original de Base44 no se usaban en ninguna página, así que se eliminaron del shim y del esquema (limpieza 2026-07-02).
 
 **Convenciones** (heredadas de Base44): cada fila tiene `id`, `created_date`, `updated_date`, `created_by`, `created_by_id`.
 
@@ -146,7 +154,7 @@ URL: `https://onivkquggfshyjqfpuuw.supabase.co`
 
 **Edge Function** `invite-user`: crea usuarios (conductor/trabajador) con service role; incluye bootstrap para el admin maestro.
 
-> El detalle de las migraciones está en el historial de migraciones de Supabase (`init_portemania_schema`, `realtime_and_storage`, `auto_set_created_by`, `security_hardening`).
+> Todo lo anterior (tablas, triggers, funciones, RLS, realtime y buckets) se crea con [`supabase/migrations/0001_init_portemania_schema.sql`](./supabase/migrations/0001_init_portemania_schema.sql).
 
 ---
 
@@ -160,8 +168,8 @@ npm run build     # build de producción (32 rutas)
 
 ### Variables de entorno (`.env.local`)
 ```
-NEXT_PUBLIC_SUPABASE_URL=https://onivkquggfshyjqfpuuw.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_dt7MUErNUBelCvijuPK9Dw_fu-nzoTi
+NEXT_PUBLIC_SUPABASE_URL=https://dnehzwrqphqpkcdjwqfi.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<clave publishable del dashboard>
 # Opcional para pago real:
 # NEXT_PUBLIC_STRIPE_PUBLIC_KEY=pk_...
 ```
@@ -198,9 +206,10 @@ Ajustes de dashboard/entorno para activar funciones secundarias:
 
 1. **Google OAuth** — activar el provider Google en Supabase Auth para los botones "Continuar con Google".
 2. **Registro por email** — o configurar la plantilla de "Confirm signup" con `{{ .Token }}` (para el OTP de 6 dígitos), o desactivar "Confirm email" para registro instantáneo.
-3. **Reset password** — añadir el dominio de producción a los *Redirect URLs* de Supabase Auth.
-4. **Stripe** — definir `NEXT_PUBLIC_STRIPE_PUBLIC_KEY` para pago real con tarjeta (sin ella, `/payment` funciona en modo prueba).
-5. **Emails a conductores** — `SendEmail` es hoy no-op; enchufar un proveedor (p. ej. Resend) en una Edge Function `send-email`.
+3. ~~**Reset password** — Redirect URLs~~ ✅ configurado (site URL + allowlist con prod y localhost, 2026-07-02).
+4. ~~**Edge Function `invite-user`**~~ ✅ desplegada (con `verify_jwt` activado; autoriza solo admins). Código versionado en `supabase/functions/invite-user/`.
+5. **Stripe** — definir `NEXT_PUBLIC_STRIPE_PUBLIC_KEY` para pago real con tarjeta (sin ella, `/payment` funciona en modo prueba).
+6. **Emails a conductores** — `SendEmail` es hoy no-op; enchufar un proveedor (p. ej. Resend) en una Edge Function `send-email`.
 
 ---
 

@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 .vercel
+
+# Export original de Base44 — solo referencia local, no forma parte del repo
+/base44/

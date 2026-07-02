@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import StatusBadge from "@/components/common/StatusBadge";
 import RatingStars from "@/components/common/RatingStars";
 import { vehicleData } from "@/components/common/VehicleCard";
-import { Search, Check, X, Shield } from "lucide-react";
+import { Search, Check, X, Shield, UserPlus, Phone, Mail } from "lucide-react";
 import { useState } from "react";
 
 export default function AdminDrivers() {
@@ -19,9 +19,19 @@ export default function AdminDrivers() {
     queryFn: () => base44.entities.DriverProfile.list("-created_date", 200),
   });
 
+  const { data: applications = [] } = useQuery({
+    queryKey: ["admin-driver-applications"],
+    queryFn: () => base44.entities.DriverApplication.filter({ status: "new" }, "-created_date", 100),
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => base44.entities.DriverProfile.update(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-drivers"] }),
+  });
+
+  const applicationMutation = useMutation({
+    mutationFn: ({ id, data }) => base44.entities.DriverApplication.update(id, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin-driver-applications"] }),
   });
 
   const filtered = drivers.filter(d =>
@@ -35,6 +45,69 @@ export default function AdminDrivers() {
         <h1 className="text-2xl font-display font-bold text-foreground">Conductores</h1>
         <span className="text-sm text-muted-foreground">{drivers.length} registrados</span>
       </div>
+
+      {/* Candidaturas del formulario público "Quiero ser conductor" */}
+      {applications.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <UserPlus className="w-4 h-4 text-primary" />
+            <h2 className="font-display font-semibold text-foreground">Candidaturas nuevas</h2>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary font-medium">{applications.length}</span>
+          </div>
+          {applications.map(app => (
+            <div key={app.id} className="bg-card rounded-2xl border border-primary/20 p-5">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-foreground">{app.full_name}</p>
+                  <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                    <span className="flex items-center gap-1"><Phone className="w-3 h-3" /> {app.phone}</span>
+                    {app.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3" /> {app.email}</span>}
+                  </div>
+                </div>
+                <span className="text-xs text-muted-foreground whitespace-nowrap">
+                  {app.created_date ? new Date(app.created_date).toLocaleDateString("es-ES") : ""}
+                </span>
+              </div>
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Furgoneta</p>
+                  <p className="font-medium text-foreground">{vehicleData[app.vehicle_type]?.name || app.vehicle_type || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Autónomo</p>
+                  <p className="font-medium text-foreground">{app.is_autonomo === true ? "Sí" : app.is_autonomo === false ? "No" : "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Disponibilidad</p>
+                  <p className="font-medium text-foreground">{app.availability || "—"}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Dirección</p>
+                  <p className="font-medium text-foreground">{app.address || "—"}</p>
+                </div>
+              </div>
+              {app.notes && <p className="mt-2 text-sm text-muted-foreground italic">“{app.notes}”</p>}
+              <div className="mt-4 flex gap-2">
+                <Button
+                  size="sm"
+                  className="rounded-xl gap-1"
+                  onClick={() => applicationMutation.mutate({ id: app.id, data: { status: "contacted" } })}
+                >
+                  <Check className="w-3 h-3" /> Marcar contactado
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="rounded-xl gap-1 border-destructive/30 text-destructive"
+                  onClick={() => applicationMutation.mutate({ id: app.id, data: { status: "discarded" } })}
+                >
+                  <X className="w-3 h-3" /> Descartar
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />

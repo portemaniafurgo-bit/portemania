@@ -61,6 +61,9 @@ export function AuthProvider({ children }) {
     setIsLoadingAuth(false);
   }, [supabase]);
 
+  // Carga inicial de sesión + re-carga en cada cambio de auth: patrón intencionado
+  // (loadUser es async; los setState ocurren tras resolver la sesión, no en cascada).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     loadUser();
 

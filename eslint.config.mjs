@@ -10,6 +10,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Export original de Base44: solo referencia local, no se lintéa
+    "base44/**",
+    // Edge Functions (Deno, no Node)
+    "supabase/functions/**",
   ]),
 ]);
 

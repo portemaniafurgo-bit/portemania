@@ -59,6 +59,9 @@ export default function DriverProfilePage() {
   const [uploading, setUploading] = useState({});
   const [saveSuccess, setSaveSuccess] = useState(false);
 
+  // Rellenar el formulario al cargar el perfil existente: patrón intencionado
+  // (sincronizar datos del servidor -> estado del form una sola vez por cambio).
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (existingProfile) {
       setForm({

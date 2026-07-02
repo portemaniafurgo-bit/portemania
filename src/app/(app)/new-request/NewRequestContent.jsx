@@ -59,12 +59,24 @@ export default function NewRequestContent() {
   };
 
   const validateCP = (field, value) => {
+    if (!value.trim()) {
+      setCpError(prev => ({ ...prev, [field]: "" }));
+      return;
+    }
     const cp = extractCP(value);
-    if (cp && !ALBACETE_CP.includes(cp)) {
+    if (!cp) {
+      setCpError(prev => ({ ...prev, [field]: "El código postal es obligatorio (02001–02008)." }));
+    } else if (!ALBACETE_CP.includes(cp)) {
       setCpError(prev => ({ ...prev, [field]: `El código postal ${cp} no pertenece a Albacete capital (02001–02008).` }));
     } else {
       setCpError(prev => ({ ...prev, [field]: "" }));
     }
+  };
+
+  // CP presente y dentro de Albacete capital: requisito para continuar.
+  const hasValidCP = (address) => {
+    const cp = extractCP(address);
+    return !!cp && ALBACETE_CP.includes(cp);
   };
 
   const update = (field, value) => {
@@ -145,7 +157,7 @@ export default function NewRequestContent() {
   };
 
   const canNext = () => {
-    if (step === 1) return form.origin_address && form.destination_address && form.client_phone && !cpError.origin && !cpError.destination;
+    if (step === 1) return form.client_phone && hasValidCP(form.origin_address) && hasValidCP(form.destination_address);
     if (step === 2) return form.cargo_description && form.cargo_description.length >= 10 && photos.length >= 1 && acceptPortal && acceptTerms;
     if (step === 3) return form.vehicle_type;
     return true;
@@ -317,7 +329,11 @@ export default function NewRequestContent() {
                   <a href="/terminos" className="text-primary underline hover:no-underline" onClick={e => e.stopPropagation()}>
                     términos y condiciones
                   </a>{" "}
-                  de la página <span className="text-destructive">*</span>
+                  y la{" "}
+                  <a href="/privacidad" className="text-primary underline hover:no-underline" onClick={e => e.stopPropagation()}>
+                    política de privacidad
+                  </a>{" "}
+                  <span className="text-destructive">*</span>
                 </span>
               </button>
             </div>
