@@ -232,11 +232,13 @@ export default function OrderDetail() {
       </div>
 
       {/* Chat — arriba del todo cuando hay conductor activo */}
-      {isActive && order.driver_id && order.status !== "pending" && (
+      {/* Chat: activo durante el servicio; tras la entrega queda el historial en solo-lectura */}
+      {order.driver_id && !["pending", "cancelled"].includes(order.status) && (isActive || messages.length > 0) && (
         <div className="bg-card rounded-2xl border border-border overflow-hidden">
           <div className="p-4 border-b border-border flex items-center gap-2">
             <MessageCircle className="w-4 h-4 text-primary" />
             <span className="font-semibold text-sm text-foreground">Chat con el conductor</span>
+            {!isActive && <span className="text-xs text-muted-foreground ml-auto">Historial</span>}
           </div>
           <div className="h-48 overflow-y-auto p-4 space-y-3">
             {messages.map(msg => (
@@ -252,23 +254,25 @@ export default function OrderDetail() {
             ))}
             <div ref={chatEndRef} />
           </div>
-          <div className="p-3 border-t border-border flex gap-2">
-            <Input
-              placeholder="Escribe un mensaje..."
-              value={message}
-              onChange={e => setMessage(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && message.trim() && sendMutation.mutate(message)}
-              className="rounded-xl"
-            />
-            <Button
-              size="icon"
-              className="rounded-xl flex-shrink-0"
-              disabled={!message.trim()}
-              onClick={() => sendMutation.mutate(message)}
-            >
-              <Send className="w-4 h-4" />
-            </Button>
-          </div>
+          {isActive && (
+            <div className="p-3 border-t border-border flex gap-2">
+              <Input
+                placeholder="Escribe un mensaje..."
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && message.trim() && sendMutation.mutate(message)}
+                className="rounded-xl"
+              />
+              <Button
+                size="icon"
+                className="rounded-xl flex-shrink-0"
+                disabled={!message.trim()}
+                onClick={() => sendMutation.mutate(message)}
+              >
+                <Send className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
         </div>
       )}
 
@@ -392,7 +396,7 @@ export default function OrderDetail() {
               </div>
             )}
             <div>
-              <p className="font-semibold text-foreground">{order.driver_name.split(" ")[0]}</p>
+              <p className="font-semibold text-foreground">{order.driver_name}</p>
               {driverProfile?.phone && (
                 <a href={`tel:${driverProfile.phone}`} className="text-sm text-primary font-medium flex items-center gap-1">
                   📞 {driverProfile.phone}
