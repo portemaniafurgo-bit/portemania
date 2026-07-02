@@ -7,8 +7,8 @@ import Logo from "@/components/common/Logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  Home, Package, Clock, User, Settings,
-  Truck, BarChart3, AlertTriangle, Menu, X, LogOut, ChevronRight,
+  Home, Package, Clock, User, Settings, Users,
+  Truck, BarChart3, AlertTriangle, Menu, X, LogOut, ChevronRight, LayoutDashboard,
 } from "lucide-react";
 import { useState } from "react";
 
@@ -30,9 +30,12 @@ const driverNav = [
 ];
 
 const adminNav = [
-  { label: "Conductores", icon: Truck, path: "/admin" },
+  { label: "Operación", icon: LayoutDashboard, path: "/admin" },
   { label: "Pedidos", icon: Package, path: "/admin/orders" },
+  { label: "Conductores", icon: Truck, path: "/admin/drivers" },
+  { label: "Usuarios", icon: Users, path: "/admin/users" },
   { label: "Incidencias", icon: AlertTriangle, path: "/admin/incidents" },
+  { label: "Ajustes", icon: Settings, path: "/admin/settings" },
   { label: "Página principal", icon: ChevronRight, path: "/" },
 ];
 

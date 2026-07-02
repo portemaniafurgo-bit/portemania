@@ -39,6 +39,7 @@ export default function AdminOrderDetail() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [showReassign, setShowReassign] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
 
   const { data: order, isLoading } = useQuery({
     queryKey: ["admin-order", id],
@@ -246,17 +247,24 @@ export default function AdminOrderDetail() {
         </div>
       )}
 
-      {/* Acciones */}
+      {/* Acciones. Confirmación en dos clics (el confirm() nativo congela el navegador) */}
       {!isFinished && (
         <Button
           variant="outline"
-          className="w-full rounded-xl border-destructive/30 text-destructive"
+          className={`w-full rounded-xl ${confirmCancel ? "border-destructive bg-destructive/10 text-destructive font-semibold" : "border-destructive/30 text-destructive"}`}
           onClick={() => {
-            if (confirm("¿Cancelar este pedido?")) updateMutation.mutate({ status: "cancelled" });
+            if (!confirmCancel) {
+              setConfirmCancel(true);
+              setTimeout(() => setConfirmCancel(false), 4000);
+            } else {
+              updateMutation.mutate({ status: "cancelled" });
+              setConfirmCancel(false);
+            }
           }}
           disabled={updateMutation.isPending}
         >
-          <XCircle className="w-4 h-4 mr-1" /> Cancelar pedido
+          <XCircle className="w-4 h-4 mr-1" />
+          {confirmCancel ? "¿Seguro? Pulsa otra vez para cancelar" : "Cancelar pedido"}
         </Button>
       )}
     </div>

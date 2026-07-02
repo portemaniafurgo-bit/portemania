@@ -33,6 +33,7 @@ export default function AdminDrivers() {
   const [formSuccess, setFormSuccess] = useState("");
   const [creating, setCreating] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null);
 
   const { data: drivers = [], isLoading } = useQuery({
     queryKey: ["admin-drivers"],
@@ -433,10 +434,20 @@ export default function AdminDrivers() {
                   <Button
                     size="sm"
                     variant="outline"
-                    className="rounded-xl gap-1 border-destructive/30 text-destructive ml-auto"
-                    onClick={() => { if (confirm("¿Eliminar este conductor?")) deleteMutation.mutate(driver.id); }}
+                    className={`rounded-xl gap-1 ml-auto ${confirmDeleteId === driver.id ? "border-destructive bg-destructive/10 text-destructive font-semibold" : "border-destructive/30 text-destructive"}`}
+                    onClick={() => {
+                      // Confirmación en dos clics (el confirm() nativo congela el navegador)
+                      if (confirmDeleteId !== driver.id) {
+                        setConfirmDeleteId(driver.id);
+                        setTimeout(() => setConfirmDeleteId(null), 4000);
+                      } else {
+                        deleteMutation.mutate(driver.id);
+                        setConfirmDeleteId(null);
+                      }
+                    }}
                   >
-                    <Trash2 className="w-3 h-3" /> Eliminar
+                    <Trash2 className="w-3 h-3" />
+                    {confirmDeleteId === driver.id ? "¿Seguro? Pulsa otra vez" : "Eliminar"}
                   </Button>
                 </div>
                 </div>
