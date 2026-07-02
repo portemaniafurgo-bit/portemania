@@ -78,6 +78,12 @@ npx vercel deploy --prod --yes   # deploy a producción
 - **Edge Functions**: código en `supabase/functions/`; se despliegan por la Management API (`/functions/deploy`).
 - **Tarifas**: se cambian desde la app, Admin → Ajustes (no requiere deploy).
 
+### 2026-07-03 — Verificación E2E completa (bucle probar→corregir)
+- Dos rondas con Claude Chrome (flujos de usuario 21/23; panel admin 22/22) y después **suites Playwright propias en el repo** ([`e2e/`](../e2e)): `flows.js` (invitado+conductor+cliente, 18 checks) y `admin.js` (panel completo, 26 checks). **Resultado final: 44/44 en producción.**
+- Corregido a raíz de las pruebas: chat visible en solo-lectura tras la entrega; nombre completo del conductor; menú del admin completo (faltaban Operación/Usuarios/Ajustes); confirmaciones en dos clics en lugar de `confirm()` nativo (congelaba el navegador); detalle de pedido con `router.push` y estado de error visible; `send-email` responde `sent:false` en fallos de entrega (consola limpia).
+- Verificado que NO eran bugs: el "pago pendiente" del informe (el conductor aceptó el pedido duplicado sin pagar; Stripe marcó `paid` correctamente) y el "fallo" del clic de fila (artefacto del test: `isVisible()` de Playwright no espera).
+- Datos de prueba de todas las rondas borrados; BD limpia (0 pedidos, 0 candidaturas, conductor de prueba a 5.0/0 viajes).
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

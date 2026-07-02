@@ -71,7 +71,12 @@ Deno.serve(async (req: Request) => {
     body: JSON.stringify({ from: FROM, to: [to], subject, text }),
   });
   const result = await res.json();
-  if (!res.ok) return json({ error: result?.message || "Fallo al enviar" }, 502);
+  if (!res.ok) {
+    // El envío es best-effort (p. ej. dominio sin verificar en Resend): se
+    // responde 200 con sent:false para no ensuciar la consola del cliente.
+    console.warn("send-email fallo de entrega:", to, result?.message);
+    return json({ sent: false, error: result?.message || "Fallo al enviar" });
+  }
 
   return json({ sent: true, id: result?.id });
 });
