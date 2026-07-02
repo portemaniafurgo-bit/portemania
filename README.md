@@ -204,12 +204,12 @@ Flujo probado end-to-end (respetando RLS): cliente crea pedido → ve el suyo �
 
 Ajustes de dashboard/entorno para activar funciones secundarias:
 
-1. **Google OAuth** — activar el provider Google en Supabase Auth para los botones "Continuar con Google".
-2. **Registro por email** — o configurar la plantilla de "Confirm signup" con `{{ .Token }}` (para el OTP de 6 dígitos), o desactivar "Confirm email" para registro instantáneo.
+1. ~~**Google OAuth**~~ ✅ provider activo (proyecto Google "portemania", cuenta portemaniafurgo@gmail.com). ⚠️ La pantalla de consentimiento está en modo *Testing*: solo los test users añadidos en Google Cloud pueden usar "Continuar con Google" hasta publicarla.
+2. ~~**Registro por email**~~ ✅ registro instantáneo (Confirm email desactivado).
 3. ~~**Reset password** — Redirect URLs~~ ✅ configurado (site URL + allowlist con prod y localhost, 2026-07-02).
 4. ~~**Edge Function `invite-user`**~~ ✅ desplegada (con `verify_jwt` activado; autoriza solo admins). Código versionado en `supabase/functions/invite-user/`.
-5. **Stripe** — definir `NEXT_PUBLIC_STRIPE_PUBLIC_KEY` para pago real con tarjeta (sin ella, `/payment` funciona en modo prueba).
-6. **Emails a conductores** — `SendEmail` es hoy no-op; enchufar un proveedor (p. ej. Resend) en una Edge Function `send-email`.
+5. ~~**Stripe**~~ ✅ `NEXT_PUBLIC_STRIPE_PUBLIC_KEY` configurada (clave **de test** `pk_test_`; cambiar a `pk_live_` al ir a producción real).
+6. ~~**Emails a conductores**~~ ✅ Edge Function `send-email` con **Resend** (allowlist de destinatarios: admins + conductores verificados). ⚠️ Sin dominio verificado en Resend se envía desde `onboarding@resend.dev` y solo entrega al email del negocio; verificar dominio para entregar a conductores.
 
 ---
 
