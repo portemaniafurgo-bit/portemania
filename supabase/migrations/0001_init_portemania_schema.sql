@@ -415,6 +415,38 @@ $$;
 revoke all on function public.create_guest_request(jsonb) from public;
 grant execute on function public.create_guest_request(jsonb) to anon, authenticated;
 
+-- Mapa público de la landing: conductores verificados y disponibles, SIEMPRE
+-- dentro de la zona de Albacete capital (CP 02001–02008). Por privacidad no se
+-- expone la posición exacta: si el GPS real está dentro de la zona se redondea
+-- (~100 m); si está fuera o vacío, se asigna una posición estable derivada del
+-- id dentro de la zona. Solo devuelve nombre de pila y tipo de furgoneta.
+create or replace function public.get_public_drivers()
+returns table (id uuid, name text, vehicle_type text, lat double precision, lng double precision)
+language sql stable security definer
+set search_path = public
+as $$
+  select
+    dp.id,
+    split_part(coalesce(nullif(trim(dp.full_name), ''), 'Conductor'), ' ', 1) as name,
+    dp.vehicle_type,
+    case
+      when dp.current_lat between 38.955 and 39.020 and dp.current_lng between -1.895 and -1.820
+        then round(dp.current_lat::numeric, 3)::double precision
+      else 38.975 + ((('x' || substr(md5(dp.id::text), 1, 8))::bit(32)::bigint & 2147483647) % 40)::double precision / 1000.0
+    end as lat,
+    case
+      when dp.current_lat between 38.955 and 39.020 and dp.current_lng between -1.895 and -1.820
+        then round(dp.current_lng::numeric, 3)::double precision
+      else -1.882 + ((('x' || substr(md5(dp.id::text), 9, 8))::bit(32)::bigint & 2147483647) % 55)::double precision / 1000.0
+    end as lng
+  from public.driver_profiles dp
+  where dp.status = 'verified'
+    and coalesce(dp.is_available, true)
+$$;
+
+revoke all on function public.get_public_drivers() from public;
+grant execute on function public.get_public_drivers() to anon, authenticated;
+
 -- ============ REALTIME ============
 
 do $$
