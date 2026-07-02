@@ -187,6 +187,17 @@ export default function ActiveJob() {
         </div>
       )}
 
+      {/* Ayuda solicitada por el cliente (aceptada al tomar el trabajo) */}
+      {job.needs_help && (
+        <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <span className="flex-shrink-0">🤝</span>
+          <div>
+            <p className="font-semibold text-amber-800">El cliente pide ayuda</p>
+            <p className="text-amber-700">{job.help_description}</p>
+          </div>
+        </div>
+      )}
+
       {/* Action button */}
       {nextStep && !isFinished && (
         <Button

@@ -215,8 +215,9 @@ Ajustes de dashboard/entorno para activar funciones secundarias:
 
 ## 10. Próximos pasos / ampliación
 
-- Geocoding y rutas reales (empezar gratis con **Nominatim + OSRM**; migrar a servicio de pago solo si el volumen lo exige).
-- Reemplazar la distancia simulada por cálculo real origen→destino.
+- ~~Geocoding y rutas reales~~ ✅ el detalle del pedido muestra **ETA en vivo** (Nominatim geocodifica la dirección + OSRM calcula la ruta; fallback aproximado si el router no responde). Pendiente: usar lo mismo para la distancia del precio.
+- Reemplazar la distancia simulada del precio por cálculo real origen→destino.
+- Llamada cliente↔conductor con número fijo enmascarado (Twilio/Zadarma) — decidido empezar sin ello.
 - Emails transaccionales (proveedor real).
 - Endurecer el flujo de pagos (webhook de Stripe, confirmación server-side).
 - Tests automatizados (unit/e2e).

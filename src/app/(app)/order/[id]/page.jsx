@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState, useEffect, useRef } from "react";
 import DriverTrackingMap from "@/components/common/DriverTrackingMap";
+import { fetchRouteEta, geocodeAlbacete } from "@/lib/eta";
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -32,6 +33,8 @@ export default function OrderDetail() {
   const [orderLoading, setOrderLoading] = useState(true);
   const [driverProfile, setDriverProfile] = useState(null);
   const [driverLocation, setDriverLocation] = useState(null);
+  const [eta, setEta] = useState(null);
+  const [targetCoords, setTargetCoords] = useState(null);
 
   useEffect(() => {
     base44.entities.TransportRequest.get(id).then(async res => {
@@ -85,6 +88,46 @@ export default function OrderDetail() {
     const interval = setInterval(poll, 10000);
     return () => clearInterval(interval);
   }, [order?.driver_id, order?.status]);
+
+  // Destino del ETA: hasta recoger la carga, la dirección de recogida;
+  // después, la de entrega. Si el pedido no tiene coordenadas, se geocodifica
+  // la dirección una vez (Nominatim) y se cachea en estado.
+  useEffect(() => {
+    if (!order) return;
+    const goingToPickup = ["accepted", "in_transit"].includes(order.status);
+    const lat = goingToPickup ? order.origin_lat : order.destination_lat;
+    const lng = goingToPickup ? order.origin_lng : order.destination_lng;
+    if (lat && lng) {
+      setTargetCoords({ lat, lng, label: goingToPickup ? "la recogida" : "la entrega" });
+      return;
+    }
+    const address = goingToPickup ? order.origin_address : order.destination_address;
+    let active = true;
+    geocodeAlbacete(address).then(coords => {
+      if (active && coords) {
+        setTargetCoords({ ...coords, label: goingToPickup ? "la recogida" : "la entrega" });
+      }
+    });
+    return () => { active = false; };
+  }, [order?.status, order?.origin_address, order?.destination_address]);
+
+  // ETA en tiempo real: se recalcula con cada actualización de posición (máx. cada 15 s).
+  const lastEtaCalc = useRef(0);
+  useEffect(() => {
+    if (!driverLocation || !targetCoords) return;
+    if (!["accepted", "in_transit", "picked_up"].includes(order?.status)) {
+      setEta(null);
+      return;
+    }
+    const now = Date.now();
+    if (now - lastEtaCalc.current < 15000) return;
+    lastEtaCalc.current = now;
+    let active = true;
+    fetchRouteEta(driverLocation, targetCoords).then(result => {
+      if (active && result) setEta({ ...result, label: targetCoords.label });
+    });
+    return () => { active = false; };
+  }, [driverLocation, targetCoords, order?.status]);
 
   const sendMutation = useMutation({
     mutationFn: (msg) => base44.entities.ChatMessage.create({
@@ -225,6 +268,19 @@ export default function OrderDetail() {
             >
               <Send className="w-4 h-4" />
             </Button>
+          </div>
+        </div>
+      )}
+
+      {/* ETA en tiempo real */}
+      {eta && ["accepted", "in_transit", "picked_up"].includes(order.status) && (
+        <div className="bg-primary/5 rounded-2xl border-2 border-primary/20 p-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-lg flex-shrink-0">🚐</div>
+          <div>
+            <p className="font-display font-bold text-foreground text-lg leading-tight">
+              Llega a {eta.label} en ~{eta.minutes} min
+            </p>
+            <p className="text-xs text-muted-foreground">{eta.km} km por carretera · se actualiza en vivo</p>
           </div>
         </div>
       )}

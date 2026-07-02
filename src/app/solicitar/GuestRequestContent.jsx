@@ -36,6 +36,8 @@ export default function GuestRequestContent() {
     cargo_description: "",
     vehicle_type: preselectedVehicle,
     insurance_selected: false,
+    needs_help: false,
+    help_description: "",
     notes: "",
     distance_km: 0,
     extra_hours: 0,
@@ -144,7 +146,7 @@ export default function GuestRequestContent() {
 
   const canNext = () => {
     if (step === 1) return form.client_name.trim() && form.client_phone.trim() && hasValidCP(form.origin_address) && hasValidCP(form.destination_address);
-    if (step === 2) return form.cargo_description && form.cargo_description.length >= 10 && photos.length >= 1 && acceptPortal && acceptTerms;
+    if (step === 2) return form.cargo_description && form.cargo_description.length >= 10 && photos.length >= 1 && (!form.needs_help || form.help_description.trim().length >= 5) && acceptPortal && acceptTerms;
     if (step === 3 && !preselectedVehicle) return form.vehicle_type;
     return true;
   };
@@ -248,6 +250,32 @@ export default function GuestRequestContent() {
               </div>
               {photos.length === 0 && <p className="text-xs text-destructive">Debes subir al menos 1 foto</p>}
             </div>
+
+            {/* ¿Necesita ayuda del conductor? El autónomo la ve antes de aceptar y decide. */}
+            <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-foreground">¿Necesitas ayuda del conductor?</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">Por ejemplo: bajar un sofá, cargar cajas…</p>
+                </div>
+                <Switch checked={form.needs_help} onCheckedChange={v => update("needs_help", v)} />
+              </div>
+              {form.needs_help && (
+                <div className="space-y-2">
+                  <Textarea
+                    placeholder="Describe qué hay que hacer y cómo: qué objeto, en qué piso, ¿hay ascensor?…"
+                    value={form.help_description}
+                    onChange={e => update("help_description", e.target.value)}
+                    className="rounded-xl min-h-[80px]"
+                  />
+                  {form.help_description.trim().length < 5 && (
+                    <p className="text-xs text-destructive">Describe la ayuda que necesitas (obligatorio)</p>
+                  )}
+                  <p className="text-xs text-muted-foreground">El conductor verá tu petición antes de aceptar el trabajo y decidirá si puede ayudarte.</p>
+                </div>
+              )}
+            </div>
+
             <div className="space-y-3">
               <button type="button" onClick={() => setAcceptPortal(v => !v)} className="flex items-start gap-3 w-full text-left">
                 {acceptPortal ? <CheckSquare className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" /> : <Square className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />}

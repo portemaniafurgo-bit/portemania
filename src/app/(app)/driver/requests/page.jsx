@@ -109,6 +109,17 @@ export default function DriverRequests() {
                 </div>
               )}
 
+              {/* El cliente pide ayuda: el conductor lo ve ANTES de aceptar y decide */}
+              {req.needs_help && (
+                <div className="flex items-start gap-2 text-sm mb-3 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                  <span className="flex-shrink-0">🤝</span>
+                  <div>
+                    <p className="font-semibold text-amber-800">Pide ayuda del conductor</p>
+                    <p className="text-amber-700">{req.help_description}</p>
+                  </div>
+                </div>
+              )}
+
               {req.distance_km && (
                 <p className="text-xs text-muted-foreground mb-3">
                   📏 {req.distance_km} km · {req.helpers_count > 0 ? `${req.helpers_count} ayudantes · ` : ""}

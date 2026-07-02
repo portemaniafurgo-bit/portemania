@@ -134,6 +134,8 @@ create table if not exists public.transport_requests (
   vehicle_type text,
   distance_km numeric,
   helpers_count integer not null default 0,
+  needs_help boolean not null default false,
+  help_description text,
   extra_hours numeric not null default 0,
   insurance_selected boolean not null default false,
   estimated_price numeric,
@@ -392,7 +394,8 @@ begin
     client_name, client_phone, origin_address, destination_address,
     origin_lat, origin_lng, destination_lat, destination_lng,
     cargo_description, cargo_photos, vehicle_type, distance_km,
-    helpers_count, extra_hours, insurance_selected, estimated_price,
+    helpers_count, needs_help, help_description,
+    extra_hours, insurance_selected, estimated_price,
     payment_method, notes
   ) values (
     payload->>'client_name', payload->>'client_phone',
@@ -402,6 +405,8 @@ begin
     payload->>'cargo_description', coalesce(payload->'cargo_photos', '[]'::jsonb),
     payload->>'vehicle_type', (payload->>'distance_km')::numeric,
     coalesce((payload->>'helpers_count')::integer, 0),
+    coalesce((payload->>'needs_help')::boolean, false),
+    payload->>'help_description',
     coalesce((payload->>'extra_hours')::numeric, 0),
     coalesce((payload->>'insurance_selected')::boolean, false),
     (payload->>'estimated_price')::numeric,

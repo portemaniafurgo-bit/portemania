@@ -104,8 +104,10 @@ export default function DriversMapSectionInner() {
 
   return (
     <div className="w-full">
-      <div className="relative w-full">
-        <div className="absolute top-3 left-3 z-[1000] bg-white/90 backdrop-blur-sm rounded-xl px-3 py-1.5 text-xs font-medium text-foreground shadow flex items-center gap-1.5">
+      {/* z-0 crea un stacking context propio: los controles internos de Leaflet
+          (z-index 1000) no se montan sobre el navbar ni sobre los modales. */}
+      <div className="relative w-full z-0">
+        <div className="absolute top-3 right-3 z-[1000] bg-white/90 backdrop-blur-sm rounded-xl px-3 py-1.5 text-xs font-medium text-foreground shadow flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           {drivers.length} conductor{drivers.length === 1 ? "" : "es"} disponible{drivers.length === 1 ? "" : "s"} · CP 02001–02008
         </div>
