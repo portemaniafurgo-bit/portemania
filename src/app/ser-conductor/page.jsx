@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import VehicleCard, { vehicleData } from "@/components/common/VehicleCard";
 import { ArrowLeft, CheckCircle2, CheckSquare, Loader2, Send, Square, Truck } from "lucide-react";
 import { motion } from "framer-motion";
+import { useTariffs } from "@/lib/tariffs";
 
 const AVAILABILITY_OPTIONS = [
   "Disponibilidad inmediata",
@@ -21,6 +22,7 @@ const AVAILABILITY_OPTIONS = [
 
 export default function SerConductorPage() {
   const router = useRouter();
+  const tariffs = useTariffs();
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
@@ -153,7 +155,7 @@ export default function SerConductorPage() {
           <Label>Tamaño de tu furgoneta <span className="text-destructive">*</span></Label>
           <div className="grid grid-cols-1 gap-3">
             {Object.keys(vehicleData).map(type => (
-              <VehicleCard key={type} type={type} selected={form.vehicle_type === type} onClick={(t) => update("vehicle_type", t)} />
+              <VehicleCard key={type} type={type} price={tariffs[type]} selected={form.vehicle_type === type} onClick={(t) => update("vehicle_type", t)} />
             ))}
           </div>
         </div>

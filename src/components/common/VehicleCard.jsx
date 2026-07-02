@@ -30,7 +30,9 @@ const vehicleData = {
 
 export { vehicleData };
 
-export default function VehicleCard({ type, selected, onClick }) {
+// `price` (opcional) sobreescribe el precio por defecto con la tarifa viva
+// de app_settings (ver src/lib/tariffs.js).
+export default function VehicleCard({ type, selected, onClick, price }) {
   const vehicle = vehicleData[type];
   if (!vehicle) return null;
 
@@ -56,7 +58,7 @@ export default function VehicleCard({ type, selected, onClick }) {
         <p className="text-sm text-muted-foreground mt-0.5">{vehicle.description}</p>
         <div className="mt-2 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">{vehicle.capacity}</span>
-          <span className="font-semibold text-primary">{vehicle.basePrice}€ / 2h</span>
+          <span className="font-semibold text-primary">{price ?? vehicle.basePrice}€ / 2h</span>
         </div>
       </div>
     </button>

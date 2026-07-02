@@ -8,9 +8,11 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
+import { useTariffs } from "@/lib/tariffs";
 
 export default function VehiclesSection() {
   const vehicles = Object.entries(vehicleData);
+  const tariffs = useTariffs();
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   const [showModal, setShowModal] = useState(false);
@@ -72,7 +74,7 @@ export default function VehiclesSection() {
               </div>
               <div className="mt-5 pt-4 border-t border-border flex items-center justify-between">
                 <div>
-                  <span className="text-2xl font-bold text-foreground">{vehicle.basePrice}€</span>
+                  <span className="text-2xl font-bold text-foreground">{tariffs[key] ?? vehicle.basePrice}€</span>
                   <span className="text-muted-foreground text-sm"> /2h</span>
                 </div>
                 <Button onClick={() => handleContratar(key)} className="rounded-full px-5 font-semibold gap-1.5">

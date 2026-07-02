@@ -27,6 +27,7 @@ export default function DriverRequests() {
         status: "accepted",
         driver_id: user?.id,
         driver_name: user?.full_name || "Conductor",
+        accepted_at: new Date().toISOString(),
       });
 
       // Obtener datos del pedido para el email

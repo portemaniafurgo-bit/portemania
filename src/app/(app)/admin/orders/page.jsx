@@ -26,6 +26,8 @@ export default function AdminOrders() {
     .filter(o => tab === "all" || o.status === tab)
     .filter(o =>
       (o.client_name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (o.client_phone || "").includes(search) ||
+      (o.driver_name || "").toLowerCase().includes(search.toLowerCase()) ||
       (o.origin_address || "").toLowerCase().includes(search.toLowerCase()) ||
       (o.destination_address || "").toLowerCase().includes(search.toLowerCase())
     );
@@ -47,7 +49,7 @@ export default function AdminOrders() {
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input placeholder="Buscar pedidos..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 rounded-xl" />
+        <Input placeholder="Buscar por cliente, teléfono, conductor o dirección..." value={search} onChange={e => setSearch(e.target.value)} className="pl-10 rounded-xl" />
       </div>
 
       <div className="bg-card rounded-2xl border border-border overflow-hidden overflow-x-auto">
@@ -57,22 +59,30 @@ export default function AdminOrders() {
               <TableHead>Cliente</TableHead>
               <TableHead>Origen</TableHead>
               <TableHead>Destino</TableHead>
-              <TableHead>Vehículo</TableHead>
+              <TableHead>Conductor</TableHead>
               <TableHead>Precio</TableHead>
+              <TableHead>Pago</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Fecha</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filtered.map(order => (
-              <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50">
-                <TableCell className="font-medium">{order.client_name || "—"}</TableCell>
+              <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => window.location.assign(`/admin/orders/${order.id}`)}>
+                <TableCell className="font-medium">
+                  <span className="mr-1">{vehicleData[order.vehicle_type]?.icon}</span>
+                  {order.client_name || "—"}
+                </TableCell>
                 <TableCell className="text-sm max-w-[150px] truncate">{order.origin_address}</TableCell>
                 <TableCell className="text-sm max-w-[150px] truncate">{order.destination_address}</TableCell>
-                <TableCell>
-                  <span className="text-lg mr-1">{vehicleData[order.vehicle_type]?.icon}</span>
-                </TableCell>
+                <TableCell className="text-sm">{order.driver_name || <span className="text-muted-foreground">Sin asignar</span>}</TableCell>
                 <TableCell className="font-medium">{(order.final_price || order.estimated_price)?.toFixed(2)}€</TableCell>
+                <TableCell className="text-sm">
+                  <span className={order.payment_status === "paid" ? "text-emerald-600 font-medium" : "text-amber-600"}>
+                    {order.payment_status === "paid" ? "Pagado" : "Pendiente"}
+                  </span>
+                  <span className="text-muted-foreground"> · {order.payment_method === "card" ? "tarjeta" : "efectivo"}</span>
+                </TableCell>
                 <TableCell><StatusBadge status={order.status} /></TableCell>
                 <TableCell className="text-muted-foreground text-sm">
                   {order.created_date && format(new Date(order.created_date), "dd/MM/yy", { locale: es })}

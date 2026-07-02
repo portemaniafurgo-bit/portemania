@@ -8,16 +8,19 @@ import { DollarSign, TrendingUp, Truck, Calendar } from "lucide-react";
 import { format, startOfMonth, startOfWeek, isAfter } from "date-fns";
 import { es } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { useTariffs } from "@/lib/tariffs";
 
 export default function DriverEarnings() {
   const { user } = useAuth();
+  const tariffs = useTariffs();
 
   const { data: jobs = [] } = useQuery({
     queryKey: ["driver-history"],
     queryFn: () => base44.entities.TransportRequest.filter({ driver_id: user?.id, status: "delivered" }, "-created_date", 100),
   });
 
-  const commission = 0.85;
+  // Parte del conductor = 100% - comisión de la plataforma (editable en Ajustes del admin)
+  const commission = (100 - (tariffs.commission_pct ?? 15)) / 100;
   const totalEarnings = jobs.reduce((acc, j) => acc + (j.final_price || j.estimated_price || 0) * commission, 0);
 
   const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });

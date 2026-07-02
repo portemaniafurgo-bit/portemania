@@ -12,21 +12,11 @@ import { Switch } from "@/components/ui/switch";
 import VehicleCard, { vehicleData } from "@/components/common/VehicleCard";
 import { ArrowLeft, ArrowRight, Camera, MapPin, Package, Shield, AlertCircle, Loader2, CreditCard, Banknote, CheckSquare, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-
-const INSURANCE_PRICE = 12;
-const EXTRA_HOUR_PRICE = 15;
-
-function estimatePrice(vehicleType, extraHours, insurance) {
-  if (!vehicleType) return 0;
-  const base = vehicleData[vehicleType]?.basePrice || 50;
-  const extraCost = (extraHours || 0) * EXTRA_HOUR_PRICE;
-  const insuranceCost = insurance ? INSURANCE_PRICE : 0;
-  return base + extraCost + insuranceCost;
-}
+import { useTariffs, estimatePrice } from "@/lib/tariffs";
 
 export default function NewRequestContent() {
   const { user } = useAuth();
+  const tariffs = useTariffs();
   const router = useRouter();
   const searchParams = useSearchParams();
   const preselectedVehicle = searchParams.get("vehicle") || "";
@@ -97,7 +87,7 @@ export default function NewRequestContent() {
     return form.distance_km;
   };
 
-  const price = estimatePrice(form.vehicle_type, form.extra_hours, form.insurance_selected);
+  const price = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected);
 
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -111,7 +101,7 @@ export default function NewRequestContent() {
     setLoading(true);
     try {
       simulateDistance();
-      const finalPrice = estimatePrice(form.vehicle_type, form.extra_hours, form.insurance_selected);
+      const finalPrice = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected);
 
       const request = await base44.entities.TransportRequest.create({
         ...form,
@@ -384,6 +374,7 @@ export default function NewRequestContent() {
                 <VehicleCard
                   key={type}
                   type={type}
+                  price={tariffs[type]}
                   selected={form.vehicle_type === type}
                   onClick={(t) => update("vehicle_type", t)}
                 />
@@ -395,7 +386,7 @@ export default function NewRequestContent() {
               <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
                 <div>
                   <p className="text-sm font-medium text-foreground">¿Necesitas más de 2 horas?</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">El precio base incluye 2 horas. Cada hora adicional cuesta {EXTRA_HOUR_PRICE}€.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">El precio base incluye 2 horas. Cada hora adicional cuesta {tariffs.extra_hour}€.</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <button
@@ -406,7 +397,7 @@ export default function NewRequestContent() {
                   <div className="flex-1 text-center">
                     <p className="text-2xl font-display font-bold text-foreground">{2 + form.extra_hours}h</p>
                     <p className="text-xs text-muted-foreground">
-                      {form.extra_hours === 0 ? "Solo 2h incluidas" : `+${form.extra_hours}h extra (+${form.extra_hours * EXTRA_HOUR_PRICE}€)`}
+                      {form.extra_hours === 0 ? "Solo 2h incluidas" : `+${form.extra_hours}h extra (+${form.extra_hours * tariffs.extra_hour}€)`}
                     </p>
                   </div>
                   <button
@@ -417,7 +408,7 @@ export default function NewRequestContent() {
                 <div className="flex gap-2 p-3 rounded-xl bg-orange-50 border border-orange-200">
                   <AlertCircle className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
                   <p className="text-xs text-orange-700">
-                    <strong>Importante:</strong> El tiempo empieza a contar desde que el conductor llega a tu puerta. Si el servicio se extiende más de las horas contratadas, las horas adicionales se abonarán directamente al transportista a razón de <strong>{EXTRA_HOUR_PRICE}€/hora</strong>.
+                    <strong>Importante:</strong> El tiempo empieza a contar desde que el conductor llega a tu puerta. Si el servicio se extiende más de las horas contratadas, las horas adicionales se abonarán directamente al transportista a razón de <strong>{tariffs.extra_hour}€/hora</strong>.
                   </p>
                 </div>
               </div>
@@ -480,7 +471,7 @@ export default function NewRequestContent() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Shield className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">Seguro de mercancía (+{INSURANCE_PRICE}€)</span>
+                  <span className="text-sm">Seguro de mercancía (+{tariffs.insurance}€)</span>
                 </div>
                 <Switch
                   checked={form.insurance_selected}
@@ -497,9 +488,9 @@ export default function NewRequestContent() {
                   <p className="text-3xl font-display font-bold text-foreground">{price.toFixed(2)}€</p>
                 </div>
                 <div className="text-right text-xs text-muted-foreground space-y-0.5">
-                  <p>Base (2h): {vehicleData[form.vehicle_type]?.basePrice}€</p>
-                  {form.extra_hours > 0 && <p>Horas extra: +{form.extra_hours * EXTRA_HOUR_PRICE}€</p>}
-                  {form.insurance_selected && <p>Seguro: +{INSURANCE_PRICE}€</p>}
+                  <p>Base (2h): {tariffs[form.vehicle_type]}€</p>
+                  {form.extra_hours > 0 && <p>Horas extra: +{form.extra_hours * tariffs.extra_hour}€</p>}
+                  {form.insurance_selected && <p>Seguro: +{tariffs.insurance}€</p>}
                 </div>
               </div>
             </div>

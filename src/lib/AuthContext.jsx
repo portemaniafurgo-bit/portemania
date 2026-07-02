@@ -25,9 +25,14 @@ export function AuthProvider({ children }) {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
   const loadUser = useCallback(async () => {
+    // getSession() lee la sesión local (cookies/storage) sin llamada de red:
+    // al volver atrás o con conexión inestable NO se pierde la sesión (el bug
+    // de la versión Base44 era exactamente ese). El refresco del token lo
+    // gestionan supabase-js y el proxy del servidor.
     const {
-      data: { user: authUser },
-    } = await supabase.auth.getUser();
+      data: { session },
+    } = await supabase.auth.getSession();
+    const authUser = session?.user ?? null;
 
     if (!authUser) {
       setUser(null);

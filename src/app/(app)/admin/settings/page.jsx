@@ -1,64 +1,139 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/lib/entities";
+import { DEFAULT_TARIFFS, fetchTariffs } from "@/lib/tariffs";
+import { vehicleData } from "@/components/common/VehicleCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Settings, Percent, CreditCard, Globe } from "lucide-react";
+import { Percent, CreditCard, Globe, Loader2, Save } from "lucide-react";
+
+const FIELDS = [
+  { key: "l1h1", label: `${vehicleData.l1h1.name} (base 2h, €)` },
+  { key: "l1h2", label: `${vehicleData.l1h2.name} (base 2h, €)` },
+  { key: "l2h2", label: `${vehicleData.l2h2.name} (base 2h, €)` },
+  { key: "extra_hour", label: "Hora extra (€)" },
+  { key: "insurance", label: "Seguro de mercancía (€)" },
+];
 
 export default function AdminSettings() {
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState(null);
+
+  const { data: tariffs } = useQuery({ queryKey: ["tariffs"], queryFn: fetchTariffs });
+
+  // Cargar tarifas al formulario cuando llegan (patrón intencionado servidor->form)
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    if (tariffs && !form) setForm({ ...tariffs });
+  }, [tariffs, form]);
+
+  const update = (key, value) => {
+    setForm(prev => ({ ...prev, [key]: value === "" ? "" : Number(value) }));
+    setMessage(null);
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setMessage(null);
+    try {
+      const clean = { ...DEFAULT_TARIFFS };
+      for (const k of Object.keys(clean)) {
+        const v = Number(form[k]);
+        if (!Number.isFinite(v) || v < 0) throw new Error(`Valor no válido en "${k}"`);
+        clean[k] = v;
+      }
+      const { error } = await supabase
+        .from("app_settings")
+        .update({ value: clean })
+        .eq("key", "tariffs");
+      if (error) throw error;
+      queryClient.invalidateQueries({ queryKey: ["tariffs"] });
+      setMessage({ ok: true, text: "Tarifas guardadas. Se aplican al momento en toda la app." });
+    } catch (err) {
+      setMessage({ ok: false, text: err.message || "Error al guardar" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!form) {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-lg mx-auto space-y-6">
       <h1 className="text-2xl font-display font-bold text-foreground">Configuración</h1>
 
       <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
         <h3 className="font-heading font-semibold text-foreground flex items-center gap-2">
-          <Percent className="w-4 h-4 text-primary" /> Comisiones
+          <CreditCard className="w-4 h-4 text-primary" /> Tarifas
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Estos precios se usan en la landing, en los formularios de solicitud y en el cálculo de cada pedido nuevo.
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          {FIELDS.map(f => (
+            <div key={f.key} className="space-y-1">
+              <Label className="text-xs">{f.label}</Label>
+              <Input
+                type="number"
+                min="0"
+                step="1"
+                value={form[f.key]}
+                onChange={e => update(f.key, e.target.value)}
+                className="rounded-xl"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
+        <h3 className="font-heading font-semibold text-foreground flex items-center gap-2">
+          <Percent className="w-4 h-4 text-primary" /> Comisión
         </h3>
         <div className="space-y-2">
           <Label>Comisión por servicio (%)</Label>
-          <Input type="number" defaultValue="15" className="rounded-xl" disabled />
-          <p className="text-xs text-muted-foreground">Porcentaje que retiene la plataforma por cada servicio</p>
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            value={form.commission_pct}
+            onChange={e => update("commission_pct", e.target.value)}
+            className="rounded-xl"
+          />
+          <p className="text-xs text-muted-foreground">
+            Porcentaje que retiene la plataforma; el conductor recibe el {100 - (Number(form.commission_pct) || 0)}%.
+          </p>
         </div>
       </div>
 
-      <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
+      {message && (
+        <div className={`p-3 rounded-xl text-sm ${message.ok ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-destructive/10 text-destructive"}`}>
+          {message.text}
+        </div>
+      )}
+
+      <Button className="w-full h-12 rounded-xl gap-2" onClick={handleSave} disabled={saving}>
+        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+        Guardar tarifas
+      </Button>
+
+      <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
         <h3 className="font-heading font-semibold text-foreground flex items-center gap-2">
-          <CreditCard className="w-4 h-4 text-primary" /> Precios base
+          <Globe className="w-4 h-4 text-primary" /> Zona de operación
         </h3>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <Label className="text-xs">Furgoneta pequeña</Label>
-            <Input type="number" defaultValue="25" className="rounded-xl" disabled />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Furgoneta mediana</Label>
-            <Input type="number" defaultValue="45" className="rounded-xl" disabled />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Furgoneta grande</Label>
-            <Input type="number" defaultValue="70" className="rounded-xl" disabled />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-xs">Camión ligero</Label>
-            <Input type="number" defaultValue="100" className="rounded-xl" disabled />
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">🇪🇸 Albacete capital (CP 02001–02008) — Activo</p>
       </div>
-
-      <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
-        <h3 className="font-heading font-semibold text-foreground flex items-center gap-2">
-          <Globe className="w-4 h-4 text-primary" /> Zonas de operación
-        </h3>
-        <div className="space-y-2 text-sm text-muted-foreground">
-          <p>🇪🇸 España — Activo</p>
-          <p>🇵🇹 Portugal — Próximamente</p>
-          <p>🇫🇷 Francia — Próximamente</p>
-        </div>
-      </div>
-
-      <p className="text-xs text-muted-foreground text-center">
-        Los cambios de configuración se aplican globalmente. Contacta con soporte para modificaciones avanzadas.
-      </p>
     </div>
   );
 }

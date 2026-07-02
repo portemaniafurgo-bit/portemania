@@ -145,6 +145,7 @@ create table if not exists public.transport_requests (
   stripe_session_id text,
   driver_id uuid,
   driver_name text,
+  accepted_at timestamptz,
   notes text,
   pickup_time timestamptz,
   delivery_time timestamptz,
@@ -181,8 +182,35 @@ create table if not exists public.incidents (
   resolution text
 );
 
--- Nota: las entidades Worker y AppSettings del original de Base44 no se usan en
--- ninguna página, así que sus tablas se eliminaron del esquema a propósito.
+-- Nota: la entidad Worker del original de Base44 no se usa en ninguna página,
+-- así que su tabla se eliminó del esquema a propósito.
+
+-- Ajustes globales editables por el admin. La clave 'tariffs' guarda los precios
+-- (base por furgoneta, hora extra, seguro, comisión). Lectura PÚBLICA a propósito:
+-- el flujo de invitado calcula el precio sin sesión.
+create table if not exists public.app_settings (
+  id uuid primary key default gen_random_uuid(),
+  created_date timestamptz not null default now(),
+  updated_date timestamptz not null default now(),
+  created_by text,
+  created_by_id uuid,
+  key text unique not null,
+  value jsonb
+);
+
+alter table public.app_settings enable row level security;
+
+drop policy if exists app_settings_select on public.app_settings;
+create policy app_settings_select on public.app_settings for select using (true);
+drop policy if exists app_settings_write on public.app_settings;
+create policy app_settings_write on public.app_settings for all
+  using (public.is_admin()) with check (public.is_admin());
+
+insert into public.app_settings (key, value) values ('tariffs', '{
+  "l1h1": 50, "l1h2": 60, "l2h2": 85,
+  "extra_hour": 15, "insurance": 12, "commission_pct": 15
+}'::jsonb)
+on conflict (key) do nothing;
 
 -- ============ TRIGGERS ============
 
@@ -194,12 +222,12 @@ create trigger on_auth_user_created
 do $$
 declare t text;
 begin
-  foreach t in array array['profiles','driver_profiles','transport_requests','chat_messages','incidents']
+  foreach t in array array['profiles','driver_profiles','transport_requests','chat_messages','incidents','app_settings']
   loop
     execute format('drop trigger if exists set_updated_date on public.%I', t);
     execute format('create trigger set_updated_date before update on public.%I for each row execute function public.set_updated_date()', t);
   end loop;
-  foreach t in array array['driver_profiles','transport_requests','chat_messages','incidents']
+  foreach t in array array['driver_profiles','transport_requests','chat_messages','incidents','app_settings']
   loop
     execute format('drop trigger if exists set_created_by on public.%I', t);
     execute format('create trigger set_created_by before insert on public.%I for each row execute function public.set_created_by()', t);
