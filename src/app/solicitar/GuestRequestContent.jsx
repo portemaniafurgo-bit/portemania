@@ -39,6 +39,7 @@ export default function GuestRequestContent() {
   const [photos, setPhotos] = useState([]);
   const [acceptPortal, setAcceptPortal] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState(false);
   const [cpError, setCpError] = useState({ origin: "", destination: "" });
 
   const ALBACETE_CP = ["02001", "02002", "02003", "02004", "02005", "02006", "02007", "02008"];
@@ -94,12 +95,14 @@ export default function GuestRequestContent() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (force = false) => {
     setLoading(true);
+    setDuplicateWarning(false);
     try {
       simulateDistance();
       const finalPrice = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected);
 
+      // `force` lo interpreta la RPC de invitado para saltarse el aviso de duplicado
       const request = await base44.entities.TransportRequest.create({
         ...form,
         estimated_price: finalPrice,
@@ -107,6 +110,7 @@ export default function GuestRequestContent() {
         helpers_count: 0,
         status: "pending",
         payment_status: "pending",
+        ...(force ? { force: true } : {}),
       });
 
       const vehicleName = vehicleData[form.vehicle_type]?.name || form.vehicle_type;
@@ -130,8 +134,12 @@ export default function GuestRequestContent() {
 
       router.push("/solicitud-enviada");
     } catch (err) {
-      console.error("Error al enviar la solicitud:", err);
-      alert("Hubo un error al enviar tu solicitud. Por favor inténtalo de nuevo.");
+      if (String(err?.message || "").includes("duplicate_pending")) {
+        setDuplicateWarning(true);
+      } else {
+        console.error("Error al enviar la solicitud:", err);
+        alert("Hubo un error al enviar tu solicitud. Por favor inténtalo de nuevo.");
+      }
     } finally {
       setLoading(false);
     }
@@ -398,6 +406,27 @@ export default function GuestRequestContent() {
         )}
       </AnimatePresence>
 
+      {/* Aviso de pedido duplicado */}
+      {duplicateWarning && (
+        <div className="flex flex-col gap-3 p-4 rounded-xl bg-amber-50 border border-amber-300">
+          <div className="flex gap-2">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-800">
+              <strong>Ya hay una solicitud pendiente con este teléfono</strong> creada hace menos de 30 minutos.
+              Si fuiste tú, no hace falta crear otra: un conductor la aceptará en breve.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="rounded-xl flex-1" onClick={() => setDuplicateWarning(false)}>
+              Vale, no crear otra
+            </Button>
+            <Button size="sm" className="rounded-xl flex-1" disabled={loading} onClick={() => handleSubmit(true)}>
+              Crear otra igualmente
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Navegación */}
       <div className="flex gap-3 pt-2">
         {step > 1 && (
@@ -408,7 +437,7 @@ export default function GuestRequestContent() {
             Continuar <ArrowRight className="w-4 h-4" />
           </Button>
         ) : (
-          <Button className="rounded-xl flex-1 h-12 gap-2" disabled={loading} onClick={handleSubmit}>
+          <Button className="rounded-xl flex-1 h-12 gap-2" disabled={loading || duplicateWarning} onClick={() => handleSubmit(false)}>
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Banknote className="w-4 h-4" />}
             Confirmar solicitud
           </Button>

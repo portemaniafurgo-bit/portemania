@@ -7,7 +7,7 @@ import Logo from "@/components/common/Logo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
-  Home, Package, Clock, User, Settings, Users,
+  Home, Package, Clock, User, Settings, Users, Euro,
   Truck, BarChart3, AlertTriangle, Menu, X, LogOut, ChevronRight, LayoutDashboard,
 } from "lucide-react";
 import { useState } from "react";
@@ -29,14 +29,17 @@ const driverNav = [
   { label: "Administración", icon: Settings, path: "/admin" },
 ];
 
+// staffOk: visible también para empleados (rol 'staff'); el resto solo admin.
 const adminNav = [
-  { label: "Operación", icon: LayoutDashboard, path: "/admin" },
-  { label: "Pedidos", icon: Package, path: "/admin/orders" },
+  { label: "Operación", icon: LayoutDashboard, path: "/admin", staffOk: true },
+  { label: "Pedidos", icon: Package, path: "/admin/orders", staffOk: true },
   { label: "Conductores", icon: Truck, path: "/admin/drivers" },
   { label: "Usuarios", icon: Users, path: "/admin/users" },
-  { label: "Incidencias", icon: AlertTriangle, path: "/admin/incidents" },
+  { label: "Incidencias", icon: AlertTriangle, path: "/admin/incidents", staffOk: true },
+  { label: "Finanzas", icon: Euro, path: "/admin/finance" },
+  { label: "Estadísticas", icon: BarChart3, path: "/admin/stats" },
   { label: "Ajustes", icon: Settings, path: "/admin/settings" },
-  { label: "Página principal", icon: ChevronRight, path: "/" },
+  { label: "Página principal", icon: ChevronRight, path: "/", staffOk: true },
 ];
 
 const ADMIN_EMAIL = "renato.0550.calero@gmail.com";
@@ -54,7 +57,7 @@ export default function AppLayout({ children }) {
     ? driverNav
     : driverNav.filter((item) => item.path !== "/admin");
   const navItems = pathname.startsWith("/admin")
-    ? adminNav
+    ? (isAdmin ? adminNav : adminNav.filter((item) => item.staffOk))
     : pathname.startsWith("/driver")
     ? baseDriverNav
     : clientNav;

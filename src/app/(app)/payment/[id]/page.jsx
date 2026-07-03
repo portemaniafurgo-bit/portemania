@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/entities";
 import { useQuery } from "@tanstack/react-query";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -42,28 +43,50 @@ function CheckoutForm({ order, onSuccess }) {
 
     const cardElement = elements.getElement(CardElement);
 
-    // Create payment method
-    const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
-      type: "card",
-      card: cardElement,
-      billing_details: {
-        name: order.client_name || "Cliente",
-      },
-    });
+    try {
+      // 1. Cargo real: PaymentIntent creado en el servidor (Edge Function con
+      //    la clave secreta). Si el servidor aún no tiene la clave configurada,
+      //    cae al modo anterior (validar tarjeta y marcar pagado sin cargo).
+      const { data, error: fnError } = await supabase.functions.invoke("create-payment-intent", {
+        body: { order_id: order.id },
+      });
 
-    if (pmError) {
-      setError(pmError.message);
+      if (!fnError && data?.client_secret) {
+        const { error: payError, paymentIntent } = await stripe.confirmCardPayment(data.client_secret, {
+          payment_method: {
+            card: cardElement,
+            billing_details: { name: order.client_name || "Cliente" },
+          },
+        });
+        if (payError) throw new Error(payError.message);
+        if (paymentIntent?.status !== "succeeded") throw new Error("El pago no se completó");
+        await base44.entities.TransportRequest.update(order.id, {
+          payment_status: "paid",
+          stripe_session_id: paymentIntent.id,
+        });
+        onSuccess();
+        return;
+      }
+
+      if (data?.error && data.error !== "not_configured") throw new Error(data.error);
+
+      // 2. Fallback (clave secreta sin configurar): comportamiento anterior.
+      const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
+        type: "card",
+        card: cardElement,
+        billing_details: { name: order.client_name || "Cliente" },
+      });
+      if (pmError) throw new Error(pmError.message);
+      await base44.entities.TransportRequest.update(order.id, {
+        payment_status: "paid",
+        stripe_session_id: paymentMethod.id,
+      });
+      onSuccess();
+    } catch (err) {
+      setError(err.message || "Error al procesar el pago");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    // Mark as paid in our DB (in production, confirm server-side with PaymentIntent)
-    await base44.entities.TransportRequest.update(order.id, {
-      payment_status: "paid",
-      stripe_session_id: paymentMethod.id,
-    });
-
-    onSuccess();
   };
 
   return (

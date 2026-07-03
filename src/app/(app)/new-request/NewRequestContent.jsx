@@ -41,6 +41,7 @@ export default function NewRequestContent() {
   const [photos, setPhotos] = useState([]);
   const [acceptPortal, setAcceptPortal] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
+  const [duplicateWarning, setDuplicateWarning] = useState(false);
 
   const ALBACETE_CP = ["02001", "02002", "02003", "02004", "02005", "02006", "02007", "02008"];
   const [cpError, setCpError] = useState({ origin: "", destination: "" });
@@ -97,9 +98,24 @@ export default function NewRequestContent() {
     }
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (force = false) => {
     setLoading(true);
+    setDuplicateWarning(false);
     try {
+      // Aviso de duplicado: si ya tiene un pedido pendiente de hace <30 min,
+      // avisar antes de crear otro (rehacer el asistente creaba dos pedidos).
+      if (!force) {
+        const mine = await base44.entities.TransportRequest.filter(
+          { created_by_id: user?.id, status: "pending" }, "-created_date", 5
+        );
+        const recent = mine.find(o => Date.now() - new Date(o.created_date).getTime() < 30 * 60 * 1000);
+        if (recent) {
+          setDuplicateWarning(true);
+          setLoading(false);
+          return;
+        }
+      }
+
       simulateDistance();
       const finalPrice = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected);
 
@@ -548,8 +564,8 @@ export default function NewRequestContent() {
         ) : (
           <Button
             className="rounded-xl flex-1 h-12 gap-2"
-            disabled={loading}
-            onClick={handleSubmit}
+            disabled={loading || duplicateWarning}
+            onClick={() => handleSubmit(false)}
           >
             {loading ? (
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -560,6 +576,27 @@ export default function NewRequestContent() {
           </Button>
         )}
       </div>
+
+      {/* Aviso de pedido duplicado */}
+      {duplicateWarning && (
+        <div className="flex flex-col gap-3 p-4 rounded-xl bg-amber-50 border border-amber-300">
+          <div className="flex gap-2">
+            <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-amber-800">
+              <strong>Ya tienes una solicitud pendiente</strong> creada hace menos de 30 minutos.
+              Puedes verla en <a href="/my-orders" className="underline font-medium">Mis pedidos</a> — no hace falta crear otra.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="rounded-xl flex-1" onClick={() => router.push("/my-orders")}>
+              Ver mis pedidos
+            </Button>
+            <Button size="sm" className="rounded-xl flex-1" disabled={loading} onClick={() => handleSubmit(true)}>
+              Crear otra igualmente
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

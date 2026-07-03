@@ -1,10 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { base44 } from "@/api/base44Client";
-import { useAuth } from "@/lib/AuthContext";
 import { useQuery } from "@tanstack/react-query";
 import { useTariffs } from "@/lib/tariffs";
 import AdminLiveMap from "@/components/admin/AdminLiveMap";
@@ -15,8 +12,8 @@ import {
 } from "lucide-react";
 import { format, isAfter, startOfDay, startOfMonth, differenceInMinutes } from "date-fns";
 import { es } from "date-fns/locale";
+import { useAdminGuard } from "@/lib/useAdminGuard";
 
-const ADMIN_EMAIL = "renato.0550.calero@gmail.com";
 const PENDING_ALERT_MIN = 10;
 
 function Kpi({ icon: Icon, label, value, sub, alert }) {
@@ -33,9 +30,8 @@ function Kpi({ icon: Icon, label, value, sub, alert }) {
 }
 
 export default function AdminDashboard() {
-  const { user } = useAuth();
-  const router = useRouter();
   const tariffs = useTariffs();
+  const canRender = useAdminGuard({ allowStaff: true });
 
   const { data: orders = [] } = useQuery({
     queryKey: ["admin-orders"],
@@ -49,11 +45,7 @@ export default function AdminDashboard() {
     refetchInterval: 15000,
   });
 
-  const isUnauthorized = user && user.email !== ADMIN_EMAIL && user.role !== "admin";
-  useEffect(() => {
-    if (isUnauthorized) router.replace("/dashboard");
-  }, [isUnauthorized, router]);
-  if (isUnauthorized) return null;
+  if (!canRender) return null;
 
   const now = new Date();
   const today = startOfDay(now);

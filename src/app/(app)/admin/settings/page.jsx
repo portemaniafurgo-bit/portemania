@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Percent, CreditCard, Globe, Loader2, Save } from "lucide-react";
+import { useAdminGuard } from "@/lib/useAdminGuard";
 
 const FIELDS = [
   { key: "l1h1", label: `${vehicleData.l1h1.name} (base 2h, €)` },
@@ -19,6 +20,7 @@ const FIELDS = [
 ];
 
 export default function AdminSettings() {
+  const canRender = useAdminGuard();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -60,6 +62,8 @@ export default function AdminSettings() {
       setSaving(false);
     }
   };
+
+  if (!canRender) return null;
 
   if (!form) {
     return (

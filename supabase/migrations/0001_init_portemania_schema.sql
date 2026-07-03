@@ -18,6 +18,20 @@ as $$
   );
 $$;
 
+-- Empleados (rol 'staff'): pueden operar pedidos e incidencias pero NO tocar
+-- tarifas, usuarios ni verificación de conductores (eso sigue siendo is_admin).
+create or replace function public.is_staff()
+returns boolean
+language sql stable security definer
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles p
+    where p.id = auth.uid()
+      and (p.role in ('admin', 'staff') or p.email = 'renato.0550.calero@gmail.com')
+  );
+$$;
+
 create or replace function public.set_updated_date()
 returns trigger
 language plpgsql
@@ -283,7 +297,7 @@ create policy transport_requests_insert on public.transport_requests for insert
 drop policy if exists transport_requests_select on public.transport_requests;
 create policy transport_requests_select on public.transport_requests for select
   using (
-    public.is_admin()
+    public.is_staff()
     or created_by_id = auth.uid()
     or driver_id = auth.uid()
     or (
@@ -297,7 +311,7 @@ create policy transport_requests_select on public.transport_requests for select
 drop policy if exists transport_requests_update on public.transport_requests;
 create policy transport_requests_update on public.transport_requests for update
   using (
-    public.is_admin()
+    public.is_staff()
     or created_by_id = auth.uid()
     or driver_id = auth.uid()
     or (
@@ -316,7 +330,7 @@ create policy transport_requests_delete on public.transport_requests for delete
 drop policy if exists chat_messages_select on public.chat_messages;
 create policy chat_messages_select on public.chat_messages for select
   using (
-    public.is_admin()
+    public.is_staff()
     or exists (
       select 1 from public.transport_requests tr
       where tr.id = request_id
@@ -343,10 +357,10 @@ create policy incidents_insert on public.incidents for insert
   with check (auth.uid() is not null);
 drop policy if exists incidents_select on public.incidents;
 create policy incidents_select on public.incidents for select
-  using (created_by_id = auth.uid() or reporter_id = auth.uid() or public.is_admin());
+  using (created_by_id = auth.uid() or reporter_id = auth.uid() or public.is_staff());
 drop policy if exists incidents_update on public.incidents;
 create policy incidents_update on public.incidents for update
-  using (public.is_admin());
+  using (public.is_staff());
 drop policy if exists incidents_delete on public.incidents;
 create policy incidents_delete on public.incidents for delete
   using (public.is_admin());
@@ -418,6 +432,19 @@ set search_path = public
 as $$
 declare r public.transport_requests;
 begin
+  -- Aviso de duplicado: si ya hay un pedido PENDIENTE con el mismo teléfono en
+  -- los últimos 30 min, se rechaza salvo que el cliente confirme (force=true).
+  if not coalesce((payload->>'force')::boolean, false) then
+    if exists (
+      select 1 from public.transport_requests tr
+      where tr.client_phone = payload->>'client_phone'
+        and tr.status = 'pending'
+        and tr.created_date > now() - interval '30 minutes'
+    ) then
+      raise exception 'duplicate_pending';
+    end if;
+  end if;
+
   insert into public.transport_requests (
     client_name, client_phone, origin_address, destination_address,
     origin_lat, origin_lng, destination_lat, destination_lng,

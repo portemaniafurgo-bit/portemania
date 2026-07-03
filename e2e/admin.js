@@ -4,9 +4,45 @@ const { chromium } = require("playwright");
 const fs = require("fs");
 
 const BASE = "https://pontemania.vercel.app";
+const SB = "https://dnehzwrqphqpkcdjwqfi.supabase.co";
+const anon = fs.readFileSync(".env.local", "utf8").match(/ANON_KEY=(.+)/)[1].trim();
 const ADMIN = { email: "renato.0550.calero@gmail.com", pass: "PorteMania2026!" };
 const results = [];
 let page;
+
+const H = (tok) => ({ apikey: anon, "Content-Type": "application/json", ...(tok ? { Authorization: "Bearer " + tok } : {}) });
+const apiLogin = async (email, password) =>
+  (await (await fetch(SB + "/auth/v1/token?grant_type=password", { method: "POST", headers: H(), body: JSON.stringify({ email, password }) })).json()).access_token;
+
+// Siembra un pedido aceptado+pagado con petición de ayuda (para el detalle)
+async function seedOrder() {
+  const dtok = await apiLogin("conductor.test@portemania.es", "Conductor2026!");
+  const dUid = JSON.parse(Buffer.from(dtok.split(".")[1], "base64").toString()).sub;
+  const r = await fetch(SB + "/rest/v1/rpc/create_guest_request", {
+    method: "POST", headers: H(),
+    body: JSON.stringify({ payload: {
+      client_name: "PRUEBA ADMIN", client_phone: "600999888",
+      origin_address: "Calle Ancha 2, 02001 Albacete", destination_address: "Calle Mayor 5, 02002 Albacete",
+      cargo_description: "PRUEBA ADMIN caja grande", vehicle_type: "l1h1", estimated_price: 50,
+      needs_help: true, help_description: "Subir caja a un 2º sin ascensor", force: true,
+    } }),
+  });
+  const order = await r.json();
+  await fetch(SB + `/rest/v1/transport_requests?id=eq.${order.id}`, {
+    method: "PATCH", headers: H(dtok),
+    body: JSON.stringify({ status: "accepted", driver_id: dUid, driver_name: "Conductor Prueba", accepted_at: new Date().toISOString() }),
+  });
+  const atok = await apiLogin(ADMIN.email, ADMIN.pass);
+  await fetch(SB + `/rest/v1/transport_requests?id=eq.${order.id}`, {
+    method: "PATCH", headers: H(atok), body: JSON.stringify({ payment_status: "paid" }),
+  });
+  return order.id;
+}
+
+async function cleanup() {
+  const atok = await apiLogin(ADMIN.email, ADMIN.pass);
+  await fetch(SB + "/rest/v1/transport_requests?client_name=eq.PRUEBA%20ADMIN", { method: "DELETE", headers: H(atok) });
+}
 
 // isVisible() NO espera en Playwright; este helper sí.
 async function visible(locator, timeout = 15000) {
@@ -29,6 +65,8 @@ async function shot(name) {
 
 (async () => {
   fs.mkdirSync("shots", { recursive: true });
+  const seedId = await seedOrder();
+  console.log("seed pedido admin:", seedId);
   const browser = await chromium.launch();
   const ctx = await browser.newContext({
     viewport: { width: 1280, height: 900 },
@@ -123,11 +161,19 @@ async function shot(name) {
   ok("8a usuarios carga", await visible(page.locator("text=/Email|Rol|usuario/i"), 20000));
   await page.goto(BASE + "/admin/incidents", { waitUntil: "networkidle" });
   ok("8b incidencias carga", await visible(page.locator("text=/incidencia/i"), 20000));
+  await page.goto(BASE + "/admin/finance", { waitUntil: "networkidle" });
+  ok("8c finanzas carga", await visible(page.locator("h1:has-text('Finanzas')"), 20000));
+  ok("8d liquidaciones con neto", await visible(page.locator("text=Neto a liquidar"), 10000));
+  await page.goto(BASE + "/admin/stats", { waitUntil: "networkidle" });
+  ok("8e estadísticas cargan", await visible(page.locator("text=Horas punta"), 20000));
+  ok("8f menú con Finanzas y Estadísticas", (await visible(page.locator("a:has-text('Finanzas')"), 5000)) && (await visible(page.locator("a:has-text('Estadísticas')"), 5000)));
 
   // ---------- 9. Consola ----------
   ok("9 sin errores de consola", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
 
   await browser.close();
+  await cleanup();
+  console.log("limpieza hecha");
   const fails = results.filter(r => !r.pass);
   console.log(`\n==== ${results.length - fails.length}/${results.length} PASS ====`);
   if (fails.length) { console.log("FALLOS:"); fails.forEach(f => console.log(" -", f.name, f.note)); process.exit(1); }
