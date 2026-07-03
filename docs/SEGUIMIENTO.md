@@ -85,7 +85,7 @@ npx vercel deploy --prod --yes   # deploy a producción
 - Datos de prueba de todas las rondas borrados; BD limpia (0 pedidos, 0 candidaturas, conductor de prueba a 5.0/0 viajes).
 
 ### 2026-07-03 — Fase 2 del admin + Stripe real + duplicados + roles
-- **Stripe server-side**: Edge Function `create-payment-intent` (valida que el pedido sea del usuario y crea el cargo real); `/payment` confirma con `confirmCardPayment`. Mientras no esté configurado el secreto `STRIPE_SECRET_KEY`, cae automáticamente al modo anterior (validar tarjeta sin cargo). **Falta: pegar la clave `sk_test_` como secreto.**
+- **Stripe server-side**: Edge Function `create-payment-intent` (valida que el pedido sea del usuario y crea el cargo real); `/payment` confirma con `confirmCardPayment`. Mientras no esté configurado el secreto `STRIPE_SECRET_KEY`, cae automáticamente al modo anterior (validar tarjeta sin cargo). ✅ Secreto `STRIPE_SECRET_KEY` configurado (2026-07-03): el cargo real funciona de punta a punta (verificado con un pago de 50€ de test que aparece en el dashboard de Stripe). Al lanzar: cambiar a claves `live`.
 - **Finanzas** (`/admin/finance`): liquidaciones por conductor y periodo (semana/mes/todo) — efectivo lo cobra el conductor (debe comisión), tarjeta lo cobra la empresa (debe su parte); neto compensado. Export **CSV** de liquidaciones y de pedidos (formato Excel ES).
 - **Estadísticas** (`/admin/stats`): pedidos por zona (CP 02001–08), horas punta, día de la semana y tipo de furgoneta.
 - **Aviso de pedido duplicado**: si hay un pendiente con el mismo teléfono (<30 min), ambos formularios avisan y piden confirmación ("Crear otra igualmente"). En invitado lo valida la RPC (`force`), en autenticado el cliente.
@@ -97,7 +97,7 @@ npx vercel deploy --prod --yes   # deploy a producción
 **Para lanzar en real:**
 1. Publicar la pantalla de consentimiento de Google (o añadir test users mientras).
 2. Verificar dominio en Resend → los avisos por email llegarán a los conductores.
-3. Stripe: cuenta activada + clave `pk_live_` (y más adelante webhook para confirmar pagos server-side).
+3. Al lanzar en real: cambiar Stripe de claves `test` a `live` (publicable en Vercel, secreta en el secreto de la Edge Function).
 
 **Fase 2 del admin (propuesta ya definida):**
 4. Dinero: desglose efectivo/tarjeta y liquidaciones por conductor (85/15) por semana/mes.

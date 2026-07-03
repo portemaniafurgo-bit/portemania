@@ -58,6 +58,9 @@ Deno.serve(async (req: Request) => {
   const params = new URLSearchParams({
     amount: String(amount),
     currency: "eur",
+    // Solo tarjeta, sin métodos con redirección: confirmCardPayment no necesita return_url
+    "automatic_payment_methods[enabled]": "true",
+    "automatic_payment_methods[allow_redirects]": "never",
     "metadata[order_id]": order.id,
     "metadata[client_name]": order.client_name || "",
     description: `PorteManía pedido ${String(order.id).slice(0, 8)}`,
