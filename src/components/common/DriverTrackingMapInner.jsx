@@ -1,7 +1,7 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet";
 import L from "leaflet";
 import { useEffect } from "react";
 
@@ -53,7 +53,7 @@ function PanTo({ position }) {
   return null;
 }
 
-export default function DriverTrackingMapInner({ driverLocation, originLat, originLng, destLat, destLng }) {
+export default function DriverTrackingMapInner({ driverLocation, originLat, originLng, destLat, destLng, route, height = 220, badge }) {
   const center = driverLocation
     ? [driverLocation.lat, driverLocation.lng]
     : originLat && originLng
@@ -61,14 +61,18 @@ export default function DriverTrackingMapInner({ driverLocation, originLat, orig
     : [39.0, -1.86]; // Albacete por defecto
 
   return (
-    <div className="rounded-2xl overflow-hidden border border-border relative">
-      {driverLocation && (
+    <div className="rounded-2xl overflow-hidden border border-border relative z-0">
+      {(driverLocation || badge) && (
         <div className="absolute top-3 left-3 z-[1000] bg-white/90 backdrop-blur-sm rounded-xl px-3 py-1.5 text-xs font-medium text-foreground shadow flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          Conductor en tiempo real
+          {badge || "Conductor en tiempo real"}
         </div>
       )}
-      <MapContainer center={center} zoom={14} style={{ height: "220px", width: "100%", zIndex: 1 }} zoomControl={false}>
+      <MapContainer center={center} zoom={14} style={{ height: `${height}px`, width: "100%", zIndex: 1 }} zoomControl={false}>
+        {/* Ruta por carretera (OSRM) estilo Uber */}
+        {route?.length > 1 && (
+          <Polyline positions={route} pathOptions={{ color: "#3b82f6", weight: 5, opacity: 0.75 }} />
+        )}
         <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
         {driverLocation && (

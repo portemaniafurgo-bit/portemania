@@ -8,9 +8,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import StatusBadge from "@/components/common/StatusBadge";
 import { vehicleData } from "@/components/common/VehicleCard";
-import { ArrowLeft, Send, MapPin, Truck, CheckCircle, Package, MessageCircle, Loader2, XCircle } from "lucide-react";
+import { ArrowLeft, Send, MapPin, Truck, CheckCircle, Package, MessageCircle, Loader2, XCircle, Navigation } from "lucide-react";
 import PhotoLightbox from "@/components/common/PhotoLightbox";
+import DriverTrackingMap from "@/components/common/DriverTrackingMap";
 import { Textarea } from "@/components/ui/textarea";
+import { fetchRouteEta, geocodeAlbacete, distanceKm } from "@/lib/eta";
+import { format, addMinutes } from "date-fns";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 const STEPS = [
@@ -44,6 +47,9 @@ export default function ActiveJob() {
   const [fbTags, setFbTags] = useState([]);
   const [fbText, setFbText] = useState("");
   const [fbSent, setFbSent] = useState(false);
+  const [myPos, setMyPos] = useState(null);
+  const [eta, setEta] = useState(null);
+  const [targetCoords, setTargetCoords] = useState(null);
 
   const { data: job, isLoading } = useQuery({
     queryKey: ["job", id],
@@ -56,6 +62,7 @@ export default function ActiveJob() {
     if (!user?.id || !job || ["delivered", "cancelled"].includes(job.status)) return;
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(async (pos) => {
+      setMyPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       const profiles = await base44.entities.DriverProfile.filter({ created_by_id: user.id });
       const profile = profiles?.[0];
       if (profile) {
@@ -72,6 +79,40 @@ export default function ActiveJob() {
     const interval = setInterval(sendLocation, 15000);
     return () => clearInterval(interval);
   }, [sendLocation]);
+
+  // Destino actual del conductor: la recogida hasta cargar, luego la entrega.
+  // Si el pedido no tiene coordenadas, se geocodifica la dirección (una vez).
+  useEffect(() => {
+    if (!job || ["delivered", "cancelled", "pending"].includes(job.status)) return;
+    const goingToPickup = ["accepted", "in_transit"].includes(job.status);
+    const lat = goingToPickup ? job.origin_lat : job.destination_lat;
+    const lng = goingToPickup ? job.origin_lng : job.destination_lng;
+    const label = goingToPickup ? "la recogida" : "la entrega";
+    const address = goingToPickup ? job.origin_address : job.destination_address;
+    if (lat && lng) {
+      setTargetCoords({ lat, lng, label, address });
+      return;
+    }
+    let active = true;
+    geocodeAlbacete(address).then(coords => {
+      if (active && coords) setTargetCoords({ ...coords, label, address });
+    });
+    return () => { active = false; };
+  }, [job?.status, job?.origin_address, job?.destination_address]);
+
+  // ETA + ruta del conductor hacia su destino (recalcula máx. cada 15 s)
+  const lastEtaCalc = useRef(0);
+  useEffect(() => {
+    if (!myPos || !targetCoords) return;
+    const now = Date.now();
+    if (now - lastEtaCalc.current < 15000) return;
+    lastEtaCalc.current = now;
+    let active = true;
+    fetchRouteEta(myPos, targetCoords).then(result => {
+      if (active && result) setEta({ ...result, label: targetCoords.label });
+    });
+    return () => { active = false; };
+  }, [myPos, targetCoords]);
 
   const { data: messages = [] } = useQuery({
     queryKey: ["chat", id],
@@ -211,6 +252,61 @@ export default function ActiveJob() {
           })}
         </div>
       </div>
+
+      {/* Mapa con mi ruta + ETA + navegación (solo durante el servicio) */}
+      {!isFinished && targetCoords && (() => {
+        const arriving = myPos && distanceKm(myPos, targetCoords) < 0.12;
+        const gmapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${targetCoords.lat},${targetCoords.lng}&travelmode=driving`;
+        const wazeUrl = `https://waze.com/ul?ll=${targetCoords.lat},${targetCoords.lng}&navigate=yes`;
+        return (
+          <div className="space-y-3">
+            {arriving ? (
+              <div className="bg-emerald-50 rounded-2xl border-2 border-emerald-300 p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-lg flex-shrink-0 animate-pulse">📍</div>
+                <p className="font-display font-bold text-emerald-800 leading-tight">
+                  Estás llegando a {targetCoords.label}
+                </p>
+              </div>
+            ) : eta ? (
+              <div className="bg-primary/5 rounded-2xl border-2 border-primary/20 p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-lg flex-shrink-0">🧭</div>
+                <div>
+                  <p className="font-display font-bold text-foreground leading-tight">
+                    Llegas a {eta.label} en ~{eta.minutes} min
+                    <span className="text-primary"> · {format(addMinutes(new Date(), eta.minutes), "HH:mm")}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">{eta.km} km por carretera · se actualiza con tu GPS</p>
+                </div>
+              </div>
+            ) : null}
+
+            <DriverTrackingMap
+              driverLocation={myPos}
+              originLat={["accepted", "in_transit"].includes(job.status) ? targetCoords.lat : job.origin_lat}
+              originLng={["accepted", "in_transit"].includes(job.status) ? targetCoords.lng : job.origin_lng}
+              destLat={job.status === "picked_up" ? targetCoords.lat : job.destination_lat}
+              destLng={job.status === "picked_up" ? targetCoords.lng : job.destination_lng}
+              route={eta?.coords}
+              height={260}
+              badge={`Tu ruta hacia ${targetCoords.label}`}
+            />
+
+            {/* Navegación con la app del móvil (deep links gratis) */}
+            <div className="grid grid-cols-2 gap-3">
+              <a href={gmapsUrl} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" className="w-full rounded-xl gap-2 h-11">
+                  <Navigation className="w-4 h-4 text-primary" /> Google Maps
+                </Button>
+              </a>
+              <a href={wazeUrl} target="_blank" rel="noopener noreferrer">
+                <Button variant="outline" className="w-full rounded-xl gap-2 h-11">
+                  <Navigation className="w-4 h-4 text-sky-500" /> Waze
+                </Button>
+              </a>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Route */}
       <div className="bg-card rounded-2xl border border-border p-5 space-y-3">

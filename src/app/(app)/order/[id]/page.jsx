@@ -12,11 +12,11 @@ import StatusBadge from "@/components/common/StatusBadge";
 import RatingVans from "@/components/common/RatingVans";
 import { vehicleData } from "@/components/common/VehicleCard";
 import { ArrowLeft, Send, MessageCircle, Loader2, CreditCard, Banknote } from "lucide-react";
-import { format } from "date-fns";
+import { format, addMinutes } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState, useEffect, useRef } from "react";
 import DriverTrackingMap from "@/components/common/DriverTrackingMap";
-import { fetchRouteEta, geocodeAlbacete } from "@/lib/eta";
+import { fetchRouteEta, geocodeAlbacete, distanceKm } from "@/lib/eta";
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -262,27 +262,49 @@ export default function OrderDetail() {
         </div>
       )}
 
-      {/* ETA en tiempo real */}
-      {eta && ["accepted", "in_transit", "picked_up"].includes(order.status) && (
-        <div className="bg-primary/5 rounded-2xl border-2 border-primary/20 p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-lg flex-shrink-0">🚐</div>
-          <div>
-            <p className="font-display font-bold text-foreground text-lg leading-tight">
-              Llega a {eta.label} en ~{eta.minutes} min
-            </p>
-            <p className="text-xs text-muted-foreground">{eta.km} km por carretera · se actualiza en vivo</p>
-          </div>
-        </div>
-      )}
+      {/* ETA en tiempo real / llegada inminente */}
+      {["accepted", "in_transit", "picked_up"].includes(order.status) && (() => {
+        const arriving =
+          driverLocation && targetCoords && distanceKm(driverLocation, targetCoords) < 0.12;
+        if (arriving) {
+          return (
+            <div className="bg-emerald-50 rounded-2xl border-2 border-emerald-300 p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center text-lg flex-shrink-0 animate-pulse">🚐</div>
+              <div>
+                <p className="font-display font-bold text-emerald-800 text-lg leading-tight">
+                  ¡El conductor está llegando a {targetCoords.label}!
+                </p>
+                <p className="text-xs text-emerald-600">A menos de 100 metros</p>
+              </div>
+            </div>
+          );
+        }
+        if (eta) {
+          return (
+            <div className="bg-primary/5 rounded-2xl border-2 border-primary/20 p-4 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-lg flex-shrink-0">🚐</div>
+              <div>
+                <p className="font-display font-bold text-foreground text-lg leading-tight">
+                  Llega a {eta.label} en ~{eta.minutes} min
+                  <span className="text-primary"> · {format(addMinutes(new Date(), eta.minutes), "HH:mm")}</span>
+                </p>
+                <p className="text-xs text-muted-foreground">{eta.km} km por carretera · se actualiza en vivo</p>
+              </div>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
-      {/* Map */}
+      {/* Map con la ruta del conductor */}
       {order.status !== "cancelled" && (
         <DriverTrackingMap
           driverLocation={driverLocation}
-          originLat={order.origin_lat}
-          originLng={order.origin_lng}
+          originLat={order.origin_lat ?? targetCoords?.lat}
+          originLng={order.origin_lng ?? targetCoords?.lng}
           destLat={order.destination_lat}
           destLng={order.destination_lng}
+          route={eta?.coords}
         />
       )}
 

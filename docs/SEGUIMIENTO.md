@@ -101,6 +101,13 @@ npx vercel deploy --prod --yes   # deploy a producción
 - **Bug de valoración ARREGLADO**: la puntuación del conductor no se actualizaba porque el cliente no tiene permiso (RLS) para escribir en driver_profiles; ahora lo recalcula un **trigger** en la BD (`sync_driver_rating`) al entregar y al valorar. Verificado.
 - Suites E2E actualizadas: **21/21 flujos + 30/30 admin** en producción.
 
+### 2026-07-04 — Sistema de rutas en vivo (estilo Uber)
+- **Cliente**: ruta por carretera dibujada en el mapa (conductor → recogida; tras cargar, → entrega), ETA con **hora estimada de llegada** ('~3 min · 15:54') actualizándose en vivo, y banner verde "¡El conductor está llegando!" a <100 m.
+- **Conductor** (pensado para móvil): mapa con su posición, destino de la fase actual y la ruta dibujada; su propio ETA; y botones **Google Maps / Waze** (deep links) que abren el navegador del teléfono con el destino puesto.
+- Técnica: OSRM devuelve también la geometría de la ruta (gratis); geocodificación migrada a **Photon** (komoot) con Nominatim de respaldo — Nominatim bloqueaba peticiones por User-Agent y era frágil. Detección de llegada por distancia haversine.
+- Limitación conocida: al ser web, el GPS del conductor solo emite con la pestaña abierta y pantalla encendida; mientras navega con Google Maps la posición se congela (solución definitiva: PWA/nativa, roadmap).
+- Suites: **29/29 flujos + 30/30 admin** (checks nuevos: mapa/ruta/ETA/hora/botones ambos lados).
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

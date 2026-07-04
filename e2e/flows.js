@@ -54,9 +54,25 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     body: JSON.stringify({ status: "delivered", pickup_time: new Date().toISOString(), delivery_time: new Date().toISOString() }),
   });
   console.log("seed entregado:", seed.id);
+  // Pedido activo (aceptado) para verificar el tracking del cliente
+  r = await fetch(SB + "/rest/v1/transport_requests", {
+    method: "POST", headers: { ...H(ctok), Prefer: "return=representation" },
+    body: JSON.stringify({
+      client_name: "Cliente Prueba", client_phone: "600111222",
+      origin_address: "Calle Ancha 2, 02001 Albacete", destination_address: "Calle Mayor 5, 02002 Albacete",
+      cargo_description: "SEED FLOWS activo tracking", cargo_photos: [], vehicle_type: "small",
+      estimated_price: 40, payment_method: "cash", status: "pending", payment_status: "pending",
+    }),
+  });
+  const seedActive = (await r.json())[0];
+  await fetch(SB + "/rest/v1/transport_requests?id=eq." + seedActive.id, {
+    method: "PATCH", headers: H(dtok),
+    body: JSON.stringify({ status: "accepted", driver_id: dUid, driver_name: "Conductor Prueba", accepted_at: new Date().toISOString() }),
+  });
+  console.log("seed activo:", seedActive.id);
 
   const browser = await chromium.launch();
-  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: "es-ES" });
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: "es-ES", geolocation: { latitude: 38.9943, longitude: -1.8585 }, permissions: ["geolocation"] });
   page = await ctx.newPage();
   const consoleErrors = [];
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text().slice(0, 200)); });
@@ -113,6 +129,13 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await reqCard.locator("button:has-text('Aceptar servicio')").click();
   ok("2c acepta y va al trabajo", await page.waitForURL(/driver\/job/, { timeout: 20000 }).then(() => true).catch(() => false));
   ok("2d ayuda visible en trabajo activo", await visible(page.locator("text=El cliente pide ayuda"), 10000));
+  // Sistema de rutas del conductor (estilo Uber)
+  ok("2e mapa con ruta hacia destino", await visible(page.locator("text=Tu ruta hacia"), 25000));
+  ok("2f botón Google Maps", await visible(page.locator("a[href*='google.com/maps']"), 8000));
+  ok("2g botón Waze", await visible(page.locator("a[href*='waze.com']"), 5000));
+  ok("2h ETA del conductor con hora", await visible(page.locator("text=/Llegas a la recogida en ~/"), 30000));
+  ok("2i ruta dibujada en el mapa", await visible(page.locator("path.leaflet-interactive"), 15000));
+  await shot("11b-conductor-ruta");
   await shot("11-conductor-job");
   // cerrar sesión del conductor
   await page.click("text=Cerrar sesión").catch(() => {});
@@ -132,6 +155,12 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok("3e nombre completo del conductor", await visible(page.locator("text=Conductor Prueba"), 5000));
   ok("3f puede valorar", await visible(page.locator("text=/Valora|valoración/i"), 5000));
   await shot("12-cliente-entregado");
+  // Tracking en vivo del pedido ACTIVO (ETA + hora + ruta)
+  await page.goto(BASE + "/order/" + seedActive.id, { waitUntil: "networkidle" });
+  ok("3g ETA visible para el cliente", await visible(page.locator("text=/Llega a la recogida en ~/"), 30000));
+  ok("3h hora estimada de llegada", await visible(page.locator("text=/\\d{1,2}:\\d{2}/"), 8000));
+  ok("3i ruta dibujada en el mapa del cliente", await visible(page.locator("path.leaflet-interactive"), 15000));
+  await shot("13-cliente-tracking");
 
   // ===== 4. Consola =====
   ok("4 sin errores de consola", consoleErrors.length === 0, consoleErrors.slice(0, 3).join(" | "));
@@ -141,6 +170,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   // ===== LIMPIEZA vía API (admin) =====
   const atok = await login("renato.0550.calero@gmail.com", "PorteMania2026!");
   await fetch(SB + "/rest/v1/transport_requests?cargo_description=like.SEED%20FLOWS*", { method: "DELETE", headers: H(atok) });
+  await fetch(SB + "/rest/v1/driver_profiles?email=eq.conductor.test@portemania.es", { method: "PATCH", headers: H(atok), body: JSON.stringify({ current_lat: 39.0, current_lng: -1.86 }) });
   await fetch(SB + "/rest/v1/transport_requests?client_name=eq.INVITADO%20E2E", { method: "DELETE", headers: H(atok) });
   await fetch(SB + "/rest/v1/driver_profiles?email=eq.conductor.test@portemania.es", { method: "PATCH", headers: H(atok), body: JSON.stringify({ average_rating: 5, total_trips: 0 }) });
   console.log("limpieza hecha");
