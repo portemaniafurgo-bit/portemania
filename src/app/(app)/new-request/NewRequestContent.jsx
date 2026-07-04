@@ -396,14 +396,24 @@ export default function NewRequestContent() {
         {step === 3 && (
           <motion.div key="step3" {...stepVariants} className="space-y-4">
             <p className="text-sm text-muted-foreground">Selecciona el tipo de vehículo adecuado para tu carga</p>
-            {/* Curbside reminder */}
-            <div className="flex gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
-              <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-amber-800">
-                <p className="font-semibold mb-0.5">Entrega y recogida a pie de calle</p>
-                <p>El conductor no sube a pisos ni realiza montaje. La mercancía debe estar accesible en la puerta o planta baja.</p>
+            {/* Recordatorio según si contrató ayuda */}
+            {form.needs_help ? (
+              <div className="flex gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                <span className="flex-shrink-0">🤝</span>
+                <div className="text-sm text-emerald-800">
+                  <p className="font-semibold mb-0.5">Ayuda del conductor contratada</p>
+                  <p>El conductor te ayudará a subir/bajar la mercancía (incluido en el precio).</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
+                <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-amber-800">
+                  <p className="font-semibold mb-0.5">Entrega y recogida a pie de calle</p>
+                  <p>El conductor no sube a pisos ni realiza montaje. La mercancía debe estar accesible en la puerta o planta baja.</p>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-1 gap-3">
               {Object.keys(vehicleData).map(type => (
                 <VehicleCard
@@ -496,10 +506,17 @@ export default function NewRequestContent() {
             </div>
 
             {/* Notice */}
+            {form.needs_help ? (
+              <div className="flex gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
+                <span className="flex-shrink-0">🤝</span>
+                <p className="text-sm text-emerald-800">Con <strong>ayuda del conductor</strong>: te ayudará a subir/bajar la mercancía.</p>
+              </div>
+            ) : (
             <div className="flex gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
               <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-amber-800">Recogida y entrega <strong>a pie de calle</strong>. El transportista no sube a pisos ni realiza montaje.</p>
             </div>
+            )}
 
             {/* Options */}
             <div className="bg-card rounded-2xl border border-border p-5">
