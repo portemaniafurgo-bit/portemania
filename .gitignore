@@ -44,3 +44,5 @@ next-env.d.ts
 
 # Export original de Base44 — solo referencia local, no forma parte del repo
 /base44/
+
+.env*

@@ -12,7 +12,7 @@ Plataforma web de transporte y portes on-demand ("Uber de furgonetas") para **Al
 - **Producción:** https://pontemania.vercel.app
 - **Repo:** https://github.com/portemaniafurgo-bit/portemania
 - **Supabase:** proyecto `dnehzwrqphqpkcdjwqfi` (cuenta portemaniafurgo, eu-west-2)
-- **Vercel:** cuenta rodriguezmartinezlw (team luis-projects) — deploy con `npx vercel deploy --prod --yes`
+- **Vercel:** cuenta del negocio **portemaniafurgo@gmail.com** (proyecto prj_VyWeiIL9kVTwyNU6FKlkU4nLRAi0), **vinculado a GitHub: cada push a master despliega solo**. Deploy manual opcional: `npx vercel deploy --prod --yes --token <token del negocio>`. Migrado desde la cuenta personal el 2026-07-04 (proyecto viejo borrado con autorización).
 
 ## 2. Cronología de lo hecho
 
