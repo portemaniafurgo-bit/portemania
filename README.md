@@ -1,6 +1,6 @@
 # ClicyVoy 🚐
 
-> Antes **ClicyVoy** — renombrado el 2026-07-04. La carpeta del proyecto y el repo conservan el nombre técnico original.
+> Antes **PorteManía** — renombrado el 2026-07-04. La carpeta del proyecto y el repo conservan el nombre técnico original.
 
 Plataforma web **responsive** de transporte y portes **on-demand** ("un Uber de furgonetas") para **Albacete capital**. Conecta a clientes que necesitan mover mercancía con conductores autónomos verificados.
 
@@ -29,15 +29,14 @@ Criterios de éxito que guiaron el trabajo:
 
 ## 2. ¿Qué hace la aplicación?
 
-Servicio de portes **a pie de calle** dentro de Albacete capital (CP 02001–02008). Tres tipos de furgoneta con tarifa por 2h + horas extra + seguro opcional:
+Servicio de portes dentro de Albacete capital (CP 02001–02008). Dos tamaños de furgoneta (tarifa por 2h + extras; precios editables en Admin → Ajustes):
 
-| Vehículo | Capacidad | Base (2h) |
+| Vehículo | Base (2h) | Con ayuda del conductor |
 |---|---|---|
-| L1H1 | hasta 5 m³ · 800 kg | 50 € |
-| L1H2 | hasta 7 m³ · 1.000 kg | 60 € |
-| L2H2 | hasta 12 m³ · 1.500 kg | 85 € |
+| Furgoneta pequeña | 40 € | 70 € |
+| Furgoneta grande | 60 € | 90 € |
 
-Hora extra: **15 €/h**. Seguro de mercancía: **12 €**. Pago con **tarjeta** (Stripe) o **efectivo** al conductor.
+Hora extra: **15 €/h**. Seguro de mercancía: **12 €**. Ayuda del conductor (subir/bajar): **+30 €**. Sin ayuda, la mercancía debe estar preparada a pie de calle. Pago con **tarjeta** (Stripe) o **efectivo** al conductor.
 
 ### Roles y áreas
 - **Público**: landing, solicitud como invitado (sin cuenta), candidatura de conductor (`/ser-conductor`), páginas legales.
