@@ -1,3 +1,5 @@
+import PreciosVigentes from "./PreciosVigentes";
+
 export const metadata = {
   title: "Términos y Condiciones — ClicyVoy",
 };
@@ -27,16 +29,9 @@ export default function TerminosPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-heading font-semibold text-foreground">3. Tipos de vehículo y precios</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          ClicyVoy ofrece tres tipos de furgoneta:
+          ClicyVoy ofrece dos tamaños de furgoneta (precios vigentes):
         </p>
-        <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-          <li><strong>Furgoneta pequeña</strong> — 40 € las primeras 2 horas</li>
-          <li><strong>Furgoneta grande</strong> — 60 € las primeras 2 horas</li>
-          <li><strong>Ayuda del conductor</strong> (subir/bajar mercancía) — suplemento de 30 €</li>
-        </ul>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Cada hora adicional se factura a <strong>15 €/hora</strong>. El seguro opcional de mercancía tiene un coste de 12 €. Los precios incluyen IVA.
-        </p>
+        <PreciosVigentes />
       </section>
 
       <section className="space-y-3">
