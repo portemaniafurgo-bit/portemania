@@ -4,7 +4,7 @@
 
 Plataforma web **responsive** de transporte y portes **on-demand** ("un Uber de furgonetas") para **Albacete capital**. Conecta a clientes que necesitan mover mercancía con conductores autónomos verificados.
 
-- **Producción:** https://clicyvoy.vercel.app (también responde https://pontemania.vercel.app)
+- **Producción:** https://clicyvoy.es (también responden clicyvoy.vercel.app y pontemania.vercel.app)
 - **Repositorio:** https://github.com/portemaniafurgo-bit/portemania
 - **Seguimiento del proyecto** (cronología, estado, roadmap): [docs/SEGUIMIENTO.md](./docs/SEGUIMIENTO.md)
 - **Estado:** portado, funcional y desplegado (2026-07-01); migrado a infraestructura propia (Supabase `dnehzwrqphqpkcdjwqfi` + repo oficial) el 2026-07-02. Preparado para ampliación.

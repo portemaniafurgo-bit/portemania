@@ -9,7 +9,7 @@
 
 Plataforma web de transporte y portes on-demand ("Uber de furgonetas") para **Albacete capital** (CP 02001–02008). Clientes (con cuenta o como invitados) piden portes; conductores autónomos verificados los aceptan; la empresa lo administra todo desde `/admin`.
 
-- **Producción:** https://pontemania.vercel.app
+- **Producción:** https://clicyvoy.es (dominio propio; también clicyvoy.vercel.app y pontemania.vercel.app)
 - **Repo:** https://github.com/portemaniafurgo-bit/portemania
 - **Supabase:** proyecto `dnehzwrqphqpkcdjwqfi` (cuenta portemaniafurgo, eu-west-2)
 - **Vercel:** cuenta del negocio **portemaniafurgo@gmail.com** (proyecto prj_VyWeiIL9kVTwyNU6FKlkU4nLRAi0), **vinculado a GitHub: cada push a master despliega solo**. Deploy manual opcional: `npx vercel deploy --prod --yes --token <token del negocio>`. Migrado desde la cuenta personal el 2026-07-04 (proyecto viejo borrado con autorización).
@@ -112,6 +112,11 @@ npx vercel deploy --prod --yes   # deploy a producción
 - Marca cambiada en toda la plataforma (16 archivos): logo (Clic**yVoy**), títulos/metadata, textos, emails y Edge Functions (redesplegadas).
 - Dominio nuevo **https://clicyvoy.vercel.app** reclamado y asignado; https://pontemania.vercel.app sigue funcionando (ambas sirven la app). Supabase site_url → clicyvoy; allowlist incluye ambas.
 - Pendiente del rebrand: el banner del hero es una imagen con el logo antiguo dibujado (hace falta un banner nuevo del negocio); añadir el origen clicyvoy.vercel.app en Google Cloud para el login con Google; los emails de prueba (@portemania.es) se mantienen porque son credenciales.
+
+### 2026-07-04 — Dominio propio clicyvoy.es y Vercel consolidado
+- El negocio compró **clicyvoy.es**: asignado al proyecto único de Vercel (www redirige al apex con 308). Supabase site_url → https://clicyvoy.es.
+- La instalación de GitHub había creado un proyecto Vercel duplicado ('portemania'); se movieron sus dominios al principal y se borró. Proyecto único: **clicyvoy** (todo verificado ✓).
+- Pendiente: añadir https://clicyvoy.es a los orígenes de Google OAuth (Google Cloud) para el login con Google desde el dominio nuevo.
 
 ## 5. Pendientes / roadmap
 
