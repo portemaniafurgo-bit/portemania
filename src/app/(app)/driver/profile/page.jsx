@@ -46,7 +46,7 @@ export default function DriverProfilePage() {
     phone: "",
     email: "",
     license_types: [],
-    vehicle_type: "l1h1",
+    vehicle_type: "small",
     vehicle_brand: "",
     vehicle_model: "",
     vehicle_year: "",
@@ -69,7 +69,7 @@ export default function DriverProfilePage() {
         phone: existingProfile.phone || "",
         email: existingProfile.email || user?.email || "",
         license_types: existingProfile.license_types || [],
-        vehicle_type: existingProfile.vehicle_type || "l1h1",
+        vehicle_type: existingProfile.vehicle_type || "small",
         vehicle_brand: existingProfile.vehicle_brand || "",
         vehicle_model: existingProfile.vehicle_model || "",
         vehicle_year: existingProfile.vehicle_year || "",
@@ -247,9 +247,8 @@ export default function DriverProfilePage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="l1h1">Furgoneta L1H1</SelectItem>
-                <SelectItem value="l1h2">Furgoneta L1H2</SelectItem>
-                <SelectItem value="l2h2">Furgoneta L2H2</SelectItem>
+                <SelectItem value="small">Furgoneta pequeña</SelectItem>
+                <SelectItem value="large">Furgoneta grande</SelectItem>
               </SelectContent>
             </Select>
           </div>

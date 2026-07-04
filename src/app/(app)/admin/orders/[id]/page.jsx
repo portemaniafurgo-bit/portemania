@@ -209,6 +209,35 @@ export default function AdminOrderDetail() {
         {order.cargo_photos?.length > 0 && <PhotoLightbox photos={order.cargo_photos} />}
       </div>
 
+      {/* Cancelación previa de un conductor */}
+      {order.driver_cancel_reason && (
+        <div className="bg-red-50 rounded-2xl border border-red-200 p-5 space-y-1">
+          <p className="text-xs text-red-500 font-medium uppercase tracking-wide">Cancelado antes de recoger por un conductor</p>
+          <p className="text-sm text-red-800">
+            <strong>{order.driver_cancel_name || "Conductor"}</strong>: {order.driver_cancel_reason}
+            {order.driver_cancel_note ? ` — “${order.driver_cancel_note}”` : ""}
+          </p>
+          {order.driver_cancel_at && (
+            <p className="text-xs text-red-500">{format(new Date(order.driver_cancel_at), "d MMM, HH:mm", { locale: es })}</p>
+          )}
+        </div>
+      )}
+
+      {/* Opinión del conductor al finalizar */}
+      {(order.driver_feedback_tags?.length > 0 || order.driver_feedback_text) && (
+        <div className="bg-card rounded-2xl border border-border p-5 space-y-2">
+          <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Opinión del conductor</p>
+          {order.driver_feedback_tags?.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {order.driver_feedback_tags.map(t => (
+                <span key={t} className="text-xs px-2.5 py-1 rounded-full bg-primary/10 text-primary font-medium">{t}</span>
+              ))}
+            </div>
+          )}
+          {order.driver_feedback_text && <p className="text-sm text-foreground italic">“{order.driver_feedback_text}”</p>}
+        </div>
+      )}
+
       {/* Pago */}
       <div className="bg-card rounded-2xl border border-border p-5 flex items-center justify-between">
         <div>

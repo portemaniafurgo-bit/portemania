@@ -92,6 +92,15 @@ npx vercel deploy --prod --yes   # deploy a producción
 - **Rol Empleado (staff)**: nueva función `is_staff()` y políticas RLS — el empleado ve/opera pedidos, chat e incidencias, pero NO tarifas, usuarios, conductores, finanzas ni estadísticas (menú filtrado + guards + RLS). El rol se asigna desde Admin → Usuarios (selector por usuario).
 - Suites E2E ampliadas y auto-sembradas: **18/18 flujos + 30/30 admin** en producción.
 
+### 2026-07-04 — Brief del negocio: furgonetas simples, ayuda con recargo, cancelación y opinión del conductor
+- **Furgonetas "pequeña" y "grande"** (adiós L1H1/L1H2/L2H2, que nadie entendía): fotos nuevas del negocio en `public/vehicles/` con nota "imagen de referencia, tamaño aprox.". Datos existentes migrados. **Reparto por tamaño**: pedido de furgoneta grande solo lo ven conductores con furgón grande (lista y emails); pedido pequeño lo ven todos.
+- **Precios nuevos**: pequeña **40 €** / grande **60 €** (2 h incluidas, hora extra 15 €) + **ayuda del conductor +30 €** — todo editable en Ajustes (`help_price` añadido).
+- **Checkbox condicionado**: con ayuda contratada desaparece "acepto recogida a pie de calle" (el conductor sube/baja contigo); sin ayuda es obligatorio y se advierte que la mercancía debe estar preparada a pie de calle.
+- **Cancelación del conductor** (solo antes de recoger): motivos predefinidos (pesada/voluminosa, carga mal especificada, sospecha de mercancía ilegal, cliente problemático, otro) → el pedido **vuelve a pendientes**, el motivo queda en el detalle del admin (recuadro rojo) y llega email a la empresa.
+- **Opinión del conductor al entregar**: chips (Precio justo / injusto / Mucho tiempo de espera) + texto libre → visible en el detalle del admin y email a la empresa.
+- **Bug de valoración ARREGLADO**: la puntuación del conductor no se actualizaba porque el cliente no tiene permiso (RLS) para escribir en driver_profiles; ahora lo recalcula un **trigger** en la BD (`sync_driver_rating`) al entregar y al valorar. Verificado.
+- Suites E2E actualizadas: **21/21 flujos + 30/30 admin** en producción.
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

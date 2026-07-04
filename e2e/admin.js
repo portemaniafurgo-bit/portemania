@@ -23,7 +23,7 @@ async function seedOrder() {
     body: JSON.stringify({ payload: {
       client_name: "PRUEBA ADMIN", client_phone: "600999888",
       origin_address: "Calle Ancha 2, 02001 Albacete", destination_address: "Calle Mayor 5, 02002 Albacete",
-      cargo_description: "PRUEBA ADMIN caja grande", vehicle_type: "l1h1", estimated_price: 50,
+      cargo_description: "PRUEBA ADMIN caja grande", vehicle_type: "small", estimated_price: 40,
       needs_help: true, help_description: "Subir caja a un 2º sin ascensor", force: true,
     } }),
   });
@@ -147,12 +147,12 @@ async function shot(name) {
 
   // ---------- 7. Ajustes ----------
   await page.goto(BASE + "/admin/settings", { waitUntil: "networkidle" });
-  const l1h1Input = page.locator("div:has(> label:has-text('L1H1')) input").first();
-  const inputVisible = await visible(l1h1Input, 20000);
+  const smallInput = page.locator("div:has(> label:has-text('pequeña')) input").first();
+  const inputVisible = await visible(smallInput, 20000);
   ok("7a tarifas cargan", inputVisible);
   if (inputVisible) {
-    const val = await l1h1Input.inputValue();
-    ok("7b L1H1 = 50", val === "50", "valor: " + val);
+    const val = await smallInput.inputValue();
+    ok("7b pequeña = 40", val === "40", "valor: " + val);
   }
   await shot("07-admin-settings");
 

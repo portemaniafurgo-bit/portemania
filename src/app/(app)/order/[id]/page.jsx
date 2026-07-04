@@ -142,26 +142,12 @@ export default function OrderDetail() {
 
   const rateMutation = useMutation({
     mutationFn: async () => {
+      // La media y el nº de viajes del conductor los recalcula un trigger en la
+      // BD (el cliente no tiene permiso para escribir en driver_profiles).
       await base44.entities.TransportRequest.update(id, {
         client_rating: rating,
         client_review: review,
       });
-      // Actualizar puntuación media del conductor
-      if (order?.driver_id) {
-        const profiles = await base44.entities.DriverProfile.filter({ created_by_id: order.driver_id });
-        const profile = profiles?.[0];
-        if (profile) {
-          const allRated = await base44.entities.TransportRequest.filter({ driver_id: order.driver_id });
-          const rated = allRated.filter(r => r.client_rating && r.id !== id);
-          const total = rated.length + 1;
-          const sum = rated.reduce((acc, r) => acc + r.client_rating, 0) + rating;
-          const newAvg = sum / total;
-          await base44.entities.DriverProfile.update(profile.id, {
-            average_rating: Math.round(newAvg * 10) / 10,
-            total_trips: total,
-          });
-        }
-      }
     },
     onSuccess: async () => {
       const res = await base44.entities.TransportRequest.get(id);

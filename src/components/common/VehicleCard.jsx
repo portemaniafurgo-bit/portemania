@@ -1,29 +1,25 @@
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+// Dos tamaños de cara al cliente: pequeña y grande. Las fotos son solo una
+// referencia orientativa del tamaño (no el modelo exacto del conductor).
 const vehicleData = {
-  l1h1: {
-    name: "Furgoneta L1H1",
-    description: "Ideal para mudanzas pequeñas, cajas y objetos ligeros",
-    capacity: "Hasta 5m³ · 800kg",
-    photo: "https://media.base44.com/images/public/6a32f79927b9d0ad42c1c9e5/6786c0cfd_l1h1.png",
-    basePrice: 50,
+  small: {
+    name: "Furgoneta pequeña",
+    icon: "🚐",
+    description: "Ideal para cajas, electrodomésticos y muebles sueltos",
+    capacity: "Tamaño orientativo · carga pequeña",
+    photo: "/vehicles/pequena.jpeg",
+    basePrice: 40,
     includedHours: 2,
   },
-  l1h2: {
-    name: "Furgoneta L1H2",
-    description: "Mayor altura, perfecta para muebles altos y electrodomésticos",
-    capacity: "Hasta 7m³ · 1.000kg",
-    photo: "https://media.base44.com/images/public/6a32f79927b9d0ad42c1c9e5/1a7857a53_l1h2.png",
+  large: {
+    name: "Furgoneta grande",
+    icon: "🚚",
+    description: "Para mudanzas pequeñas y cargas voluminosas",
+    capacity: "Tamaño orientativo · carga grande",
+    photo: "/vehicles/grande.jpeg",
     basePrice: 60,
-    includedHours: 2,
-  },
-  l2h2: {
-    name: "Furgoneta L2H2",
-    description: "Gran capacidad para mudanzas medianas y cargas voluminosas",
-    capacity: "Hasta 12m³ · 1.500kg",
-    photo: "https://media.base44.com/images/public/6a32f79927b9d0ad42c1c9e5/b65b63982_l2h2.png",
-    basePrice: 85,
     includedHours: 2,
   },
 };
@@ -50,8 +46,11 @@ export default function VehicleCard({ type, selected, onClick, price }) {
           <Check className="w-3.5 h-3.5 text-primary-foreground" />
         </div>
       )}
-      <div className="h-36 w-full overflow-hidden">
-        <img src={vehicle.photo} alt={vehicle.name} className="w-full h-full object-cover" />
+      <div className="h-36 w-full overflow-hidden bg-white relative">
+        <img src={vehicle.photo} alt={vehicle.name} className="w-full h-full object-contain" />
+        <span className="absolute bottom-1.5 right-2 text-[10px] text-muted-foreground bg-white/80 rounded px-1.5 py-0.5">
+          Imagen de referencia (tamaño aprox.)
+        </span>
       </div>
       <div className="p-4">
         <h3 className="font-heading font-semibold text-foreground">{vehicle.name}</h3>

@@ -15,11 +15,22 @@ export default function DriverRequests() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const { data: requests = [], isLoading } = useQuery({
+  const { data: allRequests = [], isLoading } = useQuery({
     queryKey: ["pending-requests"],
     queryFn: () => base44.entities.TransportRequest.filter({ status: "pending" }, "-created_date", 20),
     refetchInterval: 10000,
   });
+
+  const { data: myProfiles = [] } = useQuery({
+    queryKey: ["my-driver-profile", user?.id],
+    queryFn: () => base44.entities.DriverProfile.filter({ created_by_id: user?.id }),
+    enabled: !!user?.id,
+  });
+
+  // Reparto por tamaño: un furgón grande puede con todo; los pedidos de
+  // furgoneta grande solo los ven conductores con furgón grande.
+  const myVehicle = myProfiles?.[0]?.vehicle_type;
+  const requests = allRequests.filter(r => r.vehicle_type !== "large" || myVehicle === "large");
 
   const acceptMutation = useMutation({
     mutationFn: async (requestId) => {

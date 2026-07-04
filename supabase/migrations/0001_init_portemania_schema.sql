@@ -164,7 +164,16 @@ create table if not exists public.transport_requests (
   pickup_time timestamptz,
   delivery_time timestamptz,
   client_rating numeric,
-  client_review text
+  client_review text,
+  -- Cancelación por el conductor antes de recoger: el pedido vuelve a pendiente
+  -- y queda el motivo registrado para el admin.
+  driver_cancel_reason text,
+  driver_cancel_note text,
+  driver_cancel_name text,
+  driver_cancel_at timestamptz,
+  -- Opinión del conductor al finalizar (chips + texto libre), visible en admin.
+  driver_feedback_tags jsonb,
+  driver_feedback_text text
 );
 
 create table if not exists public.chat_messages (
@@ -221,10 +230,43 @@ create policy app_settings_write on public.app_settings for all
   using (public.is_admin()) with check (public.is_admin());
 
 insert into public.app_settings (key, value) values ('tariffs', '{
-  "l1h1": 50, "l1h2": 60, "l2h2": 85,
-  "extra_hour": 15, "insurance": 12, "commission_pct": 15
+  "small": 40, "large": 60,
+  "extra_hour": 15, "insurance": 12, "help_price": 30, "commission_pct": 15
 }'::jsonb)
 on conflict (key) do nothing;
+
+-- Mantiene la puntuación y el nº de viajes del conductor al entregar/valorar.
+-- (El cliente no puede escribir en driver_profiles por RLS: esto lo hace la BD.)
+create or replace function public.sync_driver_rating()
+returns trigger
+language plpgsql security definer
+set search_path = public
+as $$
+begin
+  if new.driver_id is not null and (
+    (old.status is distinct from new.status and new.status = 'delivered')
+    or (old.client_rating is distinct from new.client_rating)
+  ) then
+    update public.driver_profiles dp
+    set average_rating = coalesce(sub.avg_rating, dp.average_rating),
+        total_trips = sub.trips
+    from (
+      select
+        round(avg(client_rating) filter (where client_rating is not null)::numeric, 2) as avg_rating,
+        count(*) as trips
+      from public.transport_requests
+      where driver_id = new.driver_id and status = 'delivered'
+    ) sub
+    where dp.created_by_id = new.driver_id;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists sync_driver_rating on public.transport_requests;
+create trigger sync_driver_rating
+  after update on public.transport_requests
+  for each row execute function public.sync_driver_rating();
 
 -- ============ TRIGGERS ============
 

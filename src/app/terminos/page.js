@@ -30,9 +30,9 @@ export default function TerminosPage() {
           PorteManía ofrece tres tipos de furgoneta:
         </p>
         <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-          <li><strong>L1H1</strong> — 50 € las primeras 2 horas</li>
-          <li><strong>L1H2</strong> — 60 € las primeras 2 horas</li>
-          <li><strong>L2H2</strong> — 85 € las primeras 2 horas</li>
+          <li><strong>Furgoneta pequeña</strong> — 40 € las primeras 2 horas</li>
+          <li><strong>Furgoneta grande</strong> — 60 € las primeras 2 horas</li>
+          <li><strong>Ayuda del conductor</strong> (subir/bajar mercancía) — suplemento de 30 €</li>
         </ul>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Cada hora adicional se factura a <strong>15 €/hora</strong>. El seguro opcional de mercancía tiene un coste de 12 €. Los precios incluyen IVA.

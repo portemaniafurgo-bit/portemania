@@ -36,7 +36,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
     body: JSON.stringify({
       client_name: "Cliente Prueba", client_phone: "600111222",
       origin_address: "Calle Ancha 2, 02001 Albacete", destination_address: "Calle Mayor 5, 02002 Albacete",
-      cargo_description: "SEED FLOWS entrega con chat", cargo_photos: [], vehicle_type: "l1h1",
+      cargo_description: "SEED FLOWS entrega con chat", cargo_photos: [], vehicle_type: "small",
       estimated_price: 50, payment_method: "cash", status: "pending", payment_status: "pending",
     }),
   });
@@ -81,18 +81,20 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   // ayuda
   await page.locator("button[role='switch']").first().click();
   await page.fill("textarea >> nth=1", "Bajar cajas de un 2º, hay ascensor");
-  // checkboxes
-  await page.locator("button:has-text('Acepto que la mercancía')").click({ position: { x: 12, y: 12 } });
+  // Con ayuda activada, el checkbox de pie de calle desaparece (feature 2026-07-04)
+  ok("1e-pre checkbox pie de calle oculto con ayuda", !(await page.locator("button:has-text('Acepto que la mercancía')").isVisible().catch(() => false)));
+  ok("1e-pre2 aviso conductor ayuda visible", await visible(page.locator("text=sube/baja la mercancía contigo"), 5000));
   await page.locator("button:has-text('Acepto los')").click({ position: { x: 12, y: 12 } });
   await page.waitForTimeout(300);
   ok("1e continuar habilitado paso 2", await page.locator("button:has-text('Continuar')").isEnabled());
   await page.click("button:has-text('Continuar')");
   // Paso 3: vehículo
-  await page.click("text=Furgoneta L1H1");
+  await page.click("text=Furgoneta pequeña");
   await page.waitForTimeout(300);
   await page.click("button:has-text('Continuar')");
   // Paso 4: confirmar
   ok("1f resumen con precio", await visible(page.locator("text=Precio estimado"), 10000));
+  ok("1f2 suplemento de ayuda en el desglose", await visible(page.locator("text=Ayuda del conductor:"), 5000));
   await page.click("button:has-text('Confirmar solicitud')");
   ok("1g solicitud enviada", await visible(page.locator("text=/Solicitud enviada|solicitud-enviada/i").or(page.locator("text=¡Solicitud enviada!")), 25000) || page.url().includes("solicitud-enviada"));
   await shot("10-invitado-enviado");

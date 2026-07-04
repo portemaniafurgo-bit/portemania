@@ -12,11 +12,11 @@ import { Percent, CreditCard, Globe, Loader2, Save } from "lucide-react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
 
 const FIELDS = [
-  { key: "l1h1", label: `${vehicleData.l1h1.name} (base 2h, €)` },
-  { key: "l1h2", label: `${vehicleData.l1h2.name} (base 2h, €)` },
-  { key: "l2h2", label: `${vehicleData.l2h2.name} (base 2h, €)` },
+  { key: "small", label: `${vehicleData.small.name} (base 2h, €)` },
+  { key: "large", label: `${vehicleData.large.name} (base 2h, €)` },
   { key: "extra_hour", label: "Hora extra (€)" },
   { key: "insurance", label: "Seguro de mercancía (€)" },
+  { key: "help_price", label: "Ayuda del conductor (€)" },
 ];
 
 export default function AdminSettings() {

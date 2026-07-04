@@ -88,7 +88,7 @@ export default function NewRequestContent() {
     return form.distance_km;
   };
 
-  const price = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected);
+  const price = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected, form.needs_help);
 
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -117,7 +117,7 @@ export default function NewRequestContent() {
       }
 
       simulateDistance();
-      const finalPrice = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected);
+      const finalPrice = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected, form.needs_help);
 
       const request = await base44.entities.TransportRequest.create({
         ...form,
@@ -136,7 +136,9 @@ export default function NewRequestContent() {
       const emailBody = `Hay un nuevo trabajo disponible en PorteManía.\n\nCliente: ${user?.full_name || "Cliente"}\nTeléfono: ${form.client_phone}\n\nRecogida: ${form.origin_address}\nEntrega: ${form.destination_address}\n\nVehículo: ${vehicleName}\nDuración: ${2 + form.extra_hours}h\nPrecio estimado: ${finalPrice.toFixed(2)}€\nPago: ${form.payment_method === "card" ? "Tarjeta" : "Efectivo"}\n\nDescripción: ${form.cargo_description}\n${form.notes ? `Notas: ${form.notes}` : ""}\n\nID de reserva: ${request.id}\n\nAccede a la app para aceptar el trabajo.`;
 
       // Send all emails in parallel (fire and forget)
-      base44.entities.DriverProfile.filter({ status: "verified", vehicle_type: form.vehicle_type }).then(drivers => {
+      base44.entities.DriverProfile.filter({ status: "verified" }).then(all => {
+        // Pedido grande: solo a conductores con furgón grande; pequeño: a todos
+        const drivers = form.vehicle_type === "large" ? all.filter(d => d.vehicle_type === "large") : all;
         const emailPromises = [
           base44.integrations.Core.SendEmail({ to: "renato.0550.calero@gmail.com", subject: `🚚 Nueva reserva — ${vehicleName}`, body: emailBody }),
           base44.integrations.Core.SendEmail({ to: "renatocaleromartinez407@gmail.com", subject: `🚚 Nueva reserva — ${vehicleName}`, body: emailBody }),
@@ -166,7 +168,7 @@ export default function NewRequestContent() {
 
   const canNext = () => {
     if (step === 1) return form.client_phone && hasValidCP(form.origin_address) && hasValidCP(form.destination_address);
-    if (step === 2) return form.cargo_description && form.cargo_description.length >= 10 && photos.length >= 1 && (!form.needs_help || form.help_description.trim().length >= 5) && acceptPortal && acceptTerms;
+    if (step === 2) return form.cargo_description && form.cargo_description.length >= 10 && photos.length >= 1 && (!form.needs_help || form.help_description.trim().length >= 5) && (form.needs_help || acceptPortal) && acceptTerms;
     if (step === 3) return form.vehicle_type;
     return true;
   };
@@ -311,7 +313,7 @@ export default function NewRequestContent() {
             <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-foreground">¿Necesitas ayuda del conductor?</p>
+                  <p className="text-sm font-medium text-foreground">¿Necesitas ayuda del conductor? <span className="text-primary font-semibold">+{tariffs.help_price}€</span></p>
                   <p className="text-xs text-muted-foreground mt-0.5">Por ejemplo: bajar un sofá, cargar cajas…</p>
                 </div>
                 <Switch checked={form.needs_help} onCheckedChange={v => update("needs_help", v)} />
@@ -334,19 +336,36 @@ export default function NewRequestContent() {
 
             {/* Checkboxes obligatorios */}
             <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => setAcceptPortal(v => !v)}
-                className="flex items-start gap-3 w-full text-left"
-              >
-                {acceptPortal
-                  ? <CheckSquare className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-                  : <Square className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                }
-                <span className="text-sm text-foreground">
-                  Acepto que la mercancía sea recogida en el portal <span className="text-destructive">*</span>
-                </span>
-              </button>
+              {form.needs_help ? (
+                <div className="flex gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+                  <span className="flex-shrink-0">🤝</span>
+                  <p className="text-xs text-emerald-800">
+                    Con la ayuda contratada, el conductor <strong>sube/baja la mercancía contigo</strong> — no hace falta tenerla a pie de calle.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setAcceptPortal(v => !v)}
+                    className="flex items-start gap-3 w-full text-left"
+                  >
+                    {acceptPortal
+                      ? <CheckSquare className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+                      : <Square className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                    }
+                    <span className="text-sm text-foreground">
+                      Acepto que la mercancía sea recogida a pie de calle (en el portal) <span className="text-destructive">*</span>
+                    </span>
+                  </button>
+                  <div className="flex gap-2 p-3 rounded-xl bg-amber-50 border border-amber-200 ml-8">
+                    <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-amber-700">
+                      Sin ayuda contratada, <strong>la mercancía debe estar preparada a pie de calle</strong> cuando llegue el conductor.
+                    </p>
+                  </div>
+                </>
+              )}
 
               <button
                 type="button"
@@ -507,6 +526,7 @@ export default function NewRequestContent() {
                   <p>Base (2h): {tariffs[form.vehicle_type]}€</p>
                   {form.extra_hours > 0 && <p>Horas extra: +{form.extra_hours * tariffs.extra_hour}€</p>}
                   {form.insurance_selected && <p>Seguro: +{tariffs.insurance}€</p>}
+                  {form.needs_help && <p>Ayuda del conductor: +{tariffs.help_price}€</p>}
                 </div>
               </div>
             </div>

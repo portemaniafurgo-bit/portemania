@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import StatusBadge from "@/components/common/StatusBadge";
 import { vehicleData } from "@/components/common/VehicleCard";
-import { ArrowLeft, Send, MapPin, Truck, CheckCircle, Package, MessageCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, MapPin, Truck, CheckCircle, Package, MessageCircle, Loader2, XCircle } from "lucide-react";
 import PhotoLightbox from "@/components/common/PhotoLightbox";
+import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect, useRef, useCallback } from "react";
 
 const STEPS = [
@@ -18,6 +19,18 @@ const STEPS = [
   { from: "picked_up",  to: "delivered",   label: "Trabajo finalizado ✓", icon: CheckCircle, color: "bg-emerald-600 hover:bg-emerald-700" },
 ];
 
+// Motivos de cancelación del conductor (solo antes de recoger la mercancía)
+const CANCEL_REASONS = [
+  "Mercancía muy pesada o voluminosa",
+  "El cliente no ha especificado correctamente la carga",
+  "Mercancía ilegal (sospecha de robo)",
+  "Cliente problemático",
+  "Otro",
+];
+
+const FEEDBACK_TAGS = ["Precio justo", "Precio injusto", "Mucho tiempo de espera"];
+const ADMIN_EMAILS = ["renato.0550.calero@gmail.com", "portemaniafurgo@gmail.com"];
+
 export default function ActiveJob() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -25,6 +38,12 @@ export default function ActiveJob() {
   const queryClient = useQueryClient();
   const [message, setMessage] = useState("");
   const chatEndRef = useRef(null);
+  const [showCancel, setShowCancel] = useState(false);
+  const [cancelReason, setCancelReason] = useState("");
+  const [cancelNote, setCancelNote] = useState("");
+  const [fbTags, setFbTags] = useState([]);
+  const [fbText, setFbText] = useState("");
+  const [fbSent, setFbSent] = useState(false);
 
   const { data: job, isLoading } = useQuery({
     queryKey: ["job", id],
@@ -87,6 +106,56 @@ export default function ActiveJob() {
       setMessage("");
     },
   });
+
+  // Cancelación del conductor antes de recoger: el pedido vuelve a pendientes
+  // con el motivo registrado, y se avisa a la empresa por email.
+  const releaseMutation = useMutation({
+    mutationFn: async () => {
+      await base44.entities.TransportRequest.update(id, {
+        status: "pending",
+        driver_id: null,
+        driver_name: null,
+        accepted_at: null,
+        driver_cancel_reason: cancelReason,
+        driver_cancel_note: cancelNote.trim() || null,
+        driver_cancel_name: user?.full_name || "Conductor",
+        driver_cancel_at: new Date().toISOString(),
+      });
+      ADMIN_EMAILS.forEach(to =>
+        base44.integrations.Core.SendEmail({
+          to,
+          subject: `⚠️ Conductor canceló un servicio — ${cancelReason}`,
+          body: `${user?.full_name || "Un conductor"} ha cancelado un servicio antes de recoger la mercancía.\n\nMotivo: ${cancelReason}${cancelNote.trim() ? `\nDetalle: ${cancelNote.trim()}` : ""}\n\nPedido: ${job?.client_name || ""} · ${job?.origin_address || ""} → ${job?.destination_address || ""}\nID: ${id}\n\nEl pedido ha vuelto a la lista de pendientes para otros conductores.`,
+        }).catch(() => {})
+      );
+    },
+    onSuccess: () => router.push("/driver/requests"),
+  });
+
+  // Opinión del conductor al finalizar (chips + texto): se guarda en el pedido
+  // (visible en el panel admin) y se envía por email a la empresa.
+  const feedbackMutation = useMutation({
+    mutationFn: async () => {
+      await base44.entities.TransportRequest.update(id, {
+        driver_feedback_tags: fbTags,
+        driver_feedback_text: fbText.trim() || null,
+      });
+      ADMIN_EMAILS.forEach(to =>
+        base44.integrations.Core.SendEmail({
+          to,
+          subject: `💬 Opinión del conductor — ${user?.full_name || "Conductor"}`,
+          body: `${user?.full_name || "Un conductor"} ha dejado su opinión al finalizar un servicio.\n\n${fbTags.length ? `Valoración rápida: ${fbTags.join(", ")}\n` : ""}${fbText.trim() ? `Comentario: ${fbText.trim()}\n` : ""}\nPedido: ${job?.client_name || ""} · ${job?.origin_address || ""} → ${job?.destination_address || ""}\nID: ${id}`,
+        }).catch(() => {})
+      );
+    },
+    onSuccess: () => {
+      setFbSent(true);
+      queryClient.invalidateQueries({ queryKey: ["job", id] });
+    },
+  });
+
+  const toggleFbTag = (tag) =>
+    setFbTags(prev => (prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]));
 
   if (isLoading) return (
     <div className="flex justify-center py-20">
@@ -210,11 +279,104 @@ export default function ActiveJob() {
         </Button>
       )}
 
+      {/* Cancelar antes de recoger: el pedido se libera con motivo */}
+      {["accepted", "in_transit"].includes(job.status) && (
+        <div className="space-y-3">
+          {!showCancel ? (
+            <button
+              className="w-full text-center text-sm text-muted-foreground underline hover:text-destructive"
+              onClick={() => setShowCancel(true)}
+            >
+              No puedo hacer este servicio
+            </button>
+          ) : (
+            <div className="bg-card rounded-2xl border border-destructive/30 p-5 space-y-3">
+              <p className="font-semibold text-sm text-foreground">¿Por qué no puedes hacer este servicio?</p>
+              <div className="space-y-2">
+                {CANCEL_REASONS.map(reason => (
+                  <button
+                    key={reason}
+                    type="button"
+                    onClick={() => setCancelReason(reason)}
+                    className={`w-full text-left p-3 rounded-xl border text-sm transition-colors ${cancelReason === reason ? "border-destructive bg-destructive/5 font-medium text-foreground" : "border-border text-muted-foreground hover:border-destructive/40"}`}
+                  >
+                    {reason}
+                  </button>
+                ))}
+              </div>
+              {cancelReason === "Otro" && (
+                <Textarea
+                  placeholder="Especifica el motivo…"
+                  value={cancelNote}
+                  onChange={e => setCancelNote(e.target.value)}
+                  className="rounded-xl min-h-[70px]"
+                />
+              )}
+              <p className="text-xs text-muted-foreground">
+                El pedido volverá a la lista para otros conductores y la empresa recibirá tu motivo.
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" className="rounded-xl flex-1" onClick={() => { setShowCancel(false); setCancelReason(""); }}>
+                  Volver
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-xl flex-1 border-destructive/40 text-destructive"
+                  disabled={!cancelReason || (cancelReason === "Otro" && cancelNote.trim().length < 5) || releaseMutation.isPending}
+                  onClick={() => releaseMutation.mutate()}
+                >
+                  {releaseMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 mr-1" />}
+                  Cancelar servicio
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {isFinished && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 text-center">
           <CheckCircle className="w-10 h-10 text-emerald-600 mx-auto mb-2" />
           <p className="font-semibold text-emerald-800">¡Servicio completado!</p>
           <p className="text-sm text-emerald-600 mt-1">El cliente ha sido notificado.</p>
+        </div>
+      )}
+
+      {/* Opinión del conductor al finalizar */}
+      {job.status === "delivered" && !fbSent && !job.driver_feedback_tags && !job.driver_feedback_text && (
+        <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
+          <p className="font-semibold text-sm text-foreground">¿Cómo fue el servicio? <span className="text-muted-foreground font-normal">(opcional)</span></p>
+          <div className="flex gap-2 flex-wrap">
+            {FEEDBACK_TAGS.map(tag => (
+              <button
+                key={tag}
+                type="button"
+                onClick={() => toggleFbTag(tag)}
+                className={`px-3 h-9 rounded-full border text-sm transition-colors ${fbTags.includes(tag) ? "border-primary bg-primary/10 text-primary font-medium" : "border-border text-muted-foreground hover:border-primary/40"}`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+          <Textarea
+            placeholder="Escribe lo que quieras contarle a la empresa sobre este servicio…"
+            value={fbText}
+            onChange={e => setFbText(e.target.value)}
+            className="rounded-xl min-h-[80px]"
+          />
+          <Button
+            className="w-full rounded-xl gap-2"
+            disabled={(fbTags.length === 0 && !fbText.trim()) || feedbackMutation.isPending}
+            onClick={() => feedbackMutation.mutate()}
+          >
+            {feedbackMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            Enviar opinión
+          </Button>
+        </div>
+      )}
+      {job.status === "delivered" && (fbSent || job.driver_feedback_tags || job.driver_feedback_text) && (
+        <div className="bg-card rounded-2xl border border-border p-4 text-center text-sm text-muted-foreground">
+          💬 Gracias por tu opinión — la empresa la ha recibido.
         </div>
       )}
 
