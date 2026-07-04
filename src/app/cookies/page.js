@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Política de Cookies — PorteManía",
+  title: "Política de Cookies — ClicyVoy",
 };
 
 export default function CookiesPage() {
@@ -58,7 +58,7 @@ export default function CookiesPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-heading font-semibold text-foreground">Cookies de terceros</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          PorteManía utiliza servicios de terceros que pueden instalar sus propias cookies:
+          ClicyVoy utiliza servicios de terceros que pueden instalar sus propias cookies:
         </p>
         <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
           <li><strong>Stripe</strong> — procesamiento de pagos con tarjeta. Consulta su política en <a href="https://stripe.com/es/privacy" target="_blank" rel="noopener noreferrer" className="text-primary underline">stripe.com/es/privacy</a>.</li>
@@ -82,7 +82,7 @@ export default function CookiesPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-heading font-semibold text-foreground">Contacto</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Para cualquier consulta sobre el uso de cookies en PorteManía, puedes contactarnos a través de la plataforma.
+          Para cualquier consulta sobre el uso de cookies en ClicyVoy, puedes contactarnos a través de la plataforma.
         </p>
       </section>
     </div>

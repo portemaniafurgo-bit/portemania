@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Términos y Condiciones — PorteManía",
+  title: "Términos y Condiciones — ClicyVoy",
 };
 
 export default function TerminosPage() {
@@ -13,7 +13,7 @@ export default function TerminosPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-heading font-semibold text-foreground">1. Objeto del servicio</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          PorteManía es una plataforma digital que conecta a particulares y empresas con conductores autónomos verificados para la realización de servicios de transporte de mercancías y mudanzas dentro del municipio de <strong>Albacete capital</strong> (códigos postales 02001–02008). PorteManía actúa únicamente como intermediario y no es parte del contrato de transporte entre el cliente y el conductor.
+          ClicyVoy es una plataforma digital que conecta a particulares y empresas con conductores autónomos verificados para la realización de servicios de transporte de mercancías y mudanzas dentro del municipio de <strong>Albacete capital</strong> (códigos postales 02001–02008). ClicyVoy actúa únicamente como intermediario y no es parte del contrato de transporte entre el cliente y el conductor.
         </p>
       </section>
 
@@ -27,7 +27,7 @@ export default function TerminosPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-heading font-semibold text-foreground">3. Tipos de vehículo y precios</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          PorteManía ofrece tres tipos de furgoneta:
+          ClicyVoy ofrece tres tipos de furgoneta:
         </p>
         <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
           <li><strong>Furgoneta pequeña</strong> — 40 € las primeras 2 horas</li>
@@ -60,7 +60,7 @@ export default function TerminosPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-heading font-semibold text-foreground">6. Conductores verificados</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Todos los conductores de PorteManía pasan por un proceso de verificación de identidad, licencia de conducción y seguro del vehículo antes de ser activados en la plataforma. PorteManía no garantiza la disponibilidad inmediata de conductores en todo momento.
+          Todos los conductores de ClicyVoy pasan por un proceso de verificación de identidad, licencia de conducción y seguro del vehículo antes de ser activados en la plataforma. ClicyVoy no garantiza la disponibilidad inmediata de conductores en todo momento.
         </p>
       </section>
 
@@ -74,14 +74,14 @@ export default function TerminosPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-heading font-semibold text-foreground">8. Responsabilidad</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          PorteManía no se responsabiliza de daños a la mercancía salvo que se haya contratado el seguro opcional. En caso de incidencia, el cliente debe reportarla a través de la plataforma en un plazo máximo de 24 horas tras la entrega. El seguro cubre hasta el valor declarado de los bienes transportados, sujeto a las condiciones del asegurador.
+          ClicyVoy no se responsabiliza de daños a la mercancía salvo que se haya contratado el seguro opcional. En caso de incidencia, el cliente debe reportarla a través de la plataforma en un plazo máximo de 24 horas tras la entrega. El seguro cubre hasta el valor declarado de los bienes transportados, sujeto a las condiciones del asegurador.
         </p>
       </section>
 
       <section className="space-y-3">
         <h2 className="text-xl font-heading font-semibold text-foreground">9. Modificaciones</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          PorteManía se reserva el derecho a modificar estos términos en cualquier momento. Los cambios serán comunicados a los usuarios registrados por correo electrónico con un preaviso mínimo de 15 días.
+          ClicyVoy se reserva el derecho a modificar estos términos en cualquier momento. Los cambios serán comunicados a los usuarios registrados por correo electrónico con un preaviso mínimo de 15 días.
         </p>
       </section>
 

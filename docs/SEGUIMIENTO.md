@@ -108,6 +108,11 @@ npx vercel deploy --prod --yes   # deploy a producción
 - Limitación conocida: al ser web, el GPS del conductor solo emite con la pestaña abierta y pantalla encendida; mientras navega con Google Maps la posición se congela (solución definitiva: PWA/nativa, roadmap).
 - Suites: **29/29 flujos + 30/30 admin** (checks nuevos: mapa/ruta/ETA/hora/botones ambos lados).
 
+### 2026-07-04 — Rebranding: PorteManía → ClicyVoy
+- Marca cambiada en toda la plataforma (16 archivos): logo (Clic**yVoy**), títulos/metadata, textos, emails y Edge Functions (redesplegadas).
+- Dominio nuevo **https://clicyvoy.vercel.app** reclamado y asignado; https://pontemania.vercel.app sigue funcionando (ambas sirven la app). Supabase site_url → clicyvoy; allowlist incluye ambas.
+- Pendiente del rebrand: el banner del hero es una imagen con el logo antiguo dibujado (hace falta un banner nuevo del negocio); añadir el origen clicyvoy.vercel.app en Google Cloud para el login con Google; los emails de prueba (@portemania.es) se mantienen porque son credenciales.
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

@@ -1,5 +1,5 @@
 export const metadata = {
-  title: "Política de Privacidad — PorteManía",
+  title: "Política de Privacidad — ClicyVoy",
 };
 
 export default function PrivacidadPage() {
@@ -13,7 +13,7 @@ export default function PrivacidadPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-heading font-semibold text-foreground">1. Responsable del tratamiento</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          El responsable del tratamiento de los datos personales recogidos a través de esta plataforma es <strong>PorteManía</strong>, con sede en Albacete, España. Para cualquier consulta relacionada con la privacidad, puede contactar a través del correo indicado en la plataforma.
+          El responsable del tratamiento de los datos personales recogidos a través de esta plataforma es <strong>ClicyVoy</strong>, con sede en Albacete, España. Para cualquier consulta relacionada con la privacidad, puede contactar a través del correo indicado en la plataforma.
         </p>
       </section>
 
@@ -76,7 +76,7 @@ export default function PrivacidadPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-heading font-semibold text-foreground">7. Transferencias internacionales</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          Algunos servicios de infraestructura utilizados por PorteManía pueden implicar transferencias de datos fuera del Espacio Económico Europeo. En tal caso, nos aseguramos de que existan garantías adecuadas conforme al RGPD.
+          Algunos servicios de infraestructura utilizados por ClicyVoy pueden implicar transferencias de datos fuera del Espacio Económico Europeo. En tal caso, nos aseguramos de que existan garantías adecuadas conforme al RGPD.
         </p>
       </section>
 

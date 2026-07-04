@@ -28,7 +28,7 @@ export default function HeroSection() {
       <div className="relative w-full">
         <img
           src="https://media.base44.com/images/public/6a32f79927b9d0ad42c1c9e5/dcf2d978a_bannerweb.png"
-          alt="PorteManía — Espacio para lo importante. Nosotros lo llevamos."
+          alt="ClicyVoy — Espacio para lo importante. Nosotros lo llevamos."
           className="w-full object-cover object-center"
           style={{ maxHeight: "520px" }}
         />

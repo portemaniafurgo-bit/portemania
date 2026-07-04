@@ -114,7 +114,7 @@ export default function GuestRequestContent() {
       });
 
       const vehicleName = vehicleData[form.vehicle_type]?.name || form.vehicle_type;
-      const emailBody = `Hay un nuevo trabajo disponible en PorteManía.\n\nCliente: ${form.client_name}\nTeléfono: ${form.client_phone}\n\nRecogida: ${form.origin_address}\nEntrega: ${form.destination_address}\n\nVehículo: ${vehicleName}\nDuración: ${2 + form.extra_hours}h\nPrecio estimado: ${finalPrice.toFixed(2)}€ (efectivo)\n\nDescripción: ${form.cargo_description}\n\nID de reserva: ${request.id}\n\nAccede a la app para aceptar el trabajo.`;
+      const emailBody = `Hay un nuevo trabajo disponible en ClicyVoy.\n\nCliente: ${form.client_name}\nTeléfono: ${form.client_phone}\n\nRecogida: ${form.origin_address}\nEntrega: ${form.destination_address}\n\nVehículo: ${vehicleName}\nDuración: ${2 + form.extra_hours}h\nPrecio estimado: ${finalPrice.toFixed(2)}€ (efectivo)\n\nDescripción: ${form.cargo_description}\n\nID de reserva: ${request.id}\n\nAccede a la app para aceptar el trabajo.`;
 
       // Send all emails in parallel (fire and forget)
       base44.entities.DriverProfile.filter({ status: "verified" }).then(all => {

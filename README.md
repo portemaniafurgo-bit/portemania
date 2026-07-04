@@ -1,8 +1,10 @@
-# PorteManía 🚐
+# ClicyVoy 🚐
+
+> Antes **ClicyVoy** — renombrado el 2026-07-04. La carpeta del proyecto y el repo conservan el nombre técnico original.
 
 Plataforma web **responsive** de transporte y portes **on-demand** ("un Uber de furgonetas") para **Albacete capital**. Conecta a clientes que necesitan mover mercancía con conductores autónomos verificados.
 
-- **Producción:** https://pontemania.vercel.app
+- **Producción:** https://clicyvoy.vercel.app (también responde https://pontemania.vercel.app)
 - **Repositorio:** https://github.com/portemaniafurgo-bit/portemania
 - **Seguimiento del proyecto** (cronología, estado, roadmap): [docs/SEGUIMIENTO.md](./docs/SEGUIMIENTO.md)
 - **Estado:** portado, funcional y desplegado (2026-07-01); migrado a infraestructura propia (Supabase `dnehzwrqphqpkcdjwqfi` + repo oficial) el 2026-07-02. Preparado para ampliación.
@@ -60,7 +62,7 @@ Hora extra: **15 €/h**. Seguro de mercancía: **12 €**. Pago con **tarjeta**
 ### Sistema de diseño (idéntico a la referencia)
 - Primario azul `hsl(217 91% 60%)`, radius `0.75rem`, tokens HSL en `src/app/globals.css`.
 - Fuentes: **Space Grotesk** (display/heading) e **Inter** (body).
-- Marca: Porte**Manía** (la segunda mitad en color primario).
+- Marca: Clic**yVoy** (la segunda mitad en color primario).
 
 ---
 

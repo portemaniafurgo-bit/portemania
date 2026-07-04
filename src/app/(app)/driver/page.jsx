@@ -76,7 +76,7 @@ export default function DriverDashboard() {
         <div className="text-6xl">🚫</div>
         <h2 className="text-xl font-display font-bold text-foreground">Cuenta desactivada</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Tu cuenta de conductor ha sido eliminada o desactivada por el administrador. Si crees que es un error, contacta con PorteManía.
+          Tu cuenta de conductor ha sido eliminada o desactivada por el administrador. Si crees que es un error, contacta con ClicyVoy.
         </p>
         <p className="text-xs text-muted-foreground bg-muted rounded-xl px-4 py-3">
           📞 Contacta con el administrador para recuperar el acceso.

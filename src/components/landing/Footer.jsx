@@ -14,7 +14,7 @@ export default function Footer() {
                   </svg>
                 </div>
                 <span className="text-xl font-display font-bold text-white">
-                  Porte<span className="text-primary">Manía</span>
+                  Clic<span className="text-primary">yVoy</span>
                 </span>
               </div>
             </div>
@@ -54,7 +54,7 @@ export default function Footer() {
         </div>
 
         <div className="mt-12 pt-8 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-sm">© 2026 PorteManía. Todos los derechos reservados.</p>
+          <p className="text-sm">© 2026 ClicyVoy. Todos los derechos reservados.</p>
           <div className="flex items-center gap-4 text-sm">
             <span>🇪🇸 España</span>
             <span>🇵🇹 Portugal</span>

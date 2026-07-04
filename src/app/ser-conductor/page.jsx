@@ -74,7 +74,7 @@ export default function SerConductorPage() {
       base44.integrations.Core.SendEmail({
         to: "renato.0550.calero@gmail.com",
         subject: `🚐 Nueva candidatura de conductor — ${fullName}`,
-        body: `Nueva candidatura de conductor en PorteManía.\n\nNombre: ${fullName}\nTeléfono: ${form.phone}\nEmail: ${form.email || "—"}\nDirección: ${form.address || "—"}\n\nFurgoneta: ${vehicleName}\nAutónomo: ${form.is_autonomo ? "Sí" : "No"}\nDisponibilidad: ${form.availability}\n\nMensaje: ${form.notes || "—"}`,
+        body: `Nueva candidatura de conductor en ClicyVoy.\n\nNombre: ${fullName}\nTeléfono: ${form.phone}\nEmail: ${form.email || "—"}\nDirección: ${form.address || "—"}\n\nFurgoneta: ${vehicleName}\nAutónomo: ${form.is_autonomo ? "Sí" : "No"}\nDisponibilidad: ${form.availability}\n\nMensaje: ${form.notes || "—"}`,
       }).catch(() => {});
 
       setSent(true);
@@ -94,7 +94,7 @@ export default function SerConductorPage() {
         </motion.div>
         <h1 className="text-2xl font-display font-bold text-foreground">¡Candidatura enviada!</h1>
         <p className="text-muted-foreground">
-          Gracias por tu interés en conducir con Porte<span className="text-primary font-semibold">Manía</span>.
+          Gracias por tu interés en conducir con Clic<span className="text-primary font-semibold">yVoy</span>.
           Revisaremos tus datos y te contactaremos por teléfono o email.
         </p>
         <Button className="rounded-full px-8 h-12 mt-4" onClick={() => router.push("/")}>
@@ -113,7 +113,7 @@ export default function SerConductorPage() {
         </button>
         <div>
           <h1 className="text-xl font-display font-bold text-foreground">Quiero ser conductor</h1>
-          <p className="text-sm text-muted-foreground">Únete a la flota de PorteManía en Albacete</p>
+          <p className="text-sm text-muted-foreground">Únete a la flota de ClicyVoy en Albacete</p>
         </div>
       </div>
 

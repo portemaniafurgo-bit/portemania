@@ -47,9 +47,9 @@ export default function DriverRequests() {
         const vehicle = vehicleData[req.vehicle_type];
         await base44.integrations.Core.SendEmail({
           to: user.email,
-          from_name: "PorteManía",
+          from_name: "ClicyVoy",
           subject: "🚐 Nuevo trabajo asignado",
-          body: `Hola ${user?.full_name?.split(" ")[0] || "conductor"},\n\nSe te ha asignado un nuevo servicio de transporte.\n\n📍 Recogida: ${req.origin_address}\n🏁 Entrega: ${req.destination_address}\n🚐 Vehículo: ${vehicle?.name || req.vehicle_type}\n💶 Precio estimado: ${req.estimated_price?.toFixed(2)}€${req.cargo_description ? `\n📦 Carga: ${req.cargo_description}` : ""}${req.distance_km ? `\n📏 Distancia: ${req.distance_km} km` : ""}\n\nAccede a la app para ver todos los detalles y gestionar el servicio.\n\n¡Mucho éxito!\nEl equipo de PorteManía`,
+          body: `Hola ${user?.full_name?.split(" ")[0] || "conductor"},\n\nSe te ha asignado un nuevo servicio de transporte.\n\n📍 Recogida: ${req.origin_address}\n🏁 Entrega: ${req.destination_address}\n🚐 Vehículo: ${vehicle?.name || req.vehicle_type}\n💶 Precio estimado: ${req.estimated_price?.toFixed(2)}€${req.cargo_description ? `\n📦 Carga: ${req.cargo_description}` : ""}${req.distance_km ? `\n📏 Distancia: ${req.distance_km} km` : ""}\n\nAccede a la app para ver todos los detalles y gestionar el servicio.\n\n¡Mucho éxito!\nEl equipo de ClicyVoy`,
         });
       }
 

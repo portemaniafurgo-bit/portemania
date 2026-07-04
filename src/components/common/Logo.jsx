@@ -16,7 +16,7 @@ export default function Logo({ size = "default", showSlogan = false }) {
           <Truck className={`${s.icon} text-primary-foreground`} />
         </div>
         <span className={`${s.text} font-display font-bold tracking-tight text-foreground`}>
-          Porte<span className="text-primary">Manía</span>
+          Clic<span className="text-primary">yVoy</span>
         </span>
       </div>
       {showSlogan && (

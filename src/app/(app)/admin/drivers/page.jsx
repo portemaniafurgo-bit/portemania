@@ -124,7 +124,7 @@ export default function AdminDrivers() {
         <h1 className="text-2xl font-display font-bold text-foreground flex items-center gap-2">
           <Truck className="w-6 h-6 text-primary" /> Conductores
         </h1>
-        <p className="text-sm text-muted-foreground mt-1">Gestiona y registra los conductores de PorteManía</p>
+        <p className="text-sm text-muted-foreground mt-1">Gestiona y registra los conductores de ClicyVoy</p>
       </div>
 
       {/* Candidaturas del formulario público "Quiero ser conductor" */}

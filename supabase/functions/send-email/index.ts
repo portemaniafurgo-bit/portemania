@@ -12,7 +12,7 @@ const ADMIN_RECIPIENTS = [
 ];
 
 // Sin dominio verificado en Resend se envía desde la dirección de onboarding.
-const FROM = "PorteManía <onboarding@resend.dev>";
+const FROM = "ClicyVoy <onboarding@resend.dev>";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",

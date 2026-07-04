@@ -63,7 +63,7 @@ Deno.serve(async (req: Request) => {
     "automatic_payment_methods[allow_redirects]": "never",
     "metadata[order_id]": order.id,
     "metadata[client_name]": order.client_name || "",
-    description: `PorteManía pedido ${String(order.id).slice(0, 8)}`,
+    description: `ClicyVoy pedido ${String(order.id).slice(0, 8)}`,
   });
   const res = await fetch("https://api.stripe.com/v1/payment_intents", {
     method: "POST",
