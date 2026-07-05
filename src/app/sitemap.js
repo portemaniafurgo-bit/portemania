@@ -1,6 +1,9 @@
 import { listPublishedPosts, SITE_URL } from "@/lib/blog";
 
-// Sitemap del sitio: páginas públicas + artículos del blog (se regenera solo).
+// Siempre fresco: lo consultan los crawlers y debe reflejar el último artículo.
+export const dynamic = "force-dynamic";
+
+// Sitemap del sitio: páginas públicas + artículos del blog.
 export default async function sitemap() {
   const staticPages = [
     { url: SITE_URL, changeFrequency: "weekly", priority: 1 },
@@ -12,7 +15,7 @@ export default async function sitemap() {
     { url: `${SITE_URL}/cookies`, changeFrequency: "yearly", priority: 0.3 },
   ];
 
-  const posts = await listPublishedPosts();
+  const posts = await listPublishedPosts({ fresh: true });
   const postPages = posts.map(p => ({
     url: `${SITE_URL}/blog/${p.slug}`,
     lastModified: p.published_at || undefined,
