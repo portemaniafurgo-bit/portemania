@@ -19,7 +19,8 @@ const ADMIN_EMAIL = "renato.0550.calero@gmail.com";
 
 const emptyForm = {
   nombre: "", apellidos: "", telefono: "", email: "",
-  matricula: "", vehiculo_marca: "", vehiculo_modelo: "", ciudad: ""
+  matricula: "", vehiculo_marca: "", vehiculo_modelo: "", ciudad: "",
+  vehiculo_tamano: "small",
 };
 
 export default function AdminDrivers() {
@@ -79,6 +80,7 @@ export default function AdminDrivers() {
         vehicle_plate: form.matricula,
         vehicle_brand: form.vehiculo_marca,
         vehicle_model: form.vehiculo_modelo,
+        vehicle_type: form.vehiculo_tamano,
         city: form.ciudad || "Albacete",
         status: "verified",
         is_available: false,
@@ -265,6 +267,22 @@ export default function AdminDrivers() {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <Label className="text-sm">Tamaño de furgoneta * <span className="text-xs text-muted-foreground font-normal">(determina qué pedidos ve)</span></Label>
+              <div className="grid grid-cols-2 gap-3">
+                {[{ v: "small", l: `🚐 ${vehicleData.small.name}` }, { v: "large", l: `🚚 ${vehicleData.large.name}` }].map(o => (
+                  <button
+                    key={o.v}
+                    type="button"
+                    onClick={() => update("vehiculo_tamano", o.v)}
+                    className={`h-11 rounded-xl border text-sm font-medium transition-colors ${form.vehiculo_tamano === o.v ? "border-primary bg-primary/5 text-primary" : "border-border bg-card text-foreground hover:border-primary/40"}`}
+                  >
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <p className="text-xs text-muted-foreground">
               El conductor recibirá un correo de invitación en el email indicado para establecer su contraseña.
             </p>
@@ -392,6 +410,25 @@ export default function AdminDrivers() {
                     {!driver.photo_url && !driver.license_photo_url && !driver.id_document_url && !driver.insurance_url && (
                       <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">⚠️ Este conductor no ha subido documentación todavía</p>
                     )}
+                  </div>
+
+                  {/* Tamaño de furgoneta (determina el reparto de pedidos) */}
+                  <div>
+                    <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                      Tamaño de furgoneta {!driver.vehicle_type && <span className="text-amber-600 normal-case">⚠ sin definir — no verá pedidos de furgoneta grande</span>}
+                    </p>
+                    <div className="flex gap-2">
+                      {[{ v: "small", l: `🚐 ${vehicleData.small.name}` }, { v: "large", l: `🚚 ${vehicleData.large.name}` }].map(o => (
+                        <button
+                          key={o.v}
+                          type="button"
+                          onClick={() => updateMutation.mutate({ id: driver.id, data: { vehicle_type: o.v } })}
+                          className={`px-3 h-9 rounded-xl border text-sm font-medium transition-colors ${driver.vehicle_type === o.v ? "border-primary bg-primary/5 text-primary" : "border-border bg-card text-foreground hover:border-primary/40"}`}
+                        >
+                          {o.l}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {/* Acciones */}

@@ -43,11 +43,17 @@ export default function DriverDashboard() {
     queryFn: () => base44.entities.TransportRequest.filter({ driver_id: user?.id }, "-created_date", 20),
   });
 
-  const { data: pendingRequests = [] } = useQuery({
+  const { data: allPending = [] } = useQuery({
     queryKey: ["pending-requests"],
     queryFn: () => base44.entities.TransportRequest.filter({ status: "pending" }, "-created_date", 10),
     refetchInterval: 10000,
   });
+
+  // Mismo reparto que en Solicitudes: los pedidos de furgoneta grande solo
+  // los ven conductores con furgón grande (así el contador siempre coincide).
+  const pendingRequests = allPending.filter(
+    r => r.vehicle_type !== "large" || profile?.vehicle_type === "large"
+  );
 
   const toggleAvailability = useMutation({
     mutationFn: async () => {
