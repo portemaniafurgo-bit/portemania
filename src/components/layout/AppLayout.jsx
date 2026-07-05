@@ -36,6 +36,7 @@ const adminNav = [
   { label: "Conductores", icon: Truck, path: "/admin/drivers" },
   { label: "Usuarios", icon: Users, path: "/admin/users" },
   { label: "Incidencias", icon: AlertTriangle, path: "/admin/incidents", staffOk: true },
+  { label: "Blog", icon: Package, path: "/admin/blog" },
   { label: "Finanzas", icon: Euro, path: "/admin/finance" },
   { label: "Estadísticas", icon: BarChart3, path: "/admin/stats" },
   { label: "Ajustes", icon: Settings, path: "/admin/settings" },

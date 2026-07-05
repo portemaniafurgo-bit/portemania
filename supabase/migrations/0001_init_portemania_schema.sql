@@ -517,6 +517,49 @@ $$;
 revoke all on function public.create_guest_request(jsonb) from public;
 grant execute on function public.create_guest_request(jsonb) to anon, authenticated;
 
+-- Blog para SEO: lo edita el admin desde el panel; el público solo ve lo publicado.
+create table if not exists public.blog_posts (
+  id uuid primary key default gen_random_uuid(),
+  created_date timestamptz not null default now(),
+  updated_date timestamptz not null default now(),
+  created_by text,
+  created_by_id uuid,
+  title text not null,
+  slug text unique not null,
+  excerpt text,
+  content text not null default '',
+  cover_url text,
+  published boolean not null default false,
+  published_at timestamptz
+);
+
+alter table public.blog_posts enable row level security;
+
+drop policy if exists blog_posts_select on public.blog_posts;
+create policy blog_posts_select on public.blog_posts for select
+  using (published = true or public.is_admin());
+drop policy if exists blog_posts_write on public.blog_posts;
+create policy blog_posts_write on public.blog_posts for all
+  using (public.is_admin()) with check (public.is_admin());
+
+drop trigger if exists set_updated_date on public.blog_posts;
+create trigger set_updated_date before update on public.blog_posts
+  for each row execute function public.set_updated_date();
+drop trigger if exists set_created_by on public.blog_posts;
+create trigger set_created_by before insert on public.blog_posts
+  for each row execute function public.set_created_by();
+
+insert into storage.buckets (id, name, public)
+values ('blog-images', 'blog-images', true)
+on conflict (id) do nothing;
+
+drop policy if exists "blog images upload" on storage.objects;
+create policy "blog images upload" on storage.objects for insert to authenticated
+  with check (bucket_id = 'blog-images');
+drop policy if exists "blog images read" on storage.objects;
+create policy "blog images read" on storage.objects for select
+  using (bucket_id = 'blog-images');
+
 -- Mapa público de la landing: conductores verificados y disponibles, SIEMPRE
 -- dentro de la zona de Albacete capital (CP 02001–02008). Por privacidad no se
 -- expone la posición exacta: si el GPS real está dentro de la zona se redondea

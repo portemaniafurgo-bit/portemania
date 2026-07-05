@@ -37,6 +37,8 @@ const ChatMessage = createEntity("chat_messages");
 const Incident = createEntity("incidents");
 // Candidaturas del formulario público "Quiero ser conductor" (solo las ve el admin).
 const DriverApplication = createEntity("driver_applications");
+// Blog para SEO (lo edita el admin; el público solo ve lo publicado).
+const BlogPost = createEntity("blog_posts");
 
 // Entidad User -> tabla profiles, con helpers de Base44 (me / updateMyUserData)
 const User = {
@@ -231,6 +233,7 @@ export const base44 = {
     ChatMessage,
     Incident,
     DriverApplication,
+    BlogPost,
     User,
   },
   integrations: {
