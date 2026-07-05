@@ -164,6 +164,16 @@ async function shot(name) {
   await page.goto(BASE + "/admin/finance", { waitUntil: "networkidle" });
   ok("8c finanzas carga", await visible(page.locator("h1:has-text('Finanzas')"), 20000));
   ok("8d liquidaciones con neto", await visible(page.locator("text=Neto a liquidar"), 10000));
+  await page.goto(BASE + "/admin/blog", { waitUntil: "networkidle" });
+  ok("8g admin blog carga", await visible(page.locator("h1:has-text('Blog')"), 20000));
+  ok("8h listado con artículo", await visible(page.locator("text=Precios de portes en Albacete"), 10000));
+  await page.goto(BASE + "/blog", { waitUntil: "networkidle" });
+  await page.waitForTimeout(2500); // ISR: la 1ª visita regenera, la recarga ya lo trae
+  await page.reload({ waitUntil: "networkidle" });
+  ok("8i blog público lista el artículo", await visible(page.locator("text=Precios de portes en Albacete"), 15000));
+  await page.goto(BASE + "/blog/precios-portes-albacete", { waitUntil: "networkidle" });
+  ok("8j artículo renderizado", await visible(page.locator("text=Furgoneta pequena"), 15000));
+  ok("8k CTA a solicitar", await visible(page.locator("text=Solicitar transporte"), 8000));
   await page.goto(BASE + "/admin/stats", { waitUntil: "networkidle" });
   ok("8e estadísticas cargan", await visible(page.locator("text=Horas punta"), 20000));
   ok("8f menú con Finanzas y Estadísticas", (await visible(page.locator("a:has-text('Finanzas')"), 5000)) && (await visible(page.locator("a:has-text('Estadísticas')"), 5000)));
