@@ -70,13 +70,22 @@ export default function AdminDrivers() {
       setFormError("Nombre, apellidos, email y teléfono son obligatorios.");
       return;
     }
+    const email = form.email.trim().toLowerCase();
+
+    // Evitar duplicar: si ya existe un perfil de conductor con ese email
+    if (drivers.some(d => (d.email || "").toLowerCase() === email)) {
+      setFormError("Ya existe un conductor con ese email.");
+      return;
+    }
+
     setCreating(true);
     try {
-      await base44.users.inviteUser(form.email, "user");
+      // Crea la cuenta (o la reutiliza si el email ya tenía una: cliente/admin).
+      const invite = await base44.users.inviteUser(email, "driver");
       await base44.entities.DriverProfile.create({
         full_name: `${form.nombre} ${form.apellidos}`,
         phone: form.telefono,
-        email: form.email,
+        email,
         vehicle_plate: form.matricula,
         vehicle_brand: form.vehiculo_marca,
         vehicle_model: form.vehiculo_modelo,
@@ -85,7 +94,11 @@ export default function AdminDrivers() {
         status: "verified",
         is_available: false,
       });
-      setFormSuccess(`✅ Conductor creado. Se envió invitación a ${form.email}.`);
+      setFormSuccess(
+        invite?.already_existed
+          ? `✅ Conductor creado. ${email} ya tenía cuenta: entrará con su contraseña actual.`
+          : `✅ Conductor creado. Se envió invitación a ${email} para establecer su contraseña.`
+      );
       setForm(emptyForm);
       queryClient.invalidateQueries({ queryKey: ["admin-drivers"] });
     } catch (err) {

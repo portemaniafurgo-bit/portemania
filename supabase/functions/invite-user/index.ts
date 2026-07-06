@@ -18,6 +18,17 @@ function json(body: unknown, status = 200) {
   });
 }
 
+// Decodifica el payload de un JWT (ya verificado por la plataforma).
+function decodeJwtPayload(token: string): Record<string, unknown> | null {
+  try {
+    const part = token.split(".")[1];
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(part.length / 4) * 4, "=");
+    return JSON.parse(atob(b64));
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -42,26 +53,34 @@ Deno.serve(async (req: Request) => {
   let authorized = email === MASTER_ADMIN;
   const authHeader = req.headers.get("Authorization") || "";
   if (!authorized && authHeader.startsWith("Bearer ")) {
+    // verify_jwt=true → la plataforma ya validó la FIRMA del token antes de
+    // llegar aquí. Decodificamos sus claims (sub = id del usuario) y confirmamos
+    // que es admin consultando profiles con el cliente service-role.
     const token = authHeader.replace("Bearer ", "");
-    const caller = createClient(url, anonKey, {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      auth: { persistSession: false },
-    });
-    const { data: { user: callerUser } } = await caller.auth.getUser();
-    if (callerUser) {
+    const claims = decodeJwtPayload(token);
+    if (claims?.sub) {
       const { data: prof } = await admin
-        .from("profiles").select("role,email").eq("id", callerUser.id).single();
-      if (prof?.role === "admin" || (prof?.email || "").toLowerCase() === MASTER_ADMIN) {
+        .from("profiles").select("role,email").eq("id", claims.sub).maybeSingle();
+      const email2 = (prof?.email || claims.email || "").toLowerCase();
+      if (prof?.role === "admin" || email2 === MASTER_ADMIN) {
         authorized = true;
       }
     }
   }
   if (!authorized) return json({ error: "No autorizado" }, 403);
 
-  // Contraseña: usa la indicada o genera una temporal.
+  // Si el email YA tiene cuenta (cliente/admin al que se da de alta como
+  // conductor), NO se llama a createUser (podría alterar su contraseña):
+  // se devuelve OK y el panel crea su perfil de conductor. Entra con su clave.
+  const { data: existing } = await admin
+    .from("profiles").select("id").eq("email", email).maybeSingle();
+  if (existing) {
+    return json({ user: { id: existing.id, email }, already_existed: true });
+  }
+
+  const finalRole = email === MASTER_ADMIN ? "admin" : role;
   const password = body.password ||
     (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2).toUpperCase() + "!7");
-  const finalRole = email === MASTER_ADMIN ? "admin" : role;
 
   const { data, error } = await admin.auth.admin.createUser({
     email,
@@ -69,12 +88,8 @@ Deno.serve(async (req: Request) => {
     email_confirm: true,
     user_metadata: { role: finalRole },
   });
-  if (error) {
-    return json({ error: error.message }, 400);
-  }
+  if (error) return json({ error: error.message }, 400);
 
-  // Asegura el rol en el perfil (por si el trigger ya creó la fila).
   await admin.from("profiles").update({ role: finalRole }).eq("id", data.user.id);
-
   return json({ user: { id: data.user.id, email: data.user.email }, role: finalRole, password });
 });
