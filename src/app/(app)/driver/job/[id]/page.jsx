@@ -90,6 +90,7 @@ export default function ActiveJob() {
     const label = goingToPickup ? "la recogida" : "la entrega";
     const address = goingToPickup ? job.origin_address : job.destination_address;
     if (lat && lng) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTargetCoords({ lat, lng, label, address });
       return;
     }

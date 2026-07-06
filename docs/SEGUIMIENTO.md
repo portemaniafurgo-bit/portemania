@@ -140,6 +140,29 @@ npx vercel deploy --prod --yes   # deploy a producción
 - Estado final: 2 usuarios auth (admin + negocio), 0 conductores, 0 pedidos, mapa público vacío. El esquema/estructura intactos.
 - ⚠️ Consecuencia: las **suites E2E** (e2e/flows.js y e2e/admin.js) dependen de cliente.test/conductor.test; no correrán hasta recrear esas dos cuentas.
 
+### 2026-07-06 (noche) — Onboarding por email + documentos de autónomo + bug de docs "perdidos"
+
+- **Alta de conductores por email (flujo estándar)**: al crear un conductor le llega
+  "Te han invitado a ClicyVoy 🚐" y crea su propia contraseña en `/reset-password`
+  (enlace `token_hash` a prueba de escáneres de correo — era la causa del
+  "Invalid reset link"). Eliminado el apaño de contraseña en pantalla/WhatsApp.
+  Verificado E2E completo: alta → email → enlace → contraseña propia → login (7/7).
+- **Documentos nuevos del conductor**: recibo de autónomo y situación censal
+  (Hacienda), obligatorios para recibir trabajos (migración `0002`). Admiten PDF.
+- **Re-subida de documentos**: botón «Cambiar» en cada documento (para caducidades:
+  recibo, seguro, censal…). El admin ve todos los documentos en la ficha (PDF como chip).
+- **Bug corregido — "me pide todos los documentos de nuevo"**: el perfil del
+  conductor se buscaba solo por `created_by_id` (que en perfiles creados por el
+  admin apunta al admin) y con email sensible a mayúsculas → la app creía que no
+  había perfil, pedía todo otra vez y podía crear un duplicado vacío al guardar.
+  Ahora hay un lookup único y robusto en `src/lib/driverProfile.js` (created_by_id
+  → email case-insensitive → re-vínculo automático) usado por panel y perfil.
+- **Contraseña admin "incorrecta"**: era Claude reseteándola a `ClicyVoy2026!` para
+  las pruebas mientras el dueño ponía la suya. Norma desde hoy: NO tocar la
+  contraseña del admin; para pruebas se crean cuentas temporales que se borran.
+- **Plan post-MVP**: escrito en `docs/PLAN-APP-ANDROID.md` (React Native + Expo,
+  cuadro de funcionalidades cliente/conductor/plataforma, 3 fases).
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

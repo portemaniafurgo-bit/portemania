@@ -13,6 +13,7 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { fetchMyDriverProfile } from "@/lib/driverProfile";
 
 export default function DriverDashboard() {
   const { user } = useAuth();
@@ -20,21 +21,7 @@ export default function DriverDashboard() {
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["driver-profile", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return null;
-      // 1. Buscar perfil ya vinculado al usuario
-      const own = await base44.entities.DriverProfile.filter({ created_by_id: user.id });
-      if (own?.[0]) return own[0];
-      // 2. Buscar por email exacto (perfil creado por admin)
-      if (user?.email) {
-        const byEmail = await base44.entities.DriverProfile.filter({ email: user.email });
-        if (byEmail?.[0]) {
-          await base44.entities.DriverProfile.update(byEmail[0].id, { created_by_id: user.id });
-          return { ...byEmail[0], created_by_id: user.id };
-        }
-      }
-      return null;
-    },
+    queryFn: () => fetchMyDriverProfile(user),
     enabled: !!user?.id,
   });
 
@@ -100,7 +87,9 @@ export default function DriverDashboard() {
     !profile.vehicle_photo_right_url ||
     !profile.license_photo_url ||
     !profile.vehicle_plate ||
-    !profile.vehicle_brand;
+    !profile.vehicle_brand ||
+    !profile.autonomo_receipt_url ||
+    !profile.censal_document_url;
 
   if (profileIncomplete) {
     return (
@@ -123,6 +112,8 @@ export default function DriverDashboard() {
             { label: "Foto vehículo izquierda", done: !!profile.vehicle_photo_left_url },
             { label: "Foto vehículo derecha", done: !!profile.vehicle_photo_right_url },
             { label: "Marca y matrícula del vehículo", done: !!(profile.vehicle_brand && profile.vehicle_plate) },
+            { label: "Recibo de autónomo", done: !!profile.autonomo_receipt_url },
+            { label: "Situación censal (Hacienda)", done: !!profile.censal_document_url },
           ].map((item, i) => (
             <div key={i} className="flex items-center gap-3 text-sm">
               <span className={item.done ? "text-emerald-500" : "text-amber-500"}>{item.done ? "✅" : "⚠️"}</span>

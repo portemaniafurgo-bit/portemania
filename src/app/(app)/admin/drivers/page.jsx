@@ -399,28 +399,26 @@ export default function AdminDrivers() {
                   <div>
                     <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Documentación</p>
                     <div className="flex gap-2 flex-wrap">
-                      {driver.photo_url && (
-                        <a href={driver.photo_url} target="_blank" rel="noopener noreferrer">
-                          <img src={driver.photo_url} alt="Selfie" className="w-20 h-20 rounded-xl object-cover border border-border hover:border-primary transition-colors" title="Foto cara" />
+                      {[
+                        { url: driver.photo_url, title: "Foto cara" },
+                        { url: driver.license_photo_url, title: "Carnet de conducir" },
+                        { url: driver.id_document_url, title: "Documento de identidad" },
+                        { url: driver.insurance_url, title: "Seguro del vehículo" },
+                        { url: driver.autonomo_receipt_url, title: "Recibo de autónomo" },
+                        { url: driver.censal_document_url, title: "Situación censal" },
+                      ].filter(d => d.url).map(d => (
+                        <a key={d.title} href={d.url} target="_blank" rel="noopener noreferrer" title={d.title}>
+                          {/\.pdf($|\?)/i.test(d.url) ? (
+                            <span className="w-20 h-20 rounded-xl border border-border hover:border-primary transition-colors flex flex-col items-center justify-center gap-1 text-2xl bg-muted">
+                              📄<span className="text-[9px] text-muted-foreground px-1 text-center leading-tight">{d.title}</span>
+                            </span>
+                          ) : (
+                            <img src={d.url} alt={d.title} className="w-20 h-20 rounded-xl object-cover border border-border hover:border-primary transition-colors" />
+                          )}
                         </a>
-                      )}
-                      {driver.license_photo_url && (
-                        <a href={driver.license_photo_url} target="_blank" rel="noopener noreferrer">
-                          <img src={driver.license_photo_url} alt="Carnet" className="w-20 h-20 rounded-xl object-cover border border-border hover:border-primary transition-colors" title="Carnet de conducir" />
-                        </a>
-                      )}
-                      {driver.id_document_url && (
-                        <a href={driver.id_document_url} target="_blank" rel="noopener noreferrer">
-                          <img src={driver.id_document_url} alt="DNI" className="w-20 h-20 rounded-xl object-cover border border-border hover:border-primary transition-colors" title="Documento de identidad" />
-                        </a>
-                      )}
-                      {driver.insurance_url && (
-                        <a href={driver.insurance_url} target="_blank" rel="noopener noreferrer">
-                          <img src={driver.insurance_url} alt="Seguro" className="w-20 h-20 rounded-xl object-cover border border-border hover:border-primary transition-colors" title="Seguro del vehículo" />
-                        </a>
-                      )}
+                      ))}
                     </div>
-                    {!driver.photo_url && !driver.license_photo_url && !driver.id_document_url && !driver.insurance_url && (
+                    {!driver.photo_url && !driver.license_photo_url && !driver.id_document_url && !driver.insurance_url && !driver.autonomo_receipt_url && !driver.censal_document_url && (
                       <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">⚠️ Este conductor no ha subido documentación todavía</p>
                     )}
                   </div>

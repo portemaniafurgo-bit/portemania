@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 import { Save, Loader2, Upload, CheckCircle2 } from "lucide-react";
 import StatusBadge from "@/components/common/StatusBadge";
 import RatingVans from "@/components/common/RatingVans";
+import { fetchMyDriverProfile } from "@/lib/driverProfile";
 
 const LICENSE_TYPES = ["B", "C", "C1", "CE", "C1E", "D", "D1"];
 
@@ -27,18 +28,21 @@ const DOC_UPLOADS = [
   { field: "license_photo_url", label: "Foto de licencia" },
   { field: "id_document_url", label: "Documento de identidad" },
   { field: "insurance_url", label: "Seguro del vehículo" },
+  { field: "autonomo_receipt_url", label: "Recibo de autónomo *", pdf: true },
+  { field: "censal_document_url", label: "Situación censal (Hacienda) *", pdf: true },
 ];
 
 export default function DriverProfilePage() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
 
+  // Lookup ROBUSTO (created_by_id + email): si se buscara solo por created_by_id,
+  // un conductor dado de alta por el admin vería el perfil vacío y se le pediría
+  // toda la documentación otra vez (bug histórico). Ver src/lib/driverProfile.js.
   const { data: existingProfile } = useQuery({
-    queryKey: ["driver-profile"],
-    queryFn: async () => {
-      const profiles = await base44.entities.DriverProfile.filter({ created_by_id: user?.id });
-      return profiles?.[0] || null;
-    },
+    queryKey: ["driver-profile", user?.id],
+    queryFn: () => fetchMyDriverProfile(user),
+    enabled: !!user?.id,
   });
 
   const [form, setForm] = useState({
@@ -61,9 +65,9 @@ export default function DriverProfilePage() {
 
   // Rellenar el formulario al cargar el perfil existente: patrón intencionado
   // (sincronizar datos del servidor -> estado del form una sola vez por cambio).
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     if (existingProfile) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({
         full_name: existingProfile.full_name || user?.full_name || "",
         phone: existingProfile.phone || "",
@@ -77,6 +81,7 @@ export default function DriverProfilePage() {
         city: existingProfile.city || "",
       });
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm(prev => ({
         ...prev,
         full_name: user?.full_name || "",
@@ -141,20 +146,29 @@ export default function DriverProfilePage() {
   const hasSelfie = !!getFileUrl("photo_url");
   const canSave = form.full_name && form.phone && form.license_types.length > 0;
 
-  const UploadRow = ({ field, label }) => {
+  const UploadRow = ({ field, label, pdf }) => {
     const url = getFileUrl(field);
+    const accept = pdf ? "image/*,.pdf" : "image/*";
     return (
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <span className="text-sm text-foreground">{label}</span>
         {url ? (
-          <span className="text-xs text-emerald-600 font-medium flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5" /> Subido
+          <span className="flex items-center gap-3">
+            <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 font-medium flex items-center gap-1 hover:underline">
+              <CheckCircle2 className="w-3.5 h-3.5" /> Subido
+            </a>
+            {/* Re-subir: los documentos caducan (recibo autónomo, seguro...) y deben poder reemplazarse */}
+            <label className="text-xs text-primary font-medium cursor-pointer hover:underline flex items-center gap-1">
+              {uploading[field] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
+              Cambiar
+              <input type="file" accept={accept} className="hidden" onChange={e => handleFileUpload(field, e)} />
+            </label>
           </span>
         ) : (
           <label className="text-xs text-primary font-medium cursor-pointer hover:underline flex items-center gap-1">
             {uploading[field] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}
             Subir
-            <input type="file" accept="image/*" className="hidden" onChange={e => handleFileUpload(field, e)} />
+            <input type="file" accept={accept} className="hidden" onChange={e => handleFileUpload(field, e)} />
           </label>
         )}
       </div>
@@ -293,12 +307,20 @@ export default function DriverProfilePage() {
         <h3 className="font-heading font-semibold text-foreground">Documentación</h3>
         <div className="space-y-3">
           {DOC_UPLOADS.map(doc => (
-            <UploadRow key={doc.field} field={doc.field} label={doc.label} />
+            <UploadRow key={doc.field} field={doc.field} label={doc.label} pdf={doc.pdf} />
           ))}
         </div>
+        <p className="text-xs text-muted-foreground">
+          Cuando un documento caduque (recibo de autónomo, situación censal, seguro…), pulsa «Cambiar» para subir el nuevo.
+        </p>
         {!hasSelfie && (
           <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
             ⚠️ La foto de la cara es obligatoria para activar tu perfil
+          </p>
+        )}
+        {(!getFileUrl("autonomo_receipt_url") || !getFileUrl("censal_document_url")) && (
+          <p className="text-xs text-amber-600 bg-amber-50 rounded-lg px-3 py-2">
+            ⚠️ El recibo de autónomo y la situación censal son obligatorios para recibir trabajos
           </p>
         )}
       </div>
