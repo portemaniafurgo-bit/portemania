@@ -213,6 +213,39 @@ multipart `POST /v1/projects/{ref}/functions/deploy?slug=...` (metadata JSON +
 file), que genera el bundle ESZIP. El `PATCH .../functions/{slug}` con `{body}`
 sube el código en crudo (sin ESZIP) → la función arranca con `BOOT_ERROR`.
 
+### 2026-07-07 (tarde) — Bug real del cliente: perfil cruzado con otro conductor
+
+Reporte del negocio (6-jul 22:52, antes del fix de esa noche — pero el fix de la
+noche NO cubría este caso): entró como conductor con su correo (el del admin),
+subió un documento y su perfil "se convirtió" en el del conductor Sergio que
+acababa de crear; desde entonces le salía el perfil de Sergio y le pedía toda
+la documentación otra vez.
+
+**Causa raíz (dos piezas que se combinan):**
+1. El trigger `set_created_by` rellena `created_by_id` con el uid de QUIEN
+   INSERTA → los perfiles dados de alta desde `/admin/drivers` quedaban
+   ligados al uid del ADMIN, no al del conductor invitado.
+2. `fetchMyDriverProfile` buscaba PRIMERO por `created_by_id` (con `limit(1)`
+   sin `order`): un admin que además es conductor "hereda" el último perfil
+   que creó, y sus subidas de documentos se guardan en la fila del otro.
+
+**Arreglos (código + BD):**
+- Alta desde admin: `DriverProfile.create` pasa el `created_by_id` del
+  conductor invitado (`invite.user.id`) — el perfil nace bien vinculado.
+- `fetchMyDriverProfile`: la identidad fiable ahora es el **email de login**
+  (case-insensitive, fila más antigua si hay duplicados, re-vínculo
+  self-heal); `created_by_id` queda como respaldo y descartando filas cuyo
+  email es de otra persona.
+- Migración `0005_fix_driver_profile_linkage.sql`: re-vincula las filas
+  existentes al usuario auth de su mismo email (también corrige que, con la
+  fila de Sergio ligada al admin, el trigger de valoraciones y la policy de
+  aceptar pedidos trataran esa fila como del admin), y normaliza con
+  `lower()` la comparación de email de la policy de UPDATE (el self-heal
+  podía fallar en silencio por mayúsculas).
+- ⚠️ Revisar en `/admin/drivers` la ficha de Sergio: puede contener documentos
+  subidos por error desde la cuenta del admin (la mezcla ya ocurrida no se
+  puede deshacer automáticamente).
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

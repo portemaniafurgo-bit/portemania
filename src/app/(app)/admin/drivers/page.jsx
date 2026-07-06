@@ -83,6 +83,11 @@ export default function AdminDrivers() {
       // Crea la cuenta (o la reutiliza si el email ya tenía una: cliente/admin).
       const invite = await base44.users.inviteUser(email, "driver");
       await base44.entities.DriverProfile.create({
+        // Vincular al uid del CONDUCTOR: sin esto, el trigger set_created_by
+        // pone el uid del admin y el admin "hereda" este perfil al entrar
+        // como conductor (bug del perfil cruzado con Sergio).
+        created_by_id: invite?.user?.id,
+        created_by: email,
         full_name: `${form.nombre} ${form.apellidos}`,
         phone: form.telefono,
         email,
