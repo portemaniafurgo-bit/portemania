@@ -163,6 +163,55 @@ npx vercel deploy --prod --yes   # deploy a producción
 - **Plan post-MVP**: escrito en `docs/PLAN-APP-ANDROID.md` (React Native + Expo,
   cuadro de funcionalidades cliente/conductor/plataforma, 3 fases).
 
+### 2026-07-07 — Revisión de calidad pre-entrega (4 auditores + verificación real)
+
+Auditoría en paralelo de cliente, conductor, admin y seguridad; cada hallazgo se
+verificó contra código/BD reales y se corrigió. Commit `c076831` + migraciones
+0003/0004 + Edge Functions send-email v7 / create-payment-intent v6.
+
+**Seguridad (migraciones 0003 + 0004, verificado con ataques reales):**
+- Escalada a admin cerrada por dos vías: (a) `signup` con `data.role=admin`
+  (whitelist en `handle_new_user`); (b) `UPDATE` del propio `profiles.role`
+  (trigger `protect_profile_role`). El trigger DEBE ser `SECURITY INVOKER`: como
+  DEFINER, `current_user` era el propietario (postgres) y el propio trigger lo
+  autorizaba → el bug tardó en verse. Probado: cliente no puede hacerse admin;
+  transición legítima client→driver sigue funcionando.
+- PII de conductores (teléfono, email, nº carnet, DNI, recibo autónomo, censal)
+  ya NO es legible por cualquier usuario autenticado: RLS de `driver_profiles`
+  restringida a dueño/staff/cliente-con-pedido-asignado. `get_public_drivers`
+  (nombre + ubicación difusa) sigue siendo la vía pública.
+- Bucket `driver-docs` pasa a **privado** (documentos de identidad ya no
+  accesibles por URL).
+- `transport_requests`: insert/update acotados (no insertar 'paid', ni a nombre
+  de otro; el conductor solo se autoasigna o devuelve a pending).
+- CP 02001-02008 validado también en la RPC de invitado (servidor).
+
+**Pagos:**
+- `create-payment-intent` recalcula el importe en el servidor desde las tarifas
+  (probado: pedido con `estimated_price` manipulado a 1€ → cobra los 90€ reales).
+  Idempotencia por pedido (sin cargos duplicados).
+- Página de pago: **eliminado el fallback que marcaba el pedido como pagado sin
+  cobrar** (era pérdida de dinero directa). Sin Stripe → ofrece efectivo, nunca
+  marca pagado. Guard de pedido ya pagado (evita re-cobros al volver atrás).
+
+**Robustez cliente/conductor/admin:** order/[id] con catch (sin spinner
+infinito), onError con avisos en chat/valorar/cancelar, subida de fotos con
+manejo de error, CP robusto (varios códigos en la dirección); caché de ganancias
+del conductor separada (ya no infla con cancelados), carrera al aceptar resuelta
+(update condicionado), gate por perfil incompleto/no disponible en Solicitudes,
+aviso de GPS denegado, comisión desde tarifas; guards en órdenes/incidencias del
+admin, staff no ve finanzas, reasignación resuelve el uid real del conductor,
+validación de tarifas y de slug/contenido del blog.
+
+**Aviso de pedido nuevo:** `send-email` modo `new_request` — el servidor resuelve
+destinatarios (admins + conductores verificados compatibles con el tamaño) y el
+contenido. Probado: 4/4 entregados (incluido el conductor verificado).
+
+⚠️ **GOTCHA de despliegue de Edge Functions**: desplegar SIEMPRE con el endpoint
+multipart `POST /v1/projects/{ref}/functions/deploy?slug=...` (metadata JSON +
+file), que genera el bundle ESZIP. El `PATCH .../functions/{slug}` con `{body}`
+sube el código en crudo (sin ESZIP) → la función arranca con `BOOT_ERROR`.
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**
