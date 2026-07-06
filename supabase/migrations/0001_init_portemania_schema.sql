@@ -346,7 +346,8 @@ create policy transport_requests_select on public.transport_requests for select
       status = 'pending'
       and exists (
         select 1 from public.driver_profiles dp
-        where dp.created_by_id = auth.uid() and dp.status = 'verified'
+        where (dp.created_by_id = auth.uid() or lower(dp.email) = lower(auth.jwt() ->> 'email'))
+          and dp.status = 'verified'
       )
     )
   );
@@ -360,7 +361,8 @@ create policy transport_requests_update on public.transport_requests for update
       status = 'pending'
       and exists (
         select 1 from public.driver_profiles dp
-        where dp.created_by_id = auth.uid() and dp.status = 'verified'
+        where (dp.created_by_id = auth.uid() or lower(dp.email) = lower(auth.jwt() ->> 'email'))
+          and dp.status = 'verified'
       )
     )
   );

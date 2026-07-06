@@ -80,7 +80,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   // ===== 1. Invitado: /solicitar completo =====
   await page.goto(BASE + "/solicitar", { waitUntil: "networkidle" });
   await page.fill('input[placeholder*="nombre y apellidos"]', "INVITADO E2E");
-  await page.fill('input[type="tel"]', "600333444");
+  await page.fill('input[type="tel"]', "6" + String(Date.now()).slice(-8));
   // CP obligatorio: sin CP el botón sigue deshabilitado
   await page.fill('input[placeholder*="Calle, número, piso"] >> nth=0', "Calle Ancha 2");
   await page.fill('input[placeholder*="Calle, número, piso"] >> nth=1', "Calle Mayor 5, 02002 Albacete");

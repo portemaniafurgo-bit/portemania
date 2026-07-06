@@ -129,6 +129,11 @@ npx vercel deploy --prod --yes   # deploy a producción
 - **Alta de conductor**: fallaba con emails ya existentes (createUser sobre cuenta existente daba error Y corrompía su contraseña — así se rompió el login admin). Corregido: invite-user comprueba existencia antes; el panel muestra la contraseña temporal en pantalla para enviarla por WhatsApp (onboarding sin depender de email).
 - Contraseña del admin restaurada y cambiada a **ClicyVoy2026!** (estable).
 
+### 2026-07-06 (tarde) — Bug grave: conductores no veían pedidos + email operativo
+- **BUG DE PRODUCCIÓN**: los conductores reales (Leandro, Sergio) NO veían ningún pedido pendiente. Causa: al crearlos el admin, su driver_profile queda con created_by_id = uid del ADMIN (el trigger set_created_by usa auth.uid() del que inserta), y la RLS de 'ver pendientes' exigía created_by_id = auth.uid() del conductor. Corregido a dos niveles: (1) datos, se vinculó created_by_id de cada perfil a su cuenta por email; (2) RLS robusta, el conductor verificado ve/acepta pendientes si created_by_id O su email coinciden (versionado en la migración). Verificado: Sergio pasó de 0 a 10 pendientes visibles.
+- Email: Resend + dominio clicyvoy.es verificado y conectado como SMTP de Supabase (los resets/invitaciones ya llegan). Alta de conductor muestra la contraseña en pantalla (WhatsApp). Admin restaurado a ClicyVoy2026!.
+- Suites 29/29 + 35/35.
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**
