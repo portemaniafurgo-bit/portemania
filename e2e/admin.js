@@ -6,7 +6,7 @@ const fs = require("fs");
 const BASE = "https://pontemania.vercel.app";
 const SB = "https://dnehzwrqphqpkcdjwqfi.supabase.co";
 const anon = fs.readFileSync(".env.local", "utf8").match(/ANON_KEY=(.+)/)[1].trim();
-const ADMIN = { email: "renato.0550.calero@gmail.com", pass: "PorteMania2026!" };
+const ADMIN = { email: "renato.0550.calero@gmail.com", pass: "ClicyVoy2026!" };
 const results = [];
 let page;
 
