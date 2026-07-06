@@ -3,7 +3,9 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/entities";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -44,31 +46,26 @@ export default function GuestRequestContent() {
 
   const ALBACETE_CP = ["02001", "02002", "02003", "02004", "02005", "02006", "02007", "02008"];
 
-  const extractCP = (address) => {
-    const match = address.match(/\b(0[2-9]\d{3}|\d{5})\b/);
-    return match ? match[0] : null;
-  };
+  // Todos los números de 5 dígitos de la dirección (puede haber varios: "Polígono 12345, Albacete 02001")
+  const extractCPs = (address) => address.match(/\b\d{5}\b/g) || [];
 
   const validateCP = (field, value) => {
     if (!value.trim()) {
       setCpError(prev => ({ ...prev, [field]: "" }));
       return;
     }
-    const cp = extractCP(value);
-    if (!cp) {
+    const cps = extractCPs(value);
+    if (cps.length === 0) {
       setCpError(prev => ({ ...prev, [field]: "El código postal es obligatorio (02001–02008)." }));
-    } else if (!ALBACETE_CP.includes(cp)) {
-      setCpError(prev => ({ ...prev, [field]: `El código postal ${cp} no pertenece a Albacete capital (02001–02008).` }));
+    } else if (!cps.some(cp => ALBACETE_CP.includes(cp))) {
+      setCpError(prev => ({ ...prev, [field]: `El código postal ${cps[0]} no pertenece a Albacete capital (02001–02008).` }));
     } else {
       setCpError(prev => ({ ...prev, [field]: "" }));
     }
   };
 
   // CP presente y dentro de Albacete capital: requisito para continuar.
-  const hasValidCP = (address) => {
-    const cp = extractCP(address);
-    return !!cp && ALBACETE_CP.includes(cp);
-  };
+  const hasValidCP = (address) => extractCPs(address).some(cp => ALBACETE_CP.includes(cp));
 
   const update = (field, value) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -89,9 +86,20 @@ export default function GuestRequestContent() {
 
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
-    for (const file of files) {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setPhotos(prev => [...prev, file_url]);
+    try {
+      for (const file of files) {
+        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        setPhotos(prev => [...prev, file_url]);
+      }
+    } catch (err) {
+      console.error("Error al subir la foto:", err);
+      toast({
+        title: "Error al subir la foto",
+        description: "No se pudo subir la foto. Comprueba tu conexión e inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      e.target.value = "";
     }
   };
 
@@ -113,26 +121,11 @@ export default function GuestRequestContent() {
         ...(force ? { force: true } : {}),
       });
 
-      const vehicleName = vehicleData[form.vehicle_type]?.name || form.vehicle_type;
-      const emailBody = `Hay un nuevo trabajo disponible en ClicyVoy.\n\nCliente: ${form.client_name}\nTeléfono: ${form.client_phone}\n\nRecogida: ${form.origin_address}\nEntrega: ${form.destination_address}\n\nVehículo: ${vehicleName}\nDuración: ${2 + form.extra_hours}h\nPrecio estimado: ${finalPrice.toFixed(2)}€ (efectivo)\n\nDescripción: ${form.cargo_description}\n\nID de reserva: ${request.id}\n\nAccede a la app para aceptar el trabajo.`;
-
-      // Send all emails in parallel (fire and forget)
-      base44.entities.DriverProfile.filter({ status: "verified" }).then(all => {
-        // Pedido grande: solo a conductores con furgón grande; pequeño: a todos
-        const drivers = form.vehicle_type === "large" ? all.filter(d => d.vehicle_type === "large") : all;
-        const emailPromises = [
-          base44.integrations.Core.SendEmail({ to: "renato.0550.calero@gmail.com", subject: `🚚 Nueva solicitud (invitado) — ${vehicleName}`, body: emailBody }),
-          base44.integrations.Core.SendEmail({ to: "renatocaleromartinez407@gmail.com", subject: `🚚 Nueva solicitud (invitado) — ${vehicleName}`, body: emailBody }),
-          ...drivers.filter(d => d.email).map(driver =>
-            base44.integrations.Core.SendEmail({
-              to: driver.email,
-              subject: `🚐 Nuevo trabajo disponible — ${vehicleName}`,
-              body: `Hola ${driver.full_name},\n\n${emailBody}`,
-            })
-          ),
-        ];
-        Promise.all(emailPromises).catch(console.error);
-      }).catch(console.error);
+      // Notificar a admins + conductores: lo resuelve el backend (destinatarios y contenido).
+      // Best-effort: no debe bloquear el flujo si falla.
+      supabase.functions
+        .invoke("send-email", { body: { mode: "new_request", order_id: request.id } })
+        .catch(() => {});
 
       router.push("/solicitud-enviada");
     } catch (err) {

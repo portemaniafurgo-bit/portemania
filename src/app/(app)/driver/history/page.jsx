@@ -10,14 +10,19 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Clock, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { useTariffs } from "@/lib/tariffs";
 
 export default function DriverHistory() {
   const { user } = useAuth();
+  const tariffs = useTariffs();
 
   const { data: jobs = [], isLoading } = useQuery({
-    queryKey: ["driver-history"],
+    queryKey: ["driver-history", user?.id],
     queryFn: () => base44.entities.TransportRequest.filter({ driver_id: user?.id }, "-created_date", 50),
   });
+
+  // Parte del conductor = 100% - comisión de la plataforma (misma fórmula que Ganancias)
+  const driverShare = (100 - (tariffs.commission_pct ?? 15)) / 100;
 
   const completed = jobs.filter(j => j.status === "delivered");
 
@@ -50,7 +55,7 @@ export default function DriverHistory() {
                     </div>
                   </div>
                   <span className="font-bold text-foreground">
-                    {((job.final_price || job.estimated_price || 0) * 0.85).toFixed(2)}€
+                    {((job.final_price || job.estimated_price || 0) * driverShare).toFixed(2)}€
                   </span>
                 </div>
                 {job.client_rating && (

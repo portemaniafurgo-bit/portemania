@@ -9,15 +9,19 @@ import StatsCard from "@/components/common/StatsCard";
 import StatusBadge from "@/components/common/StatusBadge";
 import { vehicleData } from "@/components/common/VehicleCard";
 import { Truck, DollarSign, Star, Clock, MapPin, ShieldCheck } from "lucide-react";
-import { format } from "date-fns";
+import { format, isToday } from "date-fns";
 import { es } from "date-fns/locale";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { fetchMyDriverProfile } from "@/lib/driverProfile";
+import { fetchMyDriverProfile, isDriverProfileIncomplete } from "@/lib/driverProfile";
+import { useTariffs } from "@/lib/tariffs";
+
+const ADMIN_EMAIL = "renato.0550.calero@gmail.com";
 
 export default function DriverDashboard() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const tariffs = useTariffs();
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["driver-profile", user?.id],
@@ -27,7 +31,7 @@ export default function DriverDashboard() {
 
   const { data: myJobs = [] } = useQuery({
     queryKey: ["driver-jobs"],
-    queryFn: () => base44.entities.TransportRequest.filter({ driver_id: user?.id }, "-created_date", 20),
+    queryFn: () => base44.entities.TransportRequest.filter({ driver_id: user?.id }, "-created_date", 200),
   });
 
   const { data: allPending = [] } = useQuery({
@@ -53,7 +57,14 @@ export default function DriverDashboard() {
 
   const activeJobs = myJobs.filter(j => !["delivered", "cancelled"].includes(j.status));
   const completedJobs = myJobs.filter(j => j.status === "delivered");
-  const totalEarnings = completedJobs.reduce((acc, j) => acc + (j.final_price || j.estimated_price || 0) * 0.85, 0);
+  // Trabajos con actividad HOY (aceptados o creados hoy), no los "activos"
+  const todayJobs = myJobs.filter(j => {
+    const dateStr = j.accepted_at || j.created_date;
+    return dateStr && isToday(new Date(dateStr));
+  });
+  // Parte del conductor = 100% - comisión de la plataforma (misma fórmula que Ganancias)
+  const driverShare = (100 - (tariffs.commission_pct ?? 15)) / 100;
+  const totalEarnings = completedJobs.reduce((acc, j) => acc + (j.final_price || j.estimated_price || 0) * driverShare, 0);
 
   if (profileLoading) {
     return (
@@ -79,17 +90,7 @@ export default function DriverDashboard() {
   }
 
   // Verificar si el perfil está incompleto (falta info obligatoria)
-  const profileIncomplete =
-    !profile.photo_url ||
-    !profile.vehicle_photo_front_url ||
-    !profile.vehicle_photo_rear_url ||
-    !profile.vehicle_photo_left_url ||
-    !profile.vehicle_photo_right_url ||
-    !profile.license_photo_url ||
-    !profile.vehicle_plate ||
-    !profile.vehicle_brand ||
-    !profile.autonomo_receipt_url ||
-    !profile.censal_document_url;
+  const profileIncomplete = isDriverProfileIncomplete(profile);
 
   if (profileIncomplete) {
     return (
@@ -142,12 +143,14 @@ export default function DriverDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/admin">
-            <Button variant="outline" size="sm" className="rounded-xl gap-2">
-              <ShieldCheck className="w-4 h-4" />
-              Admin
-            </Button>
-          </Link>
+          {(user?.email === ADMIN_EMAIL || ["admin", "staff"].includes(user?.role)) && (
+            <Link href="/admin">
+              <Button variant="outline" size="sm" className="rounded-xl gap-2">
+                <ShieldCheck className="w-4 h-4" />
+                Admin
+              </Button>
+            </Link>
+          )}
           <Switch
             checked={profile?.is_available || false}
             onCheckedChange={() => toggleAvailability.mutate()}
@@ -157,7 +160,7 @@ export default function DriverDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatsCard title="Viajes hoy" value={activeJobs.length} icon={Truck} />
+        <StatsCard title="Viajes hoy" value={todayJobs.length} icon={Truck} />
         <StatsCard title="Completados" value={completedJobs.length} icon={Clock} />
         <StatsCard title="Ganancias" value={`${totalEarnings.toFixed(0)}€`} icon={DollarSign} />
         <StatsCard title="Valoración" value={profile?.average_rating?.toFixed(1) || "5.0"} icon={Star} />

@@ -32,6 +32,7 @@ export default function AdminWorkers() {
       router.push("/dashboard");
       return;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadWorkers();
   }, [user]);
 
@@ -46,8 +47,18 @@ export default function AdminWorkers() {
     }
     setLoading(true);
     try {
-      // Invite the worker as a user with role "user"
-      await base44.users.inviteUser(form.email, "user");
+      const email = form.email.trim();
+      // No crear duplicados: comprobar si ya existe un DriverProfile con ese email
+      const profiles = await base44.entities.DriverProfile.list();
+      const duplicate = profiles.some(
+        p => (p.email || "").trim().toLowerCase() === email.toLowerCase()
+      );
+      if (duplicate) {
+        setError(`Ya existe un trabajador registrado con el correo ${email}.`);
+        return;
+      }
+      // Invitar al trabajador como usuario con rol "driver"
+      await base44.users.inviteUser(email, "driver");
       // Also create a DriverProfile with their data
       await base44.entities.DriverProfile.create({
         full_name: `${form.nombre} ${form.apellidos}`,
@@ -117,7 +128,7 @@ export default function AdminWorkers() {
 
           <div className="space-y-2">
             <Label className="flex items-center gap-1.5 text-sm"><Mail className="w-3.5 h-3.5" /> Correo electrónico</Label>
-            <Input placeholder="trabajador@portemania.es" type="email" value={form.email} onChange={e => update("email", e.target.value)} className="rounded-xl h-11" required />
+            <Input placeholder="trabajador@clicyvoy.es" type="email" value={form.email} onChange={e => update("email", e.target.value)} className="rounded-xl h-11" required />
             <p className="text-xs text-muted-foreground">El trabajador recibirá un correo para establecer su contraseña e iniciar sesión.</p>
           </div>
 

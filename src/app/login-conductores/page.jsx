@@ -52,7 +52,7 @@ export default function LoginConductores() {
           <Label htmlFor="email">Correo electrónico</Label>
           <div className="relative">
             <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input id="email" type="email" placeholder="conductor@portemania.es" value={email}
+            <Input id="email" type="email" placeholder="conductor@clicyvoy.es" value={email}
               onChange={e => setEmail(e.target.value)} className="pl-10 h-12" required autoFocus />
           </div>
         </div>

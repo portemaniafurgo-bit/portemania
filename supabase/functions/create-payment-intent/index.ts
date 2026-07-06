@@ -1,8 +1,9 @@
 // Edge Function: create-payment-intent
 // Crea el cargo real en Stripe (PaymentIntent) para un pedido del usuario
 // autenticado. El cliente lo confirma con stripe.confirmCardPayment.
-// Requiere el secreto STRIPE_SECRET_KEY; si no está configurado devuelve
-// not_configured y la app cae al modo simulado.
+// El IMPORTE se recalcula en el servidor desde las tarifas (app_settings) —
+// nunca se confía en el estimated_price que manda el cliente.
+// Requiere el secreto STRIPE_SECRET_KEY; si no está, devuelve not_configured.
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const cors = {
@@ -18,6 +19,20 @@ function json(body: unknown, status = 200) {
   });
 }
 
+const DEFAULT_TARIFFS = {
+  small: 40, large: 60, extra_hour: 15, insurance: 12, help_price: 30, commission_pct: 15,
+};
+
+// Misma fórmula que src/lib/tariffs.js estimatePrice (mantener en sincronía).
+function computePrice(t: Record<string, number>, order: Record<string, unknown>): number {
+  const vt = order.vehicle_type === "large" ? "large" : "small";
+  const base = Number(t[vt] ?? DEFAULT_TARIFFS[vt]);
+  const extraHours = Number(order.extra_hours) || 0;
+  const insurance = order.insurance_selected ? Number(t.insurance ?? DEFAULT_TARIFFS.insurance) : 0;
+  const help = order.needs_help ? Number(t.help_price ?? DEFAULT_TARIFFS.help_price) : 0;
+  return base + extraHours * Number(t.extra_hour ?? DEFAULT_TARIFFS.extra_hour) + insurance + help;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -25,7 +40,6 @@ Deno.serve(async (req: Request) => {
   const stripeKey = Deno.env.get("STRIPE_SECRET_KEY");
   if (!stripeKey) return json({ error: "not_configured" }, 200);
 
-  // Usuario autenticado (verify_jwt exige token válido; comprobamos identidad)
   const admin = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -42,23 +56,26 @@ Deno.serve(async (req: Request) => {
   }
   if (!body.order_id) return json({ error: "order_id requerido" }, 400);
 
-  // El pedido debe ser del usuario, estar sin pagar y tener importe válido.
   const { data: order } = await admin
     .from("transport_requests")
-    .select("id, created_by_id, estimated_price, payment_status, client_name")
+    .select("id, created_by_id, payment_status, client_name, vehicle_type, extra_hours, insurance_selected, needs_help")
     .eq("id", body.order_id)
     .single();
   if (!order) return json({ error: "Pedido no encontrado" }, 404);
   if (order.created_by_id !== caller.user.id) return json({ error: "No es tu pedido" }, 403);
   if (order.payment_status === "paid") return json({ error: "Ya está pagado" }, 400);
-  const amount = Math.round(Number(order.estimated_price) * 100);
+
+  // Importe recalculado en servidor desde las tarifas vigentes (no el del cliente).
+  const { data: settings } = await admin
+    .from("app_settings").select("value").eq("key", "tariffs").maybeSingle();
+  const tariffs = { ...DEFAULT_TARIFFS, ...((settings?.value as Record<string, number>) || {}) };
+  const price = computePrice(tariffs, order);
+  const amount = Math.round(price * 100);
   if (!Number.isFinite(amount) || amount < 50) return json({ error: "Importe no válido" }, 400);
 
-  // PaymentIntent vía API REST de Stripe (form-encoded)
   const params = new URLSearchParams({
     amount: String(amount),
     currency: "eur",
-    // Solo tarjeta, sin métodos con redirección: confirmCardPayment no necesita return_url
     "automatic_payment_methods[enabled]": "true",
     "automatic_payment_methods[allow_redirects]": "never",
     "metadata[order_id]": order.id,
@@ -70,6 +87,8 @@ Deno.serve(async (req: Request) => {
     headers: {
       Authorization: `Bearer ${stripeKey}`,
       "Content-Type": "application/x-www-form-urlencoded",
+      // Idempotencia por pedido: reintentos no crean cargos duplicados.
+      "Idempotency-Key": `order_${order.id}`,
     },
     body: params,
   });

@@ -15,6 +15,8 @@ import {
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState } from "react";
+import { useAdminGuard } from "@/lib/useAdminGuard";
+import { supabase } from "@/lib/entities";
 
 function TimelineStep({ label, time, done }) {
   return (
@@ -35,6 +37,7 @@ function TimelineStep({ label, time, done }) {
 }
 
 export default function AdminOrderDetail() {
+  const canRender = useAdminGuard({ allowStaff: true });
   const { id } = useParams();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -62,9 +65,39 @@ export default function AdminOrderDetail() {
     mutationFn: (data) => base44.entities.TransportRequest.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
-      queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-orders-list"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-dashboard-orders"] });
     },
   });
+
+  const assignMutation = useMutation({
+    mutationFn: async (d) => {
+      // En conductores dados de alta por el admin, created_by_id es el uid del ADMIN:
+      // se resuelve el uid real del conductor por su email en profiles.
+      let driverId = d.created_by_id;
+      if (d.email) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("id")
+          .ilike("email", d.email)
+          .maybeSingle();
+        if (profile?.id) driverId = profile.id;
+      }
+      return base44.entities.TransportRequest.update(id, {
+        driver_id: driverId,
+        driver_name: d.full_name,
+        status: order.status === "pending" ? "accepted" : order.status,
+        accepted_at: order.accepted_at || new Date().toISOString(),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
+      queryClient.invalidateQueries({ queryKey: ["admin-orders-list"] });
+      queryClient.invalidateQueries({ queryKey: ["admin-dashboard-orders"] });
+    },
+  });
+
+  if (!canRender) return null;
 
   if (isLoading) {
     return (
@@ -157,13 +190,9 @@ export default function AdminOrderDetail() {
             <button
               key={d.id}
               className="w-full flex items-center justify-between p-3 rounded-xl border border-border hover:border-primary/40 hover:bg-muted text-left"
+              disabled={assignMutation.isPending}
               onClick={() => {
-                updateMutation.mutate({
-                  driver_id: d.created_by_id,
-                  driver_name: d.full_name,
-                  status: order.status === "pending" ? "accepted" : order.status,
-                  accepted_at: order.accepted_at || new Date().toISOString(),
-                });
+                assignMutation.mutate(d);
                 setShowReassign(false);
               }}
             >

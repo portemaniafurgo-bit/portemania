@@ -68,8 +68,23 @@ function ResetPasswordInner() {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
-      // Ya tiene sesión: al login correspondiente
-      window.location.href = "/login-conductores";
+      // Ya tiene sesión: al login correspondiente según el rol del usuario
+      let role = null;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const uid = sessionData?.session?.user?.id;
+        if (uid) {
+          const { data: profileRow } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", uid)
+            .single();
+          role = profileRow?.role || null;
+        }
+      } catch {
+        // si no se puede leer el rol, se asume cliente
+      }
+      window.location.href = role === "driver" ? "/login-conductores" : "/login-clientes";
     } catch (err) {
       setError(err.message || "No se pudo guardar la contraseña.");
     } finally {

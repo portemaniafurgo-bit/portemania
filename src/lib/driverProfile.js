@@ -16,6 +16,26 @@ import { supabase } from "@/lib/entities";
  * Usar SIEMPRE este helper en las páginas del conductor; nunca filtrar solo
  * por created_by_id.
  */
+/**
+ * Un perfil de conductor está "incompleto" si le falta cualquier documento o
+ * dato obligatorio. Misma condición que usa el panel del conductor: usarla
+ * SIEMPRE que haya que decidir si puede ver/aceptar trabajos.
+ */
+export function isDriverProfileIncomplete(profile) {
+  return (
+    !profile?.photo_url ||
+    !profile.vehicle_photo_front_url ||
+    !profile.vehicle_photo_rear_url ||
+    !profile.vehicle_photo_left_url ||
+    !profile.vehicle_photo_right_url ||
+    !profile.license_photo_url ||
+    !profile.vehicle_plate ||
+    !profile.vehicle_brand ||
+    !profile.autonomo_receipt_url ||
+    !profile.censal_document_url
+  );
+}
+
 export async function fetchMyDriverProfile(user) {
   if (!user?.id) return null;
 

@@ -13,6 +13,7 @@ import {
 import { format, isAfter, startOfDay, startOfMonth, differenceInMinutes } from "date-fns";
 import { es } from "date-fns/locale";
 import { useAdminGuard } from "@/lib/useAdminGuard";
+import { useAuth } from "@/lib/AuthContext";
 
 const PENDING_ALERT_MIN = 10;
 
@@ -32,9 +33,12 @@ function Kpi({ icon: Icon, label, value, sub, alert }) {
 export default function AdminDashboard() {
   const tariffs = useTariffs();
   const canRender = useAdminGuard({ allowStaff: true });
+  const { user } = useAuth();
+  // El staff puede operar, pero las finanzas son solo del admin (misma política que useAdminGuard)
+  const isStaff = user?.role === "staff";
 
   const { data: orders = [] } = useQuery({
-    queryKey: ["admin-orders"],
+    queryKey: ["admin-dashboard-orders"],
     queryFn: () => base44.entities.TransportRequest.list("-created_date", 500),
     refetchInterval: 15000,
   });
@@ -103,8 +107,12 @@ export default function AdminDashboard() {
           alert={oldestPendingMin >= PENDING_ALERT_MIN}
         />
         <Kpi icon={Truck} label="Conductores disponibles" value={availableDrivers.length} sub={`de ${drivers.filter(d => d.status === "verified").length} verificados`} />
-        <Kpi icon={Euro} label="Facturado este mes" value={`${revenueMonth.toFixed(0)}€`} sub={`${deliveredMonth.length} entregas`} />
-        <Kpi icon={Euro} label="Comisión plataforma" value={`${commissionMonth.toFixed(0)}€`} sub={`${tariffs.commission_pct ?? 15}% del facturado`} />
+        {!isStaff && (
+          <>
+            <Kpi icon={Euro} label="Facturado este mes" value={`${revenueMonth.toFixed(0)}€`} sub={`${deliveredMonth.length} entregas`} />
+            <Kpi icon={Euro} label="Comisión plataforma" value={`${commissionMonth.toFixed(0)}€`} sub={`${tariffs.commission_pct ?? 15}% del facturado`} />
+          </>
+        )}
         <Kpi icon={Star} label="Valoración media" value={avgRating} sub={`${rated.length} valoraciones`} />
       </div>
 

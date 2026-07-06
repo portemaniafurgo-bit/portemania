@@ -13,6 +13,7 @@ import PhotoLightbox from "@/components/common/PhotoLightbox";
 import DriverTrackingMap from "@/components/common/DriverTrackingMap";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchRouteEta, geocodeAlbacete, distanceKm } from "@/lib/eta";
+import { fetchMyDriverProfile } from "@/lib/driverProfile";
 import { format, addMinutes } from "date-fns";
 import { useState, useEffect, useRef, useCallback } from "react";
 
@@ -50,6 +51,7 @@ export default function ActiveJob() {
   const [myPos, setMyPos] = useState(null);
   const [eta, setEta] = useState(null);
   const [targetCoords, setTargetCoords] = useState(null);
+  const [gpsError, setGpsError] = useState(false);
 
   const { data: job, isLoading } = useQuery({
     queryKey: ["job", id],
@@ -61,18 +63,28 @@ export default function ActiveJob() {
   const sendLocation = useCallback(async () => {
     if (!user?.id || !job || ["delivered", "cancelled"].includes(job.status)) return;
     if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      setMyPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      const profiles = await base44.entities.DriverProfile.filter({ created_by_id: user.id });
-      const profile = profiles?.[0];
-      if (profile) {
-        await base44.entities.DriverProfile.update(profile.id, {
-          current_lat: pos.coords.latitude,
-          current_lng: pos.coords.longitude,
-        });
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        setGpsError(false);
+        setMyPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        // Publicar la posición no debe romper el intervalo si la red/BD falla
+        try {
+          const profile = await fetchMyDriverProfile(user);
+          if (profile) {
+            await base44.entities.DriverProfile.update(profile.id, {
+              current_lat: pos.coords.latitude,
+              current_lng: pos.coords.longitude,
+            });
+          }
+        } catch {
+          // silencioso: se reintenta en el siguiente intervalo
+        }
+      },
+      () => {
+        setGpsError(true);
       }
-    });
-  }, [user?.id, job?.status]);
+    );
+  }, [user, job?.status]);
 
   useEffect(() => {
     sendLocation();
@@ -225,6 +237,16 @@ export default function ActiveJob() {
         <h1 className="flex-1 text-xl font-display font-bold text-foreground">Servicio activo</h1>
         <StatusBadge status={job.status} />
       </div>
+
+      {/* Aviso: GPS denegado o no disponible */}
+      {gpsError && !isFinished && (
+        <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <span className="flex-shrink-0">📡</span>
+          <p className="text-amber-800 font-medium">
+            No podemos acceder a tu ubicación. Activa el GPS para que el cliente vea tu posición y el tiempo de llegada.
+          </p>
+        </div>
+      )}
 
       {/* Progress timeline */}
       <div className="bg-card rounded-2xl border border-border p-5">
@@ -505,7 +527,7 @@ export default function ActiveJob() {
             placeholder="Escribe un mensaje..."
             value={message}
             onChange={e => setMessage(e.target.value)}
-            onKeyDown={e => e.key === "Enter" && message.trim() && sendMutation.mutate(message)}
+            onKeyDown={e => e.key === "Enter" && message.trim() && !sendMutation.isPending && sendMutation.mutate(message)}
             className="rounded-xl"
           />
           <Button

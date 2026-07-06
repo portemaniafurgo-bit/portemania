@@ -44,42 +44,33 @@ function CheckoutForm({ order, onSuccess }) {
     const cardElement = elements.getElement(CardElement);
 
     try {
-      // 1. Cargo real: PaymentIntent creado en el servidor (Edge Function con
-      //    la clave secreta). Si el servidor aún no tiene la clave configurada,
-      //    cae al modo anterior (validar tarjeta y marcar pagado sin cargo).
+      // Cargo real: PaymentIntent creado en el servidor (Edge Function con la
+      // clave secreta, que recalcula el importe desde las tarifas). NUNCA se
+      // marca un pedido como pagado sin un cobro real de Stripe.
       const { data, error: fnError } = await supabase.functions.invoke("create-payment-intent", {
         body: { order_id: order.id },
       });
 
-      if (!fnError && data?.client_secret) {
-        const { error: payError, paymentIntent } = await stripe.confirmCardPayment(data.client_secret, {
-          payment_method: {
-            card: cardElement,
-            billing_details: { name: order.client_name || "Cliente" },
-          },
-        });
-        if (payError) throw new Error(payError.message);
-        if (paymentIntent?.status !== "succeeded") throw new Error("El pago no se completó");
-        await base44.entities.TransportRequest.update(order.id, {
-          payment_status: "paid",
-          stripe_session_id: paymentIntent.id,
-        });
-        onSuccess();
-        return;
+      if (fnError || !data || data.error) {
+        const code = data?.error;
+        if (code === "not_configured") {
+          throw new Error("El pago con tarjeta no está disponible ahora mismo. Elige pago en efectivo o inténtalo más tarde.");
+        }
+        throw new Error(code || "No se pudo iniciar el pago. Inténtalo de nuevo.");
       }
+      if (!data.client_secret) throw new Error("No se pudo iniciar el pago. Inténtalo de nuevo.");
 
-      if (data?.error && data.error !== "not_configured") throw new Error(data.error);
-
-      // 2. Fallback (clave secreta sin configurar): comportamiento anterior.
-      const { error: pmError, paymentMethod } = await stripe.createPaymentMethod({
-        type: "card",
-        card: cardElement,
-        billing_details: { name: order.client_name || "Cliente" },
+      const { error: payError, paymentIntent } = await stripe.confirmCardPayment(data.client_secret, {
+        payment_method: {
+          card: cardElement,
+          billing_details: { name: order.client_name || "Cliente" },
+        },
       });
-      if (pmError) throw new Error(pmError.message);
+      if (payError) throw new Error(payError.message);
+      if (paymentIntent?.status !== "succeeded") throw new Error("El pago no se completó");
       await base44.entities.TransportRequest.update(order.id, {
         payment_status: "paid",
-        stripe_session_id: paymentMethod.id,
+        stripe_session_id: paymentIntent.id,
       });
       onSuccess();
     } catch (err) {
@@ -123,45 +114,21 @@ function CheckoutForm({ order, onSuccess }) {
   );
 }
 
-function NoStripeForm({ order, onSuccess }) {
-  const [loading, setLoading] = useState(false);
-
-  const handleSimulate = async () => {
-    setLoading(true);
-    await base44.entities.TransportRequest.update(order.id, {
-      payment_status: "paid",
-    });
-    setTimeout(onSuccess, 500);
-  };
-
+function NoStripeForm() {
+  // Sin clave pública de Stripe no se puede cobrar con tarjeta. NUNCA se marca
+  // el pedido como pagado sin cobro: se ofrece el pago en efectivo al conductor.
+  const router = useRouter();
   return (
     <div className="space-y-6">
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
-        <p className="font-semibold mb-1">⚠️ Modo de prueba</p>
-        <p>Para activar el pago real, configura tu clave pública de Stripe en las variables de entorno (<code>NEXT_PUBLIC_STRIPE_PUBLIC_KEY</code>).</p>
+        <p className="font-semibold mb-1">Pago con tarjeta no disponible</p>
+        <p>Ahora mismo no podemos procesar el pago con tarjeta. Puedes pagar en efectivo directamente al conductor al recibir el servicio.</p>
       </div>
-
-      <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
-        <p className="text-sm font-medium text-muted-foreground">Simular tarjeta de prueba</p>
-        <div className="grid grid-cols-2 gap-3 text-sm">
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Número</p>
-            <p className="font-mono bg-muted rounded px-2 py-1">4242 4242 4242 4242</p>
-          </div>
-          <div>
-            <p className="text-xs text-muted-foreground mb-1">Caducidad / CVC</p>
-            <p className="font-mono bg-muted rounded px-2 py-1">12/34 / 123</p>
-          </div>
-        </div>
-      </div>
-
       <Button
         className="w-full h-12 rounded-xl text-base font-semibold"
-        disabled={loading}
-        onClick={handleSimulate}
+        onClick={() => router.push("/my-orders")}
       >
-        {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-        Simular pago de {(order.estimated_price || 0).toFixed(2)}€
+        Volver a mis pedidos
       </Button>
     </div>
   );
@@ -193,8 +160,27 @@ export default function Payment() {
 
   if (!order) {
     return (
-      <div className="text-center py-20">
+      <div className="text-center py-20 space-y-4">
         <p className="text-muted-foreground">Pedido no encontrado</p>
+        <Button variant="outline" className="rounded-xl" onClick={() => router.push("/my-orders")}>
+          Ver mis pedidos
+        </Button>
+      </div>
+    );
+  }
+
+  // Ya pagado: no se puede volver a pagar (evita re-cobros al volver atrás).
+  if (order.payment_status === "paid") {
+    return (
+      <div className="max-w-md mx-auto text-center py-20 space-y-4">
+        <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
+          <CheckCircle className="w-8 h-8 text-emerald-600" />
+        </div>
+        <h2 className="text-2xl font-display font-bold text-foreground">Este pedido ya está pagado</h2>
+        <p className="text-muted-foreground">No es necesario volver a pagar.</p>
+        <Button className="rounded-xl" onClick={() => router.push("/my-orders")}>
+          Ver mis pedidos
+        </Button>
       </div>
     );
   }
@@ -251,7 +237,7 @@ export default function Payment() {
           <CheckoutForm order={order} onSuccess={handleSuccess} />
         </Elements>
       ) : (
-        <NoStripeForm order={order} onSuccess={handleSuccess} />
+        <NoStripeForm />
       )}
     </div>
   );

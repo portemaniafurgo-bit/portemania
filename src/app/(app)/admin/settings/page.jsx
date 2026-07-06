@@ -29,8 +29,8 @@ export default function AdminSettings() {
   const { data: tariffs } = useQuery({ queryKey: ["tariffs"], queryFn: fetchTariffs });
 
   // Cargar tarifas al formulario cuando llegan (patrón intencionado servidor->form)
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (tariffs && !form) setForm({ ...tariffs });
   }, [tariffs, form]);
 
@@ -40,6 +40,15 @@ export default function AdminSettings() {
   };
 
   const handleSave = async () => {
+    // Un campo vacío daría Number("") = 0 y guardaría 0€ en silencio: se rechaza antes.
+    const hasInvalid = Object.keys(DEFAULT_TARIFFS).some(k => {
+      const v = form[k];
+      return v === "" || v === null || v === undefined || isNaN(Number(v));
+    });
+    if (hasInvalid) {
+      setMessage({ ok: false, text: "Todos los campos de tarifa deben tener un valor numérico" });
+      return;
+    }
     setSaving(true);
     setMessage(null);
     try {

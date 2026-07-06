@@ -42,6 +42,18 @@ export default function AdminBlog() {
       };
       if (!data.title) throw new Error("El título es obligatorio");
       if (!data.slug) throw new Error("La URL (slug) es obligatoria");
+      const willBePublished = publish !== undefined ? publish : !!editing?.published;
+      if (willBePublished && !data.content.trim()) {
+        throw new Error("El artículo no puede publicarse sin contenido");
+      }
+      // Evitar el error crudo de Postgres por slug duplicado: auto-sufijar -2, -3...
+      let candidate = data.slug;
+      for (let n = 2; ; n += 1) {
+        const matches = await base44.entities.BlogPost.filter({ slug: candidate });
+        if (!matches.some(p => p.id !== editing?.id)) break;
+        candidate = `${data.slug}-${n}`;
+      }
+      data.slug = candidate;
       if (publish !== undefined) {
         data.published = publish;
         if (publish && !editing?.published_at) data.published_at = new Date().toISOString();

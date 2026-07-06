@@ -12,16 +12,20 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useAdminGuard } from "@/lib/useAdminGuard";
 
 export default function AdminOrders() {
+  const canRender = useAdminGuard({ allowStaff: true });
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [tab, setTab] = useState("all");
 
   const { data: orders = [] } = useQuery({
-    queryKey: ["admin-orders"],
+    queryKey: ["admin-orders-list"],
     queryFn: () => base44.entities.TransportRequest.list("-created_date", 200),
   });
+
+  if (!canRender) return null;
 
   const filtered = orders
     .filter(o => tab === "all" || o.status === tab)

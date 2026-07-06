@@ -9,6 +9,10 @@ import { Check, MapPin, Package, Loader2 } from "lucide-react";
 import PhotoLightbox from "@/components/common/PhotoLightbox";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { supabase } from "@/lib/entities";
+import { fetchMyDriverProfile, isDriverProfileIncomplete } from "@/lib/driverProfile";
+import { toast } from "@/components/ui/use-toast";
 
 export default function DriverRequests() {
   const { user } = useAuth();
@@ -21,51 +25,97 @@ export default function DriverRequests() {
     refetchInterval: 10000,
   });
 
-  const { data: myProfiles = [] } = useQuery({
-    queryKey: ["my-driver-profile", user?.id],
-    queryFn: () => base44.entities.DriverProfile.filter({ created_by_id: user?.id }),
+  const { data: profile, isLoading: profileLoading } = useQuery({
+    queryKey: ["driver-profile", user?.id],
+    queryFn: () => fetchMyDriverProfile(user),
     enabled: !!user?.id,
   });
 
   // Reparto por tamaño: un furgón grande puede con todo; los pedidos de
   // furgoneta grande solo los ven conductores con furgón grande.
-  const myVehicle = myProfiles?.[0]?.vehicle_type;
+  const myVehicle = profile?.vehicle_type;
   const requests = allRequests.filter(r => r.vehicle_type !== "large" || myVehicle === "large");
+  const isUnavailable = profile?.is_available === false;
 
   const acceptMutation = useMutation({
     mutationFn: async (requestId) => {
-      await base44.entities.TransportRequest.update(requestId, {
-        status: "accepted",
-        driver_id: user?.id,
-        driver_name: user?.full_name || "Conductor",
-        accepted_at: new Date().toISOString(),
-      });
+      // Update condicionado: solo acepta si el pedido sigue pendiente.
+      // Si otro conductor lo aceptó antes, el array devuelto viene vacío.
+      const { data: updated, error } = await supabase
+        .from("transport_requests")
+        .update({
+          status: "accepted",
+          driver_id: user?.id,
+          driver_name: user?.full_name || "Conductor",
+          accepted_at: new Date().toISOString(),
+        })
+        .eq("id", requestId)
+        .eq("status", "pending")
+        .select();
+      if (error) throw error;
+      if (!updated || updated.length === 0) {
+        return { requestId, alreadyTaken: true };
+      }
 
       // Obtener datos del pedido para el email
       const req = requests.find(r => r.id === requestId);
       if (req && user?.email) {
         const vehicle = vehicleData[req.vehicle_type];
+        // El email es informativo: si falla, el servicio ya está aceptado
         await base44.integrations.Core.SendEmail({
           to: user.email,
           from_name: "ClicyVoy",
           subject: "🚐 Nuevo trabajo asignado",
           body: `Hola ${user?.full_name?.split(" ")[0] || "conductor"},\n\nSe te ha asignado un nuevo servicio de transporte.\n\n📍 Recogida: ${req.origin_address}\n🏁 Entrega: ${req.destination_address}\n🚐 Vehículo: ${vehicle?.name || req.vehicle_type}\n💶 Precio estimado: ${req.estimated_price?.toFixed(2)}€${req.cargo_description ? `\n📦 Carga: ${req.cargo_description}` : ""}${req.distance_km ? `\n📏 Distancia: ${req.distance_km} km` : ""}\n\nAccede a la app para ver todos los detalles y gestionar el servicio.\n\n¡Mucho éxito!\nEl equipo de ClicyVoy`,
-        });
+        }).catch(() => {});
       }
 
-      return requestId;
+      return { requestId, alreadyTaken: false };
     },
-    onSuccess: (requestId) => {
+    onSuccess: ({ requestId, alreadyTaken }) => {
+      if (alreadyTaken) {
+        toast({
+          title: "Otro conductor ya ha aceptado este servicio",
+          variant: "destructive",
+        });
+        queryClient.invalidateQueries({ queryKey: ["pending-requests"] });
+        return;
+      }
       queryClient.invalidateQueries({ queryKey: ["pending-requests"] });
       queryClient.invalidateQueries({ queryKey: ["driver-jobs"] });
       router.push(`/driver/job/${requestId}`);
     },
+    onError: () => {
+      toast({
+        title: "No se pudo aceptar el servicio",
+        description: "Inténtalo de nuevo en unos segundos.",
+        variant: "destructive",
+      });
+    },
   });
 
-  if (isLoading) {
+  if (isLoading || profileLoading) {
     return (
       <div className="flex justify-center py-20">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Gate: sin perfil o con perfil incompleto no se ven ni aceptan trabajos
+  if (!profile || isDriverProfileIncomplete(profile)) {
+    return (
+      <div className="text-center py-16 space-y-4 max-w-md mx-auto">
+        <div className="text-6xl">📋</div>
+        <h2 className="text-xl font-display font-bold text-foreground">
+          Completa tu perfil para ver y aceptar trabajos
+        </h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Necesitas subir toda la documentación requerida antes de poder recibir servicios.
+        </p>
+        <Link href="/driver/profile">
+          <Button className="rounded-xl gap-2">Completar mi perfil →</Button>
+        </Link>
       </div>
     );
   }
@@ -78,6 +128,15 @@ export default function DriverRequests() {
           {requests.length} solicitudes pendientes cerca de ti
         </p>
       </div>
+
+      {isUnavailable && (
+        <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <span className="flex-shrink-0">⚠️</span>
+          <p className="text-amber-800 font-medium">
+            Estás en modo No disponible: actívate en el panel para aceptar trabajos
+          </p>
+        </div>
+      )}
 
       {requests.length === 0 ? (
         <div className="text-center py-16">
@@ -149,7 +208,7 @@ export default function DriverRequests() {
                 <Button
                   className="flex-1 rounded-xl gap-2"
                   onClick={() => acceptMutation.mutate(req.id)}
-                  disabled={acceptMutation.isPending}
+                  disabled={acceptMutation.isPending || isUnavailable}
                 >
                   <Check className="w-4 h-4" /> Aceptar servicio
                 </Button>

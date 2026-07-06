@@ -10,6 +10,7 @@ import { AlertTriangle, MessageCircle } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState } from "react";
+import { useAdminGuard } from "@/lib/useAdminGuard";
 
 const typeLabels = {
   damage: "Daño", delay: "Retraso", lost_item: "Objeto perdido",
@@ -17,6 +18,7 @@ const typeLabels = {
 };
 
 export default function AdminIncidents() {
+  const canRender = useAdminGuard({ allowStaff: true });
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState(null);
   const [resolution, setResolution] = useState("");
@@ -34,6 +36,8 @@ export default function AdminIncidents() {
       setResolution("");
     },
   });
+
+  if (!canRender) return null;
 
   return (
     <div className="space-y-6">

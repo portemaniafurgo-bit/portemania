@@ -4,8 +4,9 @@ import { useParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import StatusBadge from "@/components/common/StatusBadge";
@@ -22,6 +23,7 @@ export default function OrderDetail() {
   const { id } = useParams();
   const { user } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
 
   const [message, setMessage] = useState("");
   const [rating, setRating] = useState(0);
@@ -44,6 +46,11 @@ export default function OrderDetail() {
         const profiles = await base44.entities.DriverProfile.filter({ created_by_id: res.driver_id });
         setDriverProfile(profiles?.[0] || null);
       }
+    }).catch(err => {
+      // Pedido inexistente u oculto por RLS: mostrar "Pedido no encontrado" en vez de spinner infinito
+      console.error("Error al cargar el pedido:", err);
+      setOrder(null);
+      setOrderLoading(false);
     });
     base44.entities.ChatMessage.filter({ request_id: id }, "created_date", 100).then(setMessages);
 
@@ -138,6 +145,13 @@ export default function OrderDetail() {
       message: msg,
     }),
     onSuccess: () => setMessage(""),
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo enviar el mensaje. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    },
   });
 
   const rateMutation = useMutation({
@@ -153,11 +167,28 @@ export default function OrderDetail() {
       const res = await base44.entities.TransportRequest.get(id);
       setOrder(res);
     },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo enviar la valoración. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    },
   });
 
   const cancelMutation = useMutation({
     mutationFn: () => base44.entities.TransportRequest.update(id, { status: "cancelled" }),
-    onSuccess: () => setOrder(prev => ({ ...prev, status: "cancelled" })),
+    onSuccess: () => {
+      setOrder(prev => ({ ...prev, status: "cancelled" }));
+      queryClient.invalidateQueries({ queryKey: ["my-orders"] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "No se pudo cancelar el pedido. Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    },
   });
 
   useEffect(() => {
@@ -177,8 +208,11 @@ export default function OrderDetail() {
 
   if (!order) {
     return (
-      <div className="text-center py-20">
+      <div className="text-center py-20 space-y-4">
         <p className="text-muted-foreground">Pedido no encontrado</p>
+        <Button className="rounded-xl" onClick={() => router.push("/my-orders")}>
+          Ver mis pedidos
+        </Button>
       </div>
     );
   }
@@ -356,7 +390,7 @@ export default function OrderDetail() {
             </div>
           </div>
         </div>
-        {order.distance_km && (
+        {order.distance_km > 0 && (
           <p className="text-xs text-muted-foreground mt-3">Distancia: {order.distance_km} km</p>
         )}
       </div>

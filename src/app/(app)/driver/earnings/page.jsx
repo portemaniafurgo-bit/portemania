@@ -15,7 +15,7 @@ export default function DriverEarnings() {
   const tariffs = useTariffs();
 
   const { data: jobs = [] } = useQuery({
-    queryKey: ["driver-history"],
+    queryKey: ["driver-earnings", user?.id],
     queryFn: () => base44.entities.TransportRequest.filter({ driver_id: user?.id, status: "delivered" }, "-created_date", 100),
   });
 
@@ -83,7 +83,7 @@ export default function DriverEarnings() {
 
       {/* Commission info */}
       <div className="bg-primary/5 rounded-2xl border border-primary/20 p-4 text-sm text-muted-foreground">
-        <p>💡 Recibes el <span className="font-bold text-foreground">85%</span> de cada servicio. La comisión de plataforma es del 15%.</p>
+        <p>💡 Recibes el <span className="font-bold text-foreground">{100 - (tariffs.commission_pct ?? 15)}%</span> de cada servicio. La comisión de plataforma es del {tariffs.commission_pct ?? 15}%.</p>
       </div>
     </div>
   );
