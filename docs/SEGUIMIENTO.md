@@ -59,7 +59,7 @@ Plataforma web de transporte y portes on-demand ("Uber de furgonetas") para **Al
 
 | Qué | Dónde |
 |---|---|
-| Admin app | `renato.0550.calero@gmail.com` / `PorteMania2026!` |
+| Admin app | `renato.0550.calero@gmail.com` / `ClicyVoy2026!` |
 | Conductor prueba | `conductor.test@portemania.es` / `Conductor2026!` |
 | Cliente prueba | `cliente.test@portemania.es` / `Cliente2026!` |
 | Supabase (gestión) | Cuenta portemaniafurgo · Management API con el PAT del negocio |
@@ -122,6 +122,12 @@ npx vercel deploy --prod --yes   # deploy a producción
 - **Blog completo**: Admin → Blog (editor con vista previa, Markdown seguro sin dependencias, slug automático, extracto para Google, portada a Storage, borrador/publicar/despublicar). Público /blog (ISR 5 min) y /blog/[slug] con metadata dinámica, canonical, Open Graph, Twitter card y schema.org Article. **sitemap.xml dinámico** (siempre incluye el último artículo) y **robots.txt** (áreas privadas fuera). Primer artículo publicado: /blog/precios-portes-albacete. Enlace Blog en el footer.
 - Fixes: panel del conductor aplica el mismo reparto por tamaño que Solicitudes (mostraba pedidos grandes a furgones pequeños → lista vacía al entrar); alta de conductor del admin pide tamaño de furgoneta; tamaño editable en la ficha; **todos los conductores existentes puestos en furgoneta grande** (decisión del negocio).
 - Suites: **29/29 flujos + 35/35 admin** (5 checks de blog nuevos, con calentamiento de ISR).
+
+### 2026-07-06 — Correo real (Resend + dominio propio) y arreglo del alta de conductores
+- **Dominio clicyvoy.es verificado en Resend** (DKIM+SPF+MX en Hostinger) y conectado como **SMTP de Supabase Auth**: los emails de restablecer contraseña e invitaciones ya salen de verdad desde noreply@clicyvoy.es (probado: recovery 'delivered'). Límite subido a 100/h. Antes salían por el correo de PRUEBA de Supabase (2/h) y no llegaban → causa del 'Invalid reset link'.
+- send-email (avisos a conductores) ahora también envía desde clicyvoy.es (antes onboarding@resend.dev, solo llegaba al negocio).
+- **Alta de conductor**: fallaba con emails ya existentes (createUser sobre cuenta existente daba error Y corrompía su contraseña — así se rompió el login admin). Corregido: invite-user comprueba existencia antes; el panel muestra la contraseña temporal en pantalla para enviarla por WhatsApp (onboarding sin depender de email).
+- Contraseña del admin restaurada y cambiada a **ClicyVoy2026!** (estable).
 
 ## 5. Pendientes / roadmap
 

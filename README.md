@@ -194,7 +194,7 @@ Producción: **https://pontemania.vercel.app**
 
 | Rol | Email | Contraseña |
 |---|---|---|
-| Admin | `renato.0550.calero@gmail.com` | `PorteMania2026!` |
+| Admin | `renato.0550.calero@gmail.com` | `ClicyVoy2026!` |
 | Conductor | `conductor.test@portemania.es` | `Conductor2026!` |
 | Cliente | `cliente.test@portemania.es` | `Cliente2026!` |
 

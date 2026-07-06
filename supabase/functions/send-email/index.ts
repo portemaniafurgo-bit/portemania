@@ -11,8 +11,9 @@ const ADMIN_RECIPIENTS = [
   "portemaniafurgo@gmail.com",
 ];
 
-// Sin dominio verificado en Resend se envía desde la dirección de onboarding.
-const FROM = "ClicyVoy <onboarding@resend.dev>";
+// Dominio clicyvoy.es verificado en Resend (2026-07-06): se envía desde él,
+// lo que permite entregar también a conductores (no solo al correo del negocio).
+const FROM = "ClicyVoy <noreply@clicyvoy.es>";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
