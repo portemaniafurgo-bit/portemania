@@ -35,7 +35,6 @@ export default function AdminDrivers() {
   const [creating, setCreating] = useState(false);
   const [expandedId, setExpandedId] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
-  const [tempCredentials, setTempCredentials] = useState(null);
 
   const { data: drivers = [], isLoading } = useQuery({
     queryKey: ["admin-drivers"],
@@ -96,12 +95,9 @@ export default function AdminDrivers() {
         is_available: false,
       });
       if (invite?.already_existed) {
-        setFormSuccess(`✅ Conductor creado. ${email} ya tenía cuenta: entrará con su contraseña de siempre.`);
-        setTempCredentials(null);
+        setFormSuccess(`✅ Conductor creado. ${email} ya tenía cuenta: entrará con su contraseña de siempre (o puede usar "he olvidado mi contraseña").`);
       } else {
-        setFormSuccess(`✅ Conductor creado.`);
-        // No se envía email automático: el admin debe pasarle las credenciales.
-        setTempCredentials({ email, password: invite?.password || "" });
+        setFormSuccess(`✅ Conductor creado. Se ha enviado un email de invitación a ${email} para que cree su contraseña y acceda.`);
       }
       setForm(emptyForm);
       queryClient.invalidateQueries({ queryKey: ["admin-drivers"] });
@@ -246,21 +242,6 @@ export default function AdminDrivers() {
           {formError && <div className="p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{formError}</div>}
           {formSuccess && <div className="p-3 rounded-lg bg-emerald-50 text-emerald-700 text-sm border border-emerald-200">{formSuccess}</div>}
 
-          {/* Credenciales temporales: se muestran UNA vez para enviárselas al conductor */}
-          {tempCredentials && (
-            <div className="p-4 rounded-xl bg-blue-50 border-2 border-blue-300 space-y-2">
-              <p className="text-sm font-semibold text-blue-900">🔑 Credenciales del conductor — envíaselas por WhatsApp:</p>
-              <div className="bg-white rounded-lg border border-blue-200 p-3 font-mono text-sm text-foreground select-all">
-                Web: clicyvoy.es/login-conductores<br />
-                Email: {tempCredentials.email}<br />
-                Contraseña: {tempCredentials.password}
-              </div>
-              <p className="text-xs text-blue-800">
-                Guárdalas ahora: por seguridad no se pueden volver a consultar. El conductor podrá cambiar la contraseña cuando quiera.
-              </p>
-            </div>
-          )}
-
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -316,7 +297,7 @@ export default function AdminDrivers() {
             </div>
 
             <p className="text-xs text-muted-foreground">
-              Al crear el conductor se genera una contraseña temporal que verás en pantalla para enviársela (por WhatsApp, por ejemplo).
+              Al crear el conductor recibirá un email de invitación para crear su contraseña y acceder.
             </p>
 
             <Button type="submit" className="w-full h-11 rounded-xl gap-2" disabled={creating}>

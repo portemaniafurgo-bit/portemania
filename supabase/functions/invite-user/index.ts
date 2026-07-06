@@ -78,18 +78,17 @@ Deno.serve(async (req: Request) => {
     return json({ user: { id: existing.id, email }, already_existed: true });
   }
 
+  // Cuenta nueva: se INVITA por email (flujo estándar). Supabase crea el
+  // usuario sin contraseña y le envía el correo "Te han invitado a ClicyVoy";
+  // al pulsar el enlace crea su propia contraseña en /reset-password.
   const finalRole = email === MASTER_ADMIN ? "admin" : role;
-  const password = body.password ||
-    (Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2).toUpperCase() + "!7");
-
-  const { data, error } = await admin.auth.admin.createUser({
-    email,
-    password,
-    email_confirm: true,
-    user_metadata: { role: finalRole },
+  const siteUrl = Deno.env.get("SITE_URL") || "https://clicyvoy.es";
+  const { data, error } = await admin.auth.admin.inviteUserByEmail(email, {
+    data: { role: finalRole },
+    redirectTo: `${siteUrl}/reset-password`,
   });
   if (error) return json({ error: error.message }, 400);
 
   await admin.from("profiles").update({ role: finalRole }).eq("id", data.user.id);
-  return json({ user: { id: data.user.id, email: data.user.email }, role: finalRole, password });
+  return json({ user: { id: data.user.id, email: data.user.email }, role: finalRole, invited: true });
 });
