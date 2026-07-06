@@ -1,7 +1,8 @@
 # ClicyVoy — Documento de seguimiento
 
-> Historial de todo lo construido, el estado actual y lo que queda. Actualizado: **2026-07-06**.
+> Historial de todo lo construido, el estado actual y lo que queda. Actualizado: **2026-07-07**.
 > Documentación técnica de referencia: [README.md](../README.md).
+> Resumen legible para entrega: [INFORME-ENTREGA.md](INFORME-ENTREGA.md).
 
 ---
 
