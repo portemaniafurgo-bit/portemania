@@ -1,6 +1,6 @@
-# PorteManía — Documento de seguimiento
+# ClicyVoy — Documento de seguimiento
 
-> Historial de todo lo construido, el estado actual y lo que queda. Actualizado: **2026-07-02**.
+> Historial de todo lo construido, el estado actual y lo que queda. Actualizado: **2026-07-06**.
 > Documentación técnica de referencia: [README.md](../README.md).
 
 ---
@@ -59,9 +59,9 @@ Plataforma web de transporte y portes on-demand ("Uber de furgonetas") para **Al
 
 | Qué | Dónde |
 |---|---|
-| Admin app | `renato.0550.calero@gmail.com` / `ClicyVoy2026!` |
-| Conductor prueba | `conductor.test@portemania.es` / `Conductor2026!` |
-| Cliente prueba | `cliente.test@portemania.es` / `Cliente2026!` |
+| Admin app | `renato.0550.calero@gmail.com` / `ClicyVoy2026!` (cambiable por email en /forgot-password) |
+| Cuentas de prueba | ⚠️ **Borradas en la limpieza del 2026-07-06** (cliente.test / conductor.test). Recrearlas si se quieren pasar las suites E2E |
+| Correo (Resend SMTP) | Dominio `clicyvoy.es` verificado; API key en el secreto `RESEND_API_KEY` de la Edge Function y en el SMTP de Supabase Auth. Envía desde `noreply@clicyvoy.es` |
 | Supabase (gestión) | Cuenta portemaniafurgo · Management API con el PAT del negocio |
 | GitHub | Token de portemaniafurgo-bit embebido en el remote local (`.git/config`) |
 | Google OAuth secret | JSON en Descargas (`client_secret_2_1012801251989...(1).json`) |
@@ -133,6 +133,12 @@ npx vercel deploy --prod --yes   # deploy a producción
 - **BUG DE PRODUCCIÓN**: los conductores reales (Leandro, Sergio) NO veían ningún pedido pendiente. Causa: al crearlos el admin, su driver_profile queda con created_by_id = uid del ADMIN (el trigger set_created_by usa auth.uid() del que inserta), y la RLS de 'ver pendientes' exigía created_by_id = auth.uid() del conductor. Corregido a dos niveles: (1) datos, se vinculó created_by_id de cada perfil a su cuenta por email; (2) RLS robusta, el conductor verificado ve/acepta pendientes si created_by_id O su email coinciden (versionado en la migración). Verificado: Sergio pasó de 0 a 10 pendientes visibles.
 - Email: Resend + dominio clicyvoy.es verificado y conectado como SMTP de Supabase (los resets/invitaciones ya llegan). Alta de conductor muestra la contraseña en pantalla (WhatsApp). Admin restaurado a ClicyVoy2026!.
 - Suites 29/29 + 35/35.
+
+### 2026-07-06 (fin) — Limpieza de la BD para probar desde cero
+- A petición del negocio se vació la base de datos para pruebas en limpio: **borrados** todos los pedidos, chats, candidaturas, usuarios cliente, TODOS los conductores (perfiles incluidos) y las cuentas de prueba (cliente.test, conductor.test). También el artículo de blog de ejemplo.
+- **Conservado**: cuenta admin (renato.0550.calero / ClicyVoy2026!), cuenta del negocio (portemaniafurgo@gmail.com), los 3 artículos de blog reales del negocio, y las tarifas/configuración.
+- Estado final: 2 usuarios auth (admin + negocio), 0 conductores, 0 pedidos, mapa público vacío. El esquema/estructura intactos.
+- ⚠️ Consecuencia: las **suites E2E** (e2e/flows.js y e2e/admin.js) dependen de cliente.test/conductor.test; no correrán hasta recrear esas dos cuentas.
 
 ## 5. Pendientes / roadmap
 
