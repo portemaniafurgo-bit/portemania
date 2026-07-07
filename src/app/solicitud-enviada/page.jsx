@@ -26,8 +26,8 @@ export default function SolicitudEnviada() {
           </p>
         </div>
         <div className="bg-muted rounded-2xl p-4 text-sm text-left space-y-1">
-          <p className="font-medium text-foreground">¿Quieres hacer seguimiento online?</p>
-          <p className="text-muted-foreground text-xs">Crea una cuenta gratuita para ver el estado de tu pedido en tiempo real.</p>
+          <p className="font-medium text-foreground">¿Pides portes a menudo?</p>
+          <p className="text-muted-foreground text-xs">Crea una cuenta gratuita y tus próximos pedidos tendrán seguimiento en tiempo real, chat con el conductor y pago con tarjeta.</p>
         </div>
         <div className="flex flex-col gap-3">
           <Link href="/register">

@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import StatusBadge from "@/components/common/StatusBadge";
 import { vehicleData } from "@/components/common/VehicleCard";
 import { resolveDriverDocUrl } from "@/lib/driverProfile";
+import { supabase } from "@/lib/entities";
 import {
   UserPlus, Search, Check, X, Shield, Truck, Phone, Mail,
   Loader2, Car, User, Trash2, ChevronDown, ChevronUp
@@ -23,12 +24,24 @@ const ADMIN_EMAIL = "renato.0550.calero@gmail.com";
 // se muestran tal cual.
 function DriverDocThumb({ value, title }) {
   const [url, setUrl] = useState(null);
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
     let active = true;
-    resolveDriverDocUrl(value).then(u => { if (active) setUrl(u); });
+    resolveDriverDocUrl(value).then(u => {
+      if (!active) return;
+      if (u) setUrl(u);
+      else setFailed(true);
+    });
     return () => { active = false; };
   }, [value]);
   const isPdf = /\.pdf($|\?)/i.test(value);
+  if (failed) {
+    return (
+      <span className="w-20 h-20 rounded-xl border border-amber-300 bg-amber-50 flex flex-col items-center justify-center gap-1 text-lg" title={`${title}: no disponible — pedir re-subida`}>
+        ⚠<span className="text-[9px] text-amber-700 px-1 text-center leading-tight">no disponible</span>
+      </span>
+    );
+  }
   if (!url) {
     return (
       <span className="w-20 h-20 rounded-xl border border-border flex items-center justify-center text-xs text-muted-foreground bg-muted" title={title}>
@@ -112,6 +125,18 @@ export default function AdminDrivers() {
 
     setCreating(true);
     try {
+      // Comprobación de duplicado EN BD (la lista local puede no haber cargado
+      // aún): así no se envía la invitación antes de descubrir el duplicado.
+      const { data: dup } = await supabase
+        .from("driver_profiles")
+        .select("id")
+        .ilike("email", email.replace(/([\\%_])/g, "\\$1"))
+        .limit(1);
+      if (dup?.length) {
+        setFormError("Ya existe un conductor con ese email.");
+        return;
+      }
+
       // Crea la cuenta (o la reutiliza si el email ya tenía una: cliente/admin).
       const invite = await base44.users.inviteUser(email, "driver");
       await base44.entities.DriverProfile.create({
@@ -527,6 +552,12 @@ export default function AdminDrivers() {
                     {confirmDeleteId === driver.id ? "¿Seguro? Pulsa otra vez" : "Eliminar"}
                   </Button>
                 </div>
+                {confirmDeleteId === driver.id && (
+                  <p className="text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-2 mt-2">
+                    Eliminar borra la ficha del conductor, pero su cuenta de acceso sigue existiendo.
+                    Para una expulsión temporal usa «Suspender».
+                  </p>
+                )}
                 </div>
               )}
             </div>

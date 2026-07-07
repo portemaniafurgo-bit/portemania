@@ -46,7 +46,10 @@ export default function DriverRequests() {
         .update({
           status: "accepted",
           driver_id: user?.id,
-          driver_name: user?.full_name || "Conductor",
+          // Nombre del PERFIL de conductor primero: en cuentas invitadas por
+          // email profiles.full_name está vacío y user.full_name cae al email
+          // — el cliente veía el correo del conductor como nombre.
+          driver_name: profile?.full_name || user?.full_name || "Conductor",
           accepted_at: new Date().toISOString(),
         })
         .eq("id", requestId)
@@ -134,6 +137,17 @@ export default function DriverRequests() {
           <span className="flex-shrink-0">⚠️</span>
           <p className="text-amber-800 font-medium">
             Estás en modo No disponible: actívate en el panel para aceptar trabajos
+          </p>
+        </div>
+      )}
+
+      {/* Perfil aún sin verificar: la RLS no le enseña pedidos pendientes y sin
+          este aviso solo veía una lista vacía sin explicación. */}
+      {profile.status === "pending_verification" && (
+        <div className="flex items-start gap-2 text-sm bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <span className="flex-shrink-0">🕐</span>
+          <p className="text-amber-800 font-medium">
+            Tu perfil está en revisión por el equipo de ClicyVoy. Verás las solicitudes disponibles en cuanto quede aprobado.
           </p>
         </div>
       )}

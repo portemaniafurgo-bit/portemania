@@ -68,10 +68,14 @@ function CheckoutForm({ order, onSuccess }) {
       });
       if (payError) throw new Error(payError.message);
       if (paymentIntent?.status !== "succeeded") throw new Error("El pago no se completó");
-      await base44.entities.TransportRequest.update(order.id, {
-        payment_status: "paid",
-        stripe_session_id: paymentIntent.id,
+      // El pedido lo marca como pagado el SERVIDOR tras verificar el cargo en
+      // Stripe (la RLS ya no deja al navegador escribir payment_status).
+      const { data: confirm, error: confirmError } = await supabase.functions.invoke("confirm-payment", {
+        body: { order_id: order.id, payment_intent_id: paymentIntent.id },
       });
+      if (confirmError || confirm?.error) {
+        throw new Error("El cobro se realizó pero no se pudo registrar. Contacta con ClicyVoy indicando tu pedido.");
+      }
       onSuccess();
     } catch (err) {
       setError(err.message || "Error al procesar el pago");
@@ -178,6 +182,20 @@ export default function Payment() {
         </div>
         <h2 className="text-2xl font-display font-bold text-foreground">Este pedido ya está pagado</h2>
         <p className="text-muted-foreground">No es necesario volver a pagar.</p>
+        <Button className="rounded-xl" onClick={() => router.push("/my-orders")}>
+          Ver mis pedidos
+        </Button>
+      </div>
+    );
+  }
+
+  // Pedido cancelado: no tiene sentido cobrarlo (la Edge Function también lo
+  // rechaza en servidor; esto es solo la pantalla amable).
+  if (order.status === "cancelled") {
+    return (
+      <div className="max-w-md mx-auto text-center py-20 space-y-4">
+        <h2 className="text-2xl font-display font-bold text-foreground">Pedido cancelado</h2>
+        <p className="text-muted-foreground">Este pedido está cancelado y no requiere pago.</p>
         <Button className="rounded-xl" onClick={() => router.push("/my-orders")}>
           Ver mis pedidos
         </Button>

@@ -17,6 +17,7 @@ import { es } from "date-fns/locale";
 import { useState } from "react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
 import { supabase } from "@/lib/entities";
+import { toast } from "@/components/ui/use-toast";
 
 function TimelineStep({ label, time, done }) {
   return (
@@ -68,18 +69,27 @@ export default function AdminOrderDetail() {
       queryClient.invalidateQueries({ queryKey: ["admin-orders-list"] });
       queryClient.invalidateQueries({ queryKey: ["admin-dashboard-orders"] });
     },
+    onError: (err) => {
+      // Sin feedback, la acción fallida parecía hecha (marcar pagado, cancelar…)
+      toast({
+        title: "No se pudo aplicar el cambio",
+        description: err?.message || "Inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    },
   });
 
   const assignMutation = useMutation({
     mutationFn: async (d) => {
       // En conductores dados de alta por el admin, created_by_id es el uid del ADMIN:
-      // se resuelve el uid real del conductor por su email en profiles.
+      // se resuelve el uid real del conductor por su email en profiles
+      // (comodines escapados: un email con "_" no debe hacer match difuso).
       let driverId = d.created_by_id;
       if (d.email) {
         const { data: profile } = await supabase
           .from("profiles")
           .select("id")
-          .ilike("email", d.email)
+          .ilike("email", d.email.replace(/([\\%_])/g, "\\$1"))
           .maybeSingle();
         if (profile?.id) driverId = profile.id;
       }
@@ -88,12 +98,25 @@ export default function AdminOrderDetail() {
         driver_name: d.full_name,
         status: order.status === "pending" ? "accepted" : order.status,
         accepted_at: order.accepted_at || new Date().toISOString(),
+        // El rastro de una cancelación anterior no aplica al nuevo conductor
+        driver_cancel_reason: null,
+        driver_cancel_note: null,
+        driver_cancel_name: null,
+        driver_cancel_at: null,
       });
     },
     onSuccess: () => {
+      setShowReassign(false);
       queryClient.invalidateQueries({ queryKey: ["admin-order", id] });
       queryClient.invalidateQueries({ queryKey: ["admin-orders-list"] });
       queryClient.invalidateQueries({ queryKey: ["admin-dashboard-orders"] });
+    },
+    onError: (err) => {
+      toast({
+        title: "No se pudo asignar el conductor",
+        description: err?.message || "Inténtalo de nuevo.",
+        variant: "destructive",
+      });
     },
   });
 
@@ -175,9 +198,13 @@ export default function AdminOrderDetail() {
         <div className="bg-card rounded-2xl border border-border p-5 space-y-1">
           <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Conductor</p>
           <p className="font-semibold text-foreground">{order.driver_name || "Sin asignar"}</p>
-          <button onClick={() => setShowReassign(v => !v)} className="text-sm text-primary flex items-center gap-1.5">
-            <UserCog className="w-3.5 h-3.5" /> {order.driver_id ? "Reasignar" : "Asignar conductor"}
-          </button>
+          {/* Un pedido entregado/cancelado no se reasigna (alteraría el
+              histórico y el recuento de viajes del conductor nuevo) */}
+          {!isFinished && (
+            <button onClick={() => setShowReassign(v => !v)} className="text-sm text-primary flex items-center gap-1.5">
+              <UserCog className="w-3.5 h-3.5" /> {order.driver_id ? "Reasignar" : "Asignar conductor"}
+            </button>
+          )}
         </div>
       </div>
 
@@ -191,10 +218,7 @@ export default function AdminOrderDetail() {
               key={d.id}
               className="w-full flex items-center justify-between p-3 rounded-xl border border-border hover:border-primary/40 hover:bg-muted text-left"
               disabled={assignMutation.isPending}
-              onClick={() => {
-                assignMutation.mutate(d);
-                setShowReassign(false);
-              }}
+              onClick={() => assignMutation.mutate(d)}
             >
               <span className="text-sm font-medium text-foreground">{d.full_name}</span>
               <span className="text-xs text-muted-foreground">

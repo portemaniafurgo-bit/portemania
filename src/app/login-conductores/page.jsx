@@ -79,7 +79,7 @@ export default function LoginConductores() {
       </form>
 
       <p className="mt-6 text-xs text-center text-muted-foreground">
-        Una vez dentro podrás cambiar tu contraseña desde tu perfil.
+        Una vez dentro podrás cambiar tu contraseña desde «Mi perfil».
       </p>
     </AuthLayout>
   );

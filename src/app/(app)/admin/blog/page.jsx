@@ -105,6 +105,8 @@ export default function AdminBlog() {
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file, bucket: "blog-images" });
       update("cover_url", file_url);
+    } catch (err) {
+      setMessage({ ok: false, text: "No se pudo subir la imagen: " + (err.message || "error de conexión") });
     } finally {
       setUploading(false);
     }

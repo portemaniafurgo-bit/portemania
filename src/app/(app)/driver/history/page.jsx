@@ -42,7 +42,7 @@ export default function DriverHistory() {
       ) : (
         <div className="space-y-3">
           {completed.map(job => (
-            <Link key={job.id} href={`/order/${job.id}`}>
+            <Link key={job.id} href={`/driver/job/${job.id}`}>
               <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md transition-all mb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">

@@ -12,6 +12,7 @@ import { useState, useEffect } from "react";
 import { Save, Loader2, Upload, CheckCircle2 } from "lucide-react";
 import StatusBadge from "@/components/common/StatusBadge";
 import RatingVans from "@/components/common/RatingVans";
+import { toast } from "@/components/ui/use-toast";
 import {
   fetchMyDriverProfile,
   PRIVATE_DOC_FIELDS,
@@ -30,9 +31,11 @@ const VEHICLE_PHOTOS = [
 
 const DOC_UPLOADS = [
   { field: "photo_url", label: "Foto de la cara (selfie) *" },
-  { field: "license_photo_url", label: "Foto de licencia" },
-  { field: "id_document_url", label: "Documento de identidad" },
-  { field: "insurance_url", label: "Seguro del vehículo" },
+  // pdf:true también en carnet/DNI/seguro: la póliza del seguro (y a menudo el
+  // resto) se entregan en PDF — con accept="image/*" no se podían subir.
+  { field: "license_photo_url", label: "Foto de licencia", pdf: true },
+  { field: "id_document_url", label: "Documento de identidad", pdf: true },
+  { field: "insurance_url", label: "Seguro del vehículo", pdf: true },
   { field: "autonomo_receipt_url", label: "Recibo de autónomo *", pdf: true },
   { field: "censal_document_url", label: "Situación censal (Hacienda) *", pdf: true },
 ];
@@ -113,21 +116,32 @@ export default function DriverProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(prev => ({ ...prev, [field]: true }));
-    // Documentos sensibles → bucket PRIVADO driver-docs (solo dueño/staff los
-    // leen, vía signed URL). El resto (fotos vehículo, selfie) sigue público
-    // porque se muestra al cliente en su pedido.
-    const file_url = PRIVATE_DOC_FIELDS.has(field)
-      ? await uploadPrivateDriverDoc(file)
-      : (await base44.integrations.Core.UploadFile({ file })).file_url;
-    if (existingProfile) {
-      // Si ya existe perfil, guardar directamente
-      await base44.entities.DriverProfile.update(existingProfile.id, { [field]: file_url });
-      queryClient.invalidateQueries({ queryKey: ["driver-profile"] });
-    } else {
-      // Acumular en estado local hasta que se guarde
-      setPendingFiles(prev => ({ ...prev, [field]: file_url }));
+    try {
+      // Documentos sensibles → bucket PRIVADO driver-docs (solo dueño/staff los
+      // leen, vía signed URL). El resto (fotos vehículo, selfie) sigue público
+      // porque se muestra al cliente en su pedido.
+      const file_url = PRIVATE_DOC_FIELDS.has(field)
+        ? await uploadPrivateDriverDoc(file)
+        : (await base44.integrations.Core.UploadFile({ file })).file_url;
+      if (existingProfile) {
+        // Si ya existe perfil, guardar directamente
+        await base44.entities.DriverProfile.update(existingProfile.id, { [field]: file_url });
+        queryClient.invalidateQueries({ queryKey: ["driver-profile"] });
+      } else {
+        // Acumular en estado local hasta que se guarde
+        setPendingFiles(prev => ({ ...prev, [field]: file_url }));
+      }
+    } catch (err) {
+      // Sin esto la subida fallida dejaba el spinner girando para siempre
+      toast({
+        title: "No se pudo subir el documento",
+        description: err.message || "Comprueba tu conexión e inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setUploading(prev => ({ ...prev, [field]: false }));
+      e.target.value = "";
     }
-    setUploading(prev => ({ ...prev, [field]: false }));
   };
 
   const saveMutation = useMutation({
@@ -150,6 +164,16 @@ export default function DriverProfilePage() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
     },
+    onError: (err) => {
+      const msg = String(err?.message || "");
+      toast({
+        title: "No se pudo guardar el perfil",
+        description: /23505|duplicate/i.test(msg)
+          ? "Ya existe un conductor con ese email. Contacta con ClicyVoy."
+          : msg || "Comprueba tu conexión e inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    },
   });
 
   const allVehiclePhotos = VEHICLE_PHOTOS.every(d => getFileUrl(d.field));
@@ -160,7 +184,15 @@ export default function DriverProfilePage() {
   // se resuelve a signed URL en el momento de abrir.
   const openDoc = async (value) => {
     const url = await resolveDriverDocUrl(value);
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    if (url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    } else {
+      toast({
+        title: "No se pudo abrir el documento",
+        description: "Vuelve a subirlo con el botón «Cambiar».",
+        variant: "destructive",
+      });
+    }
   };
 
   const UploadRow = ({ field, label, pdf }) => {

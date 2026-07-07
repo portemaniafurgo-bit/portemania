@@ -6,7 +6,12 @@ const fs = require("fs");
 const BASE = "https://pontemania.vercel.app";
 const SB = "https://dnehzwrqphqpkcdjwqfi.supabase.co";
 const anon = fs.readFileSync(".env.local", "utf8").match(/ANON_KEY=(.+)/)[1].trim();
-const ADMIN = { email: "renato.0550.calero@gmail.com", pass: "ClicyVoy2026!" };
+// La contraseña del admin real es del DUEÑO (no tocarla): para las suites se
+// usa un admin temporal vía variables de entorno; sin ellas, el admin real.
+const ADMIN = {
+  email: process.env.E2E_ADMIN_EMAIL || "renato.0550.calero@gmail.com",
+  pass: process.env.E2E_ADMIN_PASS || "ClicyVoy2026!",
+};
 const results = [];
 let page;
 

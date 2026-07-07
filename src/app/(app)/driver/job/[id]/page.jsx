@@ -11,6 +11,7 @@ import { vehicleData } from "@/components/common/VehicleCard";
 import { ArrowLeft, Send, MapPin, Truck, CheckCircle, Package, MessageCircle, Loader2, XCircle, Navigation } from "lucide-react";
 import PhotoLightbox from "@/components/common/PhotoLightbox";
 import DriverTrackingMap from "@/components/common/DriverTrackingMap";
+import ReportIncidentButton from "@/components/common/ReportIncidentButton";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchRouteEta, geocodeAlbacete, distanceKm } from "@/lib/eta";
 import { fetchMyDriverProfile } from "@/lib/driverProfile";
@@ -540,6 +541,9 @@ export default function ActiveJob() {
           </Button>
         </div>
       </div>
+
+      {/* Incidencias: también el conductor puede reportar un problema */}
+      <ReportIncidentButton order={job} user={user} />
     </div>
   );
 }

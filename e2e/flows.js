@@ -168,7 +168,10 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await browser.close();
 
   // ===== LIMPIEZA vía API (admin) =====
-  const atok = await login("renato.0550.calero@gmail.com", "ClicyVoy2026!");
+  const atok = await login(
+    process.env.E2E_ADMIN_EMAIL || "renato.0550.calero@gmail.com",
+    process.env.E2E_ADMIN_PASS || "ClicyVoy2026!"
+  );
   await fetch(SB + "/rest/v1/transport_requests?cargo_description=like.SEED%20FLOWS*", { method: "DELETE", headers: H(atok) });
   await fetch(SB + "/rest/v1/driver_profiles?email=eq.conductor.test@portemania.es", { method: "PATCH", headers: H(atok), body: JSON.stringify({ current_lat: 39.0, current_lng: -1.86 }) });
   await fetch(SB + "/rest/v1/transport_requests?client_name=eq.INVITADO%20E2E", { method: "DELETE", headers: H(atok) });

@@ -12,13 +12,28 @@ import { vehicleData } from "@/components/common/VehicleCard";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { motion } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const router = useRouter();
+
+  // El dashboard es el aterrizaje por defecto (login con Google incluido):
+  // conductor y admin van a su panel — el nav de cliente no tiene enlaces
+  // de vuelta a /driver ni /admin.
+  const roleHome =
+    user?.role === "driver" ? "/driver"
+    : user?.role === "admin" || user?.role === "staff" ? "/admin"
+    : null;
+  useEffect(() => {
+    if (roleHome) router.replace(roleHome);
+  }, [roleHome, router]);
 
   const { data: orders = [] } = useQuery({
     queryKey: ["my-orders"],
     queryFn: () => base44.entities.TransportRequest.filter({ created_by_id: user?.id }, "-created_date", 10),
+    enabled: !roleHome,
   });
 
   const activeOrders = orders.filter(o => !["delivered", "cancelled"].includes(o.status));

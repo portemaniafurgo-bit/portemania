@@ -47,6 +47,7 @@ export default function AdminOrders() {
           <TabsTrigger value="pending" className="rounded-lg text-xs">Pendientes</TabsTrigger>
           <TabsTrigger value="accepted" className="rounded-lg text-xs">Aceptados</TabsTrigger>
           <TabsTrigger value="in_transit" className="rounded-lg text-xs">En tránsito</TabsTrigger>
+          <TabsTrigger value="picked_up" className="rounded-lg text-xs">Recogidos</TabsTrigger>
           <TabsTrigger value="delivered" className="rounded-lg text-xs">Entregados</TabsTrigger>
           <TabsTrigger value="cancelled" className="rounded-lg text-xs">Cancelados</TabsTrigger>
         </TabsList>

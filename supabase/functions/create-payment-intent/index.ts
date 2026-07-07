@@ -58,12 +58,13 @@ Deno.serve(async (req: Request) => {
 
   const { data: order } = await admin
     .from("transport_requests")
-    .select("id, created_by_id, payment_status, client_name, vehicle_type, extra_hours, insurance_selected, needs_help")
+    .select("id, created_by_id, status, payment_status, client_name, vehicle_type, extra_hours, insurance_selected, needs_help")
     .eq("id", body.order_id)
     .single();
   if (!order) return json({ error: "Pedido no encontrado" }, 404);
   if (order.created_by_id !== caller.user.id) return json({ error: "No es tu pedido" }, 403);
   if (order.payment_status === "paid") return json({ error: "Ya está pagado" }, 400);
+  if (order.status === "cancelled") return json({ error: "El pedido está cancelado" }, 400);
 
   // Importe recalculado en servidor desde las tarifas vigentes (no el del cliente).
   const { data: settings } = await admin

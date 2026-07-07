@@ -74,13 +74,37 @@ export default function DriverDashboard() {
     );
   }
 
+  // Sin perfil de conductor: puede ser un conductor recién registrado que aún
+  // no lo ha creado, o un cliente que llegó aquí por error — en ambos casos el
+  // camino es crear/completar el perfil (antes salía un falso "Cuenta
+  // desactivada... eliminada por el administrador").
   if (!profile) {
     return (
       <div className="text-center py-16 space-y-4 max-w-md mx-auto">
-        <div className="text-6xl">🚫</div>
-        <h2 className="text-xl font-display font-bold text-foreground">Cuenta desactivada</h2>
+        <div className="text-6xl">📋</div>
+        <h2 className="text-xl font-display font-bold text-foreground">Crea tu perfil de conductor</h2>
         <p className="text-muted-foreground text-sm leading-relaxed">
-          Tu cuenta de conductor ha sido eliminada o desactivada por el administrador. Si crees que es un error, contacta con ClicyVoy.
+          Para recibir y aceptar trabajos necesitas completar tu perfil con tus datos, tu vehículo y la documentación requerida.
+        </p>
+        <Link href="/driver/profile">
+          <Button className="rounded-xl h-12 gap-2 px-6">Completar mi perfil →</Button>
+        </Link>
+        <p className="text-xs text-muted-foreground bg-muted rounded-xl px-4 py-3">
+          ¿Tenías ya un perfil y no aparece? Contacta con ClicyVoy.
+        </p>
+      </div>
+    );
+  }
+
+  // Perfil suspendido por el administrador: aquí sí procede el aviso de cuenta
+  // desactivada (no confundir con "sin perfil todavía").
+  if (profile.status === "suspended") {
+    return (
+      <div className="text-center py-16 space-y-4 max-w-md mx-auto">
+        <div className="text-6xl">🚫</div>
+        <h2 className="text-xl font-display font-bold text-foreground">Cuenta suspendida</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          Tu cuenta de conductor está suspendida por el administrador. Si crees que es un error, contacta con ClicyVoy.
         </p>
         <p className="text-xs text-muted-foreground bg-muted rounded-xl px-4 py-3">
           📞 Contacta con el administrador para recuperar el acceso.
@@ -134,6 +158,15 @@ export default function DriverDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Perfil completo pero aún sin verificar: sin este aviso el conductor
+          solo veía "no hay solicitudes" sin saber por qué (la RLS solo enseña
+          pendientes a perfiles verificados). */}
+      {profile.status === "pending_verification" && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
+          <p className="font-semibold">Tu perfil está en revisión</p>
+          <p className="text-xs mt-1">El equipo de ClicyVoy está verificando tu documentación. Recibirás los trabajos disponibles en cuanto quede aprobado.</p>
+        </div>
+      )}
       {/* Header with availability toggle */}
       <div className="flex items-center justify-between">
         <div>

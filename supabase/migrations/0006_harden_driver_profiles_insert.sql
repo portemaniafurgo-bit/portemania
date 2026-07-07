@@ -24,6 +24,16 @@ create policy driver_profiles_insert on public.driver_profiles for insert
     )
   );
 
+-- En una BD con datos del bug histórico puede haber emails duplicados: se
+-- conserva la fila más ANTIGUA (mismo criterio que fetchMyDriverProfile) para
+-- que el índice único no aborte la migración en instalaciones desde cero.
+delete from public.driver_profiles d
+using public.driver_profiles k
+where d.email is not null
+  and k.email is not null
+  and lower(d.email) = lower(k.email)
+  and d.created_date > k.created_date;
+
 create unique index if not exists driver_profiles_email_unique
   on public.driver_profiles (lower(email))
   where email is not null;

@@ -26,8 +26,10 @@ export default function HeroSection() {
     <section className="relative w-full overflow-hidden">
       {/* Banner image */}
       <div className="relative w-full">
+        {/* Servido en local: antes cargaba del CDN de Base44 (plataforma
+            abandonada) y podía desaparecer de un día para otro. */}
         <img
-          src="https://media.base44.com/images/public/6a32f79927b9d0ad42c1c9e5/dcf2d978a_bannerweb.png"
+          src="/hero-banner.png"
           alt="ClicyVoy — Espacio para lo importante. Nosotros lo llevamos."
           className="w-full object-cover object-center"
           style={{ maxHeight: "520px" }}

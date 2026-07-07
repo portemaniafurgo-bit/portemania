@@ -19,27 +19,26 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-sm leading-relaxed">
-              La forma más rápida y segura de transportar tus cosas. Disponible en las principales ciudades.
+              La forma más rápida y segura de transportar tus cosas. Servicio de portes en Albacete capital (CP 02001–02008).
             </p>
           </div>
 
           <div>
             <h4 className="text-white font-semibold mb-4">Servicios</h4>
             <ul className="space-y-2 text-sm">
-              <li>Mudanzas</li>
-              <li>Transporte de muebles</li>
-              <li>Electrodomésticos</li>
-              <li>Material de construcción</li>
+              <li><Link href="/solicitar" className="hover:text-white transition-colors">Mudanzas</Link></li>
+              <li><Link href="/solicitar" className="hover:text-white transition-colors">Transporte de muebles</Link></li>
+              <li><Link href="/solicitar" className="hover:text-white transition-colors">Electrodomésticos</Link></li>
+              <li><Link href="/solicitar" className="hover:text-white transition-colors">Material de construcción</Link></li>
             </ul>
           </div>
 
           <div>
             <h4 className="text-white font-semibold mb-4">Empresa</h4>
             <ul className="space-y-2 text-sm">
-              <li>Sobre nosotros</li>
-              <li>Sé conductor</li>
-              <li>Para empresas</li>
-              <li>Contacto</li>
+              <li><Link href="/ser-conductor" className="hover:text-white transition-colors">Sé conductor</Link></li>
+              <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
+              <li><Link href="/terminos" className="hover:text-white transition-colors">Cómo funciona</Link></li>
             </ul>
           </div>
 
@@ -57,9 +56,7 @@ export default function Footer() {
         <div className="mt-12 pt-8 border-t border-white/10 flex flex-col sm:flex-row justify-between items-center gap-4">
           <p className="text-sm">© 2026 ClicyVoy. Todos los derechos reservados.</p>
           <div className="flex items-center gap-4 text-sm">
-            <span>🇪🇸 España</span>
-            <span>🇵🇹 Portugal</span>
-            <span>🇫🇷 Francia</span>
+            <span>🇪🇸 Albacete, España</span>
           </div>
         </div>
       </div>

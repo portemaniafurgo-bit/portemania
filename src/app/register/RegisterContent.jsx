@@ -24,7 +24,12 @@ export default function RegisterContent() {
 
   const searchParams = useSearchParams();
   const isDriver = searchParams.get("role") === "driver";
-  const redirectUrl = isDriver ? "/driver/profile" : "/new-request";
+  const vehicle = searchParams.get("vehicle");
+  const redirectUrl = isDriver
+    ? "/driver/profile"
+    : vehicle
+    ? `/new-request?vehicle=${encodeURIComponent(vehicle)}`
+    : "/new-request";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -35,7 +40,20 @@ export default function RegisterContent() {
     }
     setLoading(true);
     try {
-      await base44.auth.register({ email, password, role: isDriver ? "driver" : undefined });
+      const data = await base44.auth.register({ email, password, role: isDriver ? "driver" : undefined });
+      // Confirmación desactivada (autoconfirm): signUp ya devuelve sesión →
+      // dentro directamente, sin pantalla de código.
+      if (data?.session) {
+        window.location.href = redirectUrl;
+        return;
+      }
+      // Email ya registrado: Supabase no da error (anti-enumeración) pero
+      // devuelve user con identities vacías y NO envía ningún correo. Sin
+      // este check el usuario quedaba atrapado en una pantalla OTP sin código.
+      if (data?.user && (data.user.identities?.length ?? 0) === 0) {
+        setError("Ese correo ya tiene una cuenta. Inicia sesión o usa «¿Olvidaste la contraseña?» para recuperarla.");
+        return;
+      }
       setShowOtp(true);
     } catch (err) {
       setError(err.message || "No se pudo completar el registro");
@@ -139,7 +157,7 @@ export default function RegisterContent() {
       footer={
       <>
           ¿Ya tienes cuenta?{" "}
-          <Link href="/login" className="text-primary font-medium hover:underline">
+          <Link href="/login-clientes" className="text-primary font-medium hover:underline">
             Iniciar sesión
           </Link>
         </>

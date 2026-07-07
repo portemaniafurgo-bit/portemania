@@ -109,14 +109,17 @@ export async function fetchMyDriverProfile(user) {
 
   // 2) Respaldo por created_by_id (perfiles antiguos sin email). Se descartan
   //    filas con email de OTRA persona: son perfiles que este usuario creó
-  //    para otros conductores siendo admin, no el suyo.
+  //    para otros conductores siendo admin, no el suyo. Las filas SIN email
+  //    solo se aceptan si el usuario no es staff (un admin pudo crearlas para
+  //    terceros y las "heredaría").
   const { data: own } = await supabase
     .from("driver_profiles")
     .select("*")
     .eq("created_by_id", user.id)
     .order("created_date", { ascending: true });
+  const isStaff = user.role === "admin" || user.role === "staff";
   const mine = (own || []).find(
-    p => !p.email || p.email.trim().toLowerCase() === loginEmail
+    p => (p.email ? p.email.trim().toLowerCase() === loginEmail : !isStaff)
   );
   return mine || null;
 }

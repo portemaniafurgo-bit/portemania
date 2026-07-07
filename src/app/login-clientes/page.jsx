@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
+import { destinoTrasLogin } from "@/lib/postLogin";
 
 export default function LoginClientes() {
   const [email, setEmail] = useState("");
@@ -21,8 +22,10 @@ export default function LoginClientes() {
     setError("");
     setLoading(true);
     try {
-      await base44.auth.loginViaEmailPassword(email, password);
-      window.location.href = "/dashboard";
+      const data = await base44.auth.loginViaEmailPassword(email, password);
+      // Redirigir según el rol: un conductor o el admin que entra por aquí
+      // no debe caer en el panel de cliente (no tiene enlaces de vuelta).
+      window.location.href = await destinoTrasLogin(data?.user?.id);
     } catch (err) {
       setError("Correo o contraseña incorrectos");
     } finally {

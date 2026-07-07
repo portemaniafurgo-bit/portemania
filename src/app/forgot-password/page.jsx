@@ -33,7 +33,7 @@ export default function ForgotPassword() {
       title="Restablecer contraseña"
       subtitle="Te enviaremos un enlace para restablecerla"
       footer={
-        <Link href="/login" className="text-primary font-medium hover:underline">
+        <Link href="/login-clientes" className="text-primary font-medium hover:underline">
           <ArrowLeft className="w-3 h-3 inline mr-1" />Volver a iniciar sesión
         </Link>
       }

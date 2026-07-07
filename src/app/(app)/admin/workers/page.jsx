@@ -72,8 +72,15 @@ export default function AdminWorkers() {
         vehicle_plate: form.matricula,
         city: form.direccion,
         status: "verified",
+        // No disponible hasta que él mismo se active: si no, aparecía al
+        // instante en el mapa público de la landing y en el KPI de flota.
+        is_available: false,
       });
-      setSuccess(`Trabajador ${form.nombre} creado. Recibirá un correo de invitación en ${form.email}.`);
+      if (invite?.already_existed) {
+        setSuccess(`Trabajador ${form.nombre} creado. ${form.email} ya tenía cuenta: entrará con su contraseña de siempre (o puede usar "he olvidado mi contraseña").`);
+      } else {
+        setSuccess(`Trabajador ${form.nombre} creado. Recibirá un correo de invitación en ${form.email}.`);
+      }
       setForm(emptyForm);
       loadWorkers();
     } catch (err) {

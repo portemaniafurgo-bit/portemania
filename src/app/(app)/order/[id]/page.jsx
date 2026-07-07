@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import StatusBadge from "@/components/common/StatusBadge";
 import RatingVans from "@/components/common/RatingVans";
+import ReportIncidentButton from "@/components/common/ReportIncidentButton";
 import { vehicleData } from "@/components/common/VehicleCard";
 import { ArrowLeft, Send, MessageCircle, Loader2, CreditCard, Banknote } from "lucide-react";
 import { format, addMinutes } from "date-fns";
@@ -85,7 +86,9 @@ export default function OrderDetail() {
     });
     const unsubChat = base44.entities.ChatMessage.subscribe((event) => {
       if (event.data?.request_id === id) {
-        if (event.type === "create") setMessages(prev => [...prev, event.data]);
+        if (event.type === "create") {
+          setMessages(prev => (prev.some(m => m.id === event.data.id) ? prev : [...prev, event.data]));
+        }
       }
     });
     return () => { unsubOrder(); unsubChat(); };
@@ -157,7 +160,14 @@ export default function OrderDetail() {
       sender_role: "client",
       message: msg,
     }),
-    onSuccess: () => setMessage(""),
+    onSuccess: (created) => {
+      setMessage("");
+      // Append optimista: si Realtime está caído el mensaje ya guardado
+      // desaparecía de la vista hasta recargar. Dedupe por id frente al evento.
+      if (created?.id) {
+        setMessages(prev => (prev.some(m => m.id === created.id) ? prev : [...prev, created]));
+      }
+    },
     onError: () => {
       toast({
         title: "Error",
@@ -232,7 +242,11 @@ export default function OrderDetail() {
 
   const vehicle = vehicleData[order.vehicle_type];
   const isActive = !["delivered", "cancelled"].includes(order.status);
-  const canRate = order.status === "delivered" && !order.client_rating;
+  // Solo el DUEÑO del pedido valora: el conductor también puede abrir esta
+  // vista (p.ej. desde su historial) y sin este check podía puntuarse a sí mismo.
+  const isOwner = user?.id && order.created_by_id === user.id;
+  const canRate = order.status === "delivered" && !order.client_rating && isOwner;
+  const canPayNow = isOwner && order.payment_method === "card" && order.payment_status !== "paid" && order.status !== "cancelled";
 
   const trackingSteps = [
     { status: "pending",    label: "Pedido recibido",   desc: "Esperando conductor" },
@@ -429,6 +443,17 @@ export default function OrderDetail() {
               {order.payment_status === "paid" ? "Pagado con tarjeta" : "Pago pendiente"}
             </div>
           )}
+          {/* Vuelta al pago: sin este botón, un pedido con tarjeta abandonado
+              a medias no se podía pagar nunca (no había ruta a /payment). */}
+          {canPayNow && (
+            <Button
+              size="sm"
+              className="rounded-xl mt-3 w-full gap-1.5"
+              onClick={() => router.push(`/payment/${order.id}`)}
+            >
+              <CreditCard className="w-3.5 h-3.5" /> Pagar ahora
+            </Button>
+          )}
           {order.payment_method === "cash" && (
             <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
               <Banknote className="w-3.5 h-3.5" />
@@ -517,6 +542,11 @@ export default function OrderDetail() {
             Enviar valoración
           </Button>
         </div>
+      )}
+
+      {/* Incidencias: el panel de admin las gestiona, y desde aquí se crean */}
+      {isOwner && order.driver_id && (
+        <ReportIncidentButton order={order} user={user} />
       )}
 
       {/* Cancel */}

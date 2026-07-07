@@ -282,6 +282,61 @@ público al privado (hoy: 2 conductores, re-subirán al caducar), borrar el
 fichero anterior al re-subir (huérfanos), y gestión de caducidad con fechas y
 avisos (diferida al plan de la app Android).
 
+### 2026-07-07 (noche) — Auditoría integral "producto final": 53 hallazgos, todos los relevantes corregidos
+
+Auditoría multi-agente de TODAS las funcionalidades (público/invitado, auth,
+cliente, conductor, admin, transversal) con verificación contra la RLS vigente.
+Corregido en esta tanda:
+
+**Flujos rotos o a medias (graves):**
+- La distancia del pedido era un número ALEATORIO (5–34 km, `Math.random`)
+  visible para cliente y conductor → ahora se geocodifican origen/destino
+  (Photon/Nominatim) y se usa la ruta real de OSRM; si falla, no se muestra.
+- Pedido con tarjeta abandonado no se podía pagar nunca → botón «Pagar ahora»
+  en el detalle. Pagar un pedido cancelado ahora está bloqueado (página + Edge).
+- Registro con email ya existente dejaba al usuario atrapado en la pantalla
+  OTP sin código posible → detectado (identities vacías) con mensaje y enlace.
+- El historial del conductor enlazaba a la vista de CLIENTE (podía valorarse
+  a sí mismo) → enlaza a su vista de trabajo, y la valoración exige ser dueño.
+- Conductor/cliente sin perfil veían un falso «Cuenta desactivada/eliminada»
+  → CTA de completar perfil; «suspendida» solo si el estado es suspended.
+- Incidencias estaba a MEDIAS (panel admin sin forma de crearlas) → botón
+  «Reportar un problema» en el pedido del cliente y en el trabajo del conductor.
+- Ningún login redirigía por rol (conductor/admin caían al panel de cliente
+  sin salida) → redirección por rol en login y dashboard; /login legado (en
+  inglés) redirige a /login-clientes.
+- Con furgoneta preseleccionada se saltaba el único paso con horas extra →
+  el paso 3 se muestra siempre. El parámetro ?vehicle ya no se pierde al
+  registrarse.
+- /solicitud-enviada prometía un seguimiento online imposible para invitados
+  → texto honesto (la cuenta sirve para los PRÓXIMOS pedidos).
+
+**Seguridad (migración 0007, código + Edge):**
+- Un conductor podía AUTO-VERIFICARSE (UPDATE sin WITH CHECK) → trigger que
+  congela status/rating/viajes para no-staff.
+- Un cliente podía marcar su pedido como PAGADO sin pagar → nueva Edge
+  Function `confirm-payment` (verifica el cargo real en Stripe con la clave
+  secreta y escribe con service role); trigger que impide cambiar
+  payment_status/final_price a no-staff. create-payment-intent rechaza
+  pedidos cancelados.
+- El invitado fijaba su propio precio → `create_guest_request` recalcula el
+  precio EN SERVIDOR desde las tarifas; duplicados por teléfono normalizado.
+- El staff no podía resolver el uid del conductor al reasignar (RLS de
+  profiles solo admin) → profiles legibles por staff.
+
+**Calidad/pulido:** manejo de errores con toast en subida de docs del
+conductor, guardado de perfil (cliente y conductor), acciones del admin sobre
+pedidos (reasignar/pagar/cancelar con onError y cierre al confirmar), portada
+del blog; PDF admitido en carnet/DNI/seguro; aviso «perfil en revisión» para
+conductores pending; nombre del conductor (no su email) al aceptar; chat con
+append optimista (Realtime caído); pestaña «Recogidos» en admin/orders;
+reasignar oculto en pedidos cerrados y limpia el rastro de cancelación;
+duplicado de alta comprobado en BD antes de invitar; alta de trabajadores
+nace no-disponible (ya no aparecía en el mapa público); hero servido en local
+(antes CDN de Base44); footer con enlaces reales y zona real (Albacete);
+cambio de contraseña en /profile; roles en español; DriverDocThumb con estado
+de error; e2e con admin temporal vía E2E_ADMIN_EMAIL/PASS.
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

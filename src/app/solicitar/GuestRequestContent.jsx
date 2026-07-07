@@ -14,13 +14,17 @@ import VehicleCard, { vehicleData } from "@/components/common/VehicleCard";
 import { ArrowLeft, ArrowRight, Camera, MapPin, Package, Shield, AlertCircle, Loader2, CreditCard, Banknote, CheckSquare, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTariffs, estimatePrice } from "@/lib/tariffs";
+import { geocodeAlbacete, fetchRouteEta } from "@/lib/eta";
 
 export default function GuestRequestContent() {
   const router = useRouter();
   const tariffs = useTariffs();
   const searchParams = useSearchParams();
   const preselectedVehicle = searchParams.get("vehicle") || "";
-  const totalSteps = preselectedVehicle ? 3 : 4;
+  // El paso 3 (furgoneta) se muestra SIEMPRE, aunque venga preseleccionada de
+  // la landing: es el único paso donde se contratan horas extra y donde se
+  // avisa de cómo cuenta el tiempo — saltarlo dejaba esas opciones inaccesibles.
+  const totalSteps = 4;
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
@@ -73,13 +77,30 @@ export default function GuestRequestContent() {
     if (field === "destination_address") validateCP("destination", value);
   };
 
-  const simulateDistance = () => {
-    if (form.origin_address && form.destination_address) {
-      const simulated = Math.floor(Math.random() * 30) + 5;
-      update("distance_km", simulated);
-      return simulated;
+  // Distancia REAL origen→destino: geocodifica ambas direcciones y usa la
+  // ruta de OSRM (antes era un número ALEATORIO 5-34 km que veían cliente y
+  // conductor). Si la geocodificación falla, distancia null y no se muestra.
+  const computeDistance = async () => {
+    if (!form.origin_address || !form.destination_address) return null;
+    try {
+      const [from, to] = await Promise.all([
+        geocodeAlbacete(form.origin_address),
+        geocodeAlbacete(form.destination_address),
+      ]);
+      if (!from || !to) return null;
+      const route = await fetchRouteEta(from, to);
+      const patch = {
+        distance_km: route?.km ?? null,
+        origin_lat: from.lat,
+        origin_lng: from.lng,
+        destination_lat: to.lat,
+        destination_lng: to.lng,
+      };
+      setForm(prev => ({ ...prev, ...patch }));
+      return patch;
+    } catch {
+      return null;
     }
-    return form.distance_km;
   };
 
   const price = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected, form.needs_help);
@@ -107,12 +128,15 @@ export default function GuestRequestContent() {
     setLoading(true);
     setDuplicateWarning(false);
     try {
-      simulateDistance();
+      // Coordenadas/distancia reales si aún no se calcularon al salir del paso 1
+      const dist = form.origin_lat ? null : await computeDistance();
       const finalPrice = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected, form.needs_help);
 
       // `force` lo interpreta la RPC de invitado para saltarse el aviso de duplicado
       const request = await base44.entities.TransportRequest.create({
         ...form,
+        ...(dist || {}),
+        distance_km: (dist?.distance_km ?? form.distance_km) || null,
         estimated_price: finalPrice,
         cargo_photos: photos,
         helpers_count: 0,
@@ -143,18 +167,13 @@ export default function GuestRequestContent() {
   const canNext = () => {
     if (step === 1) return form.client_name.trim() && form.client_phone.trim() && hasValidCP(form.origin_address) && hasValidCP(form.destination_address);
     if (step === 2) return form.cargo_description && form.cargo_description.length >= 10 && photos.length >= 1 && (!form.needs_help || form.help_description.trim().length >= 5) && (form.needs_help || acceptPortal) && acceptTerms;
-    if (step === 3 && !preselectedVehicle) return form.vehicle_type;
+    if (step === 3) return form.vehicle_type;
     return true;
   };
 
   const nextStep = () => {
-    if (step === 1) simulateDistance();
-    const next = step + 1;
-    if (next === 3 && preselectedVehicle) {
-      setStep(4);
-    } else {
-      setStep(next);
-    }
+    if (step === 1) computeDistance();
+    setStep(step + 1);
   };
 
   const stepVariants = {
@@ -172,19 +191,15 @@ export default function GuestRequestContent() {
         </button>
         <div>
           <h1 className="text-xl font-display font-bold text-foreground">Solicitar transporte</h1>
-          <p className="text-sm text-muted-foreground">Paso {preselectedVehicle ? (step === 4 ? 3 : step) : step} de {totalSteps} · Como invitado</p>
+          <p className="text-sm text-muted-foreground">Paso {step} de {totalSteps} · Como invitado</p>
         </div>
       </div>
 
       {/* Progress */}
       <div className="flex gap-1.5">
-        {Array.from({ length: totalSteps }).map((_, i) => {
-          const visualStep = i + 1;
-          const actualStep = preselectedVehicle && visualStep >= 3 ? visualStep + 1 : visualStep;
-          return (
-            <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${actualStep <= step ? "bg-primary" : "bg-muted"}`} />
-          );
-        })}
+        {Array.from({ length: totalSteps }).map((_, i) => (
+          <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i + 1 <= step ? "bg-primary" : "bg-muted"}`} />
+        ))}
       </div>
 
       <AnimatePresence mode="wait">
