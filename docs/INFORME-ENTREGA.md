@@ -1,102 +1,122 @@
 # ClicyVoy — Informe de entrega
 
 > Resumen legible del estado de la plataforma y del trabajo de calidad previo a la entrega.
-> Fecha: **2026-07-07**. El registro técnico detallado y cronológico está en [SEGUIMIENTO.md](SEGUIMIENTO.md).
+> Fecha: **2026-07-07 (noche)**. El registro técnico detallado y cronológico está en [SEGUIMIENTO.md](SEGUIMIENTO.md).
 
 ---
 
 ## 1. Estado general
 
-La plataforma está **en producción y operativa** en https://clicyvoy.es, desplegada en la
-infraestructura del negocio (GitHub `portemaniafurgo-bit`, Supabase `dnehzwrqphqpkcdjwqfi`,
-Vercel de `portemaniafurgo@gmail.com`). Cada cambio se prueba, se corrige y se vuelve a
-revisar hasta verificarlo funcionando.
+La plataforma está **en producción, operativa y verificada** en https://clicyvoy.es,
+desplegada en la infraestructura del negocio (GitHub `portemaniafurgo-bit`, Supabase
+`dnehzwrqphqpkcdjwqfi`, Vercel de `portemaniafurgo@gmail.com`).
 
-Antes de esta fase la app funcionaba, pero una revisión a fondo encontró **fallos que un
-cliente sí habría reportado** —incluidos algunos de dinero y de datos personales—. Están
-corregidos y verificados con pruebas reales (no solo "debería funcionar").
+La última verificación es del 7 de julio por la noche: **64 de 64 comprobaciones
+automáticas superadas contra la web real** (flujo de invitado completo, conductor
+aceptando y gestionando un servicio con mapa y rutas, cliente con seguimiento, chat y
+valoración, y el panel de administración entero), además de pruebas de ataque reales
+que quedaron todas bloqueadas. La base de datos contiene solo datos reales.
 
 ## 2. Qué hace la plataforma (resumen)
 
 - **Cliente**: pide un porte (con cuenta o como invitado), elige furgoneta pequeña (40€) o
   grande (60€), ayuda de carga opcional (+30€), sube fotos, ve al conductor en el mapa,
-  chatea, paga con tarjeta o efectivo y valora.
+  chatea, paga con tarjeta o efectivo, valora y puede reportar incidencias.
 - **Conductor**: se da de alta por invitación (email), completa su perfil y documentos
   (selfie, carnet, DNI, seguro, **recibo de autónomo**, **situación censal**, fotos del
-  vehículo), ve y acepta trabajos compatibles con su furgoneta, navega con Google Maps/Waze,
-  puede cancelar con motivo y deja su opinión al finalizar.
+  vehículo — los documentos caducados se pueden volver a subir con «Cambiar»), ve y acepta
+  trabajos compatibles con su furgoneta, navega con Google Maps/Waze, puede cancelar con
+  motivo, reportar incidencias y deja su opinión al finalizar.
 - **Administración** (`/admin`): operaciones y KPIs, detalle de pedidos con cronología,
   tarifas editables, finanzas y liquidaciones con exportación, estadísticas, gestión de
-  conductores y empleados, y editor de blog con SEO.
+  conductores (documentación incluida), incidencias, y editor de blog con SEO.
 
-## 3. Trabajo de calidad realizado en esta fase
+## 3. Cómo probarlo (guía rápida)
 
-### 3.1 Los tres fallos graves (corregidos y probados atacándolos)
+### Como cliente invitado (sin cuenta)
+1. Entra en https://clicyvoy.es → «Solicitar transporte» → «Continuar como invitado».
+2. Rellena los 4 pasos (las direcciones deben llevar un CP de Albacete capital,
+   02001–02008; mínimo una foto de la carga). El precio que ves es el que queda
+   registrado — lo calcula el servidor con las tarifas vigentes.
+3. Al enviar, la administración y los conductores compatibles reciben el aviso por email.
 
-1. **Escalada a administrador.** Un usuario normal podía convertirse en admin (al registrarse
-   o editando su perfil) y acceder a tarifas, finanzas y todos los pedidos. Cerrado por las
-   dos vías; probado que un cliente ya no puede, y que el paso legítimo de cliente a conductor
-   sigue funcionando.
+### Como cliente con cuenta
+1. «Crear cuenta» → entra directamente (sin código) → pide un porte igual que el invitado.
+2. En «Mis pedidos» → abre el pedido: seguimiento en vivo, chat con el conductor,
+   valoración al entregar, «Reportar un problema», y si elegiste tarjeta y no pagaste,
+   el botón **«Pagar ahora»**.
+3. **Pago con tarjeta**: Stripe está en modo PRUEBA — usa la tarjeta `4242 4242 4242 4242`
+   (cualquier fecha futura y CVC). Las tarjetas reales NO funcionarán hasta pasar a
+   claves live.
 
-2. **Pedidos marcados como "pagado" sin cobrar.** La página de pago tenía un modo de reserva
-   que daba el pedido por pagado aunque Stripe fallara o no estuviera configurado — pérdida de
-   dinero directa. Eliminado: sin tarjeta se ofrece efectivo, nunca se marca pagado. Además el
-   importe se recalcula en el servidor desde las tarifas (probado: un pedido de 90€ manipulado
-   a 1€ cobra los 90€ correctos) y hay protección contra cobros duplicados.
+### Como conductor
+1. Entra en https://clicyvoy.es/driver con tu correo. Si falta algún documento, la
+   pantalla «Completa tu perfil» te dice exactamente cuál (a Renato solo le falta
+   **su recibo de autónomo**; Sergio tiene que subir toda su documentación).
+2. Con el perfil completo y verificado: «Solicitudes» → aceptar → pantalla del trabajo
+   (mapa con ruta, Google Maps/Waze, chat, estados recogido → entregado, opinión final).
+3. Los documentos se abren desde «Subido» y se reemplazan con «Cambiar» (admiten PDF).
 
-3. **Datos personales de conductores expuestos.** DNI, teléfono, recibo de autónomo y
-   situación censal eran visibles para cualquier usuario registrado, y los documentos estaban
-   en un almacén público accesible por enlace. Ahora los documentos son **privados** y esos
-   datos solo los ven el propio conductor, la administración y el cliente con un servicio
-   asignado con él (relevante para el RGPD).
+### Como administración
+1. Entra con tu cuenta de siempre → aterrizas directamente en `/admin`.
+2. Prueba: detalle de un pedido (reasignar, marcar pagado, cancelar — ahora todo avisa
+   si algo falla), alta de un conductor (le llega email de invitación para crear su
+   contraseña), ficha con documentación, tarifas en Ajustes, finanzas, incidencias y blog.
 
-### 3.2 Robustez (el resto de correcciones)
+### Avisos importantes durante las pruebas
+- **«Continuar con Google»** solo funciona para usuarios de prueba autorizados hasta que
+  se publique la pantalla de consentimiento en Google Cloud. Usad email y contraseña.
+- Si olvidas la contraseña: «¿Olvidaste la contraseña?» → llega email de
+  `noreply@clicyvoy.es`. También puedes cambiarla desde «Mi perfil» ya dentro.
 
-- **Cliente**: pantallas que se quedaban cargando para siempre, acciones (valorar, cancelar,
-  chatear) que fallaban en silencio, subida de fotos sin aviso de error, y validación de
-  código postal más robusta.
-- **Conductor**: la caja de "ganancias" ya no se infla con pedidos cancelados; dos conductores
-  no pueden aceptar el mismo servicio a la vez; aviso claro cuando el GPS está desactivado; la
-  comisión sale siempre de las tarifas configuradas.
-- **Administración**: los empleados (rol staff) ya no ven finanzas; validación de tarifas y
-  del blog; la reasignación de un conductor apunta al conductor correcto.
-- **Avisos por email**: el aviso de "pedido nuevo" lo genera el servidor y llega a la
-  administración **y a los conductores compatibles** con el tamaño del pedido (probado: 4 de 4
-  correos entregados, incluido el del conductor real).
+## 4. Trabajo de calidad de esta fase (resumen)
 
-### 3.3 Antes de esta fase (misma sesión)
+### 4.1 Seguridad — probada con ataques reales, todos bloqueados
+- **Escalada a administrador** (registro o edición del propio rol): cerrada.
+- **Pedidos "pagados" sin cobrar**: ya no existe ningún camino — el pago lo confirma el
+  servidor verificando el cargo real en Stripe; un cliente que intente marcarse el pedido
+  como pagado por la API se queda en "pendiente" (probado).
+- **Precio fijado por el cliente**: el servidor recalcula siempre (un pedido pedido con
+  1€ entró con los 40€ correctos — probado).
+- **Conductor auto-verificándose o inflando su valoración**: bloqueado (probado).
+- **Documentos de identidad**: bucket privado con enlaces firmados; los antiguos se
+  migraron y la URL pública vieja ya no sirve (RGPD).
 
-- **Alta de conductores por email estándar**: al crearlos reciben una invitación y crean su
-  propia contraseña (se retiró el apaño de mostrar la contraseña en pantalla).
-- **Documentos de autónomo**: añadidos recibo de autónomo y situación censal (obligatorios,
-  admiten PDF) y la posibilidad de **volver a subir** cualquier documento cuando caduque.
-- **Plan de la app Android** post-MVP documentado en [PLAN-APP-ANDROID.md](PLAN-APP-ANDROID.md).
+### 4.2 Fallos de producto corregidos (los que un cliente habría reportado)
+- La **distancia** del pedido era un número aleatorio; ahora es la ruta real.
+- Un pedido con tarjeta abandonado **no se podía pagar nunca**; ahora hay «Pagar ahora»
+  (y un pedido cancelado ya no se puede pagar).
+- Registrarse con un email que ya tenía cuenta dejaba al usuario **atrapado** en una
+  pantalla de código; ahora avisa y ofrece iniciar sesión o recuperar contraseña.
+- Conductor o admin que entraba por el login de clientes caía en el panel de cliente
+  **sin salida**; ahora cada rol aterriza en su panel.
+- El conductor podía **valorarse a sí mismo** desde su historial; cerrado.
+- Quien no tenía perfil de conductor veía un falso «Tu cuenta ha sido eliminada»; ahora
+  ve «Completa tu perfil», y si está pendiente de verificación, un aviso claro.
+- **Incidencias** estaba a medias (panel sin forma de crearlas); ahora cliente y
+  conductor pueden reportar problemas desde su pedido.
+- Decenas de detalles: errores visibles cuando falla una subida o un guardado, PDF en
+  todos los documentos, nombre real del conductor (no su email), pestaña «Recogidos» en
+  admin, footer y textos reales de Albacete, banner servido en local, etc.
 
-## 4. Cómo se verificó
+## 5. Cómo se verificó
 
-No se dio nada por bueno sin comprobarlo:
-
-- **Ataques reales** contra la seguridad (registrarse como admin, editar el propio rol, leer
-  datos de conductores, insertar pedidos ya pagados): todos bloqueados; el flujo legítimo
-  cliente→conductor sigue funcionando.
-- **Prueba de pago**: pedido con precio manipulado → el servidor cobró el importe correcto.
-- **Prueba de email**: aviso de pedido nuevo entregado a los 4 destinatarios.
-- **Build** sin errores, despliegue en Vercel confirmado, y páginas clave respondiendo (home,
-  solicitar, logins, blog).
-
-## 5. Segunda auditoría (en curso)
-
-Se está ejecutando una **segunda revisión independiente** sobre el código actual: ocho frentes
-en paralelo (verificación de los fixes, RLS/datos, funciones de servidor, integridad del
-dinero, cliente, conductor, admin y transversal), cada hallazgo pasa por un verificador que
-intenta refutarlo antes de darlo por válido. Sus conclusiones confirmadas se corregirán y se
-añadirán a este informe y a SEGUIMIENTO.md.
+- **Suites automáticas contra producción**: 29/29 (invitado+conductor+cliente) y 35/35
+  (panel de administración). Con cuentas de prueba creadas para la ocasión y **borradas
+  al terminar** (sin tocar la contraseña del administrador).
+- **Ataques por API contra la web real**: precio manipulado, pago falso, auto-rating —
+  3/3 bloqueados.
+- Build limpio, deploy verificado en Vercel, todas las páginas públicas respondiendo,
+  emails reales por Resend (`noreply@clicyvoy.es`).
 
 ## 6. Pendientes que dependen del negocio (no de código)
 
 - **Stripe**: pasar de claves de prueba a claves reales (`live`) el día del lanzamiento.
-- **Google**: publicar la pantalla de consentimiento de Google (login con Google) o añadir
+- **Google**: publicar la pantalla de consentimiento (login con Google) o añadir
   usuarios de prueba mientras tanto.
-- **Imagen del banner**: sustituir el logo antiguo del hero por el nuevo de ClicyVoy (falta el
-  archivo de imagen).
+- **Arte del banner**: el hero ya se sirve desde la propia web (sin dependencia externa),
+  pero el dibujo sigue siendo el heredado; cuando haya banner nuevo del negocio, se cambia
+  en un minuto (`public/hero-banner.png`).
 - **Proyecto Supabase antiguo** (cuenta personal): eliminarlo desde su panel.
+- Mejoras futuras anotadas: avisos de caducidad de documentos con fechas (previsto para
+  la app Android), liquidaciones ampliadas, búsqueda global.
