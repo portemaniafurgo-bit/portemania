@@ -139,7 +139,7 @@ npx vercel deploy --prod --yes   # deploy a producción
 - A petición del negocio se vació la base de datos para pruebas en limpio: **borrados** todos los pedidos, chats, candidaturas, usuarios cliente, TODOS los conductores (perfiles incluidos) y las cuentas de prueba (cliente.test, conductor.test). También el artículo de blog de ejemplo.
 - **Conservado**: cuenta admin (renato.0550.calero / ClicyVoy2026!), cuenta del negocio (portemaniafurgo@gmail.com), los 3 artículos de blog reales del negocio, y las tarifas/configuración.
 - Estado final: 2 usuarios auth (admin + negocio), 0 conductores, 0 pedidos, mapa público vacío. El esquema/estructura intactos.
-- ⚠️ Consecuencia: las **suites E2E** (e2e/flows.js y e2e/admin.js) dependen de cliente.test/conductor.test; no correrán hasta recrear esas dos cuentas.
+- ⚠️ Consecuencia: las **suites E2E** (e2e/flows.cjs y e2e/admin.cjs) dependen de cliente.test/conductor.test; no correrán hasta recrear esas dos cuentas.
 
 ### 2026-07-06 (noche) — Onboarding por email + documentos de autónomo + bug de docs "perdidos"
 
@@ -336,6 +336,33 @@ nace no-disponible (ya no aparecía en el mapa público); hero servido en local
 (antes CDN de Base44); footer con enlaces reales y zona real (Albacete);
 cambio de contraseña en /profile; roles en español; DriverDocThumb con estado
 de error; e2e con admin temporal vía E2E_ADMIN_EMAIL/PASS.
+
+### 2026-07-07 (noche) — Verificación REAL en producción: 64/64 checks
+
+Con todo lo anterior desplegado (deploy `a1acd54` READY, migración 0007
+aplicada, Edge Functions `confirm-payment` v1 y `create-payment-intent` v7
+ACTIVAS con ESZIP y arranque verificado):
+
+- **Suites E2E contra producción: `flows.cjs` 29/29 + `admin.cjs` 35/35**
+  (renombradas a `.cjs`: con `"type":"module"` en package.json no podían
+  ejecutarse; checks del blog ahora DINÁMICOS sobre el artículo publicado más
+  reciente — el de ejemplo ya no existe, el negocio publicó los suyos).
+- **Ataques reales bloqueados (verificado por API):** invitado pidiendo
+  precio 1€ → se guarda 40€ (recalculado en servidor); cliente PATCH
+  payment_status='paid' → sigue 'pending'; conductor PATCH rating/viajes →
+  sin cambios.
+- **Documentos antiguos migrados al bucket privado**: los 5 docs sensibles
+  del conductor Renato copiados a `driver-docs`, campos reescritos a
+  `driver-docs://…`, originales borrados del bucket público (la URL pública
+  antigua ya devuelve 400). Signed URL verificada (staff descarga, anónimo no).
+- Config verificada: `send-email` sin verify_jwt (aviso de invitados
+  funciona), registro instantáneo (autoconfirm) — coherente con el nuevo
+  flujo de registro sin pantalla OTP.
+- **Cuentas de prueba**: se recrearon por SQL para las suites (cliente.test,
+  conductor.test y un admin temporal e2e.admin.test para NO tocar la
+  contraseña del dueño — las suites aceptan E2E_ADMIN_EMAIL/PASS) y se
+  BORRARON al terminar. Estado final de la BD: solo datos reales (4 usuarios,
+  2 conductores, 1 pedido de prueba del dueño).
 
 ## 5. Pendientes / roadmap
 

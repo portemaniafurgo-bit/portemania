@@ -6,8 +6,8 @@ Crean sus propios datos, los verifican y los borran al terminar.
 
 ```bash
 npm i -D playwright && npx playwright install chromium   # una vez
-node e2e/flows.js    # invitado + conductor + cliente (18 checks)
-node e2e/admin.js    # panel de administración (26 checks)
+node e2e/flows.cjs    # invitado + conductor + cliente (18 checks)
+node e2e/admin.cjs    # panel de administración (26 checks)
 ```
 
 - Requieren `.env.local` en la raíz (leen la anon key para sembrar/limpiar por API).

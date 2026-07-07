@@ -171,13 +171,18 @@ async function shot(name) {
   ok("8d liquidaciones con neto", await visible(page.locator("text=Neto a liquidar"), 10000));
   await page.goto(BASE + "/admin/blog", { waitUntil: "networkidle" });
   ok("8g admin blog carga", await visible(page.locator("h1:has-text('Blog')"), 20000));
-  ok("8h listado con artículo", await visible(page.locator("text=Precios de portes en Albacete"), 10000));
+  // Checks DINÁMICOS sobre el artículo publicado más reciente: los artículos
+  // son contenido del negocio y cambian (el de ejemplo original ya no existe).
+  const posts = await (await fetch(SB + "/rest/v1/blog_posts?published=eq.true&select=slug,title&order=created_date.desc&limit=1", { headers: H() })).json();
+  const post = Array.isArray(posts) && posts[0] ? posts[0] : null;
+  const titleSnippet = post ? post.title.replace(/[^\p{L}\p{N} ]/gu, " ").trim().split(/\s+/).slice(0, 3).join(" ") : "";
+  ok("8h listado con artículo", !!post && await visible(page.locator(`text=${titleSnippet}`), 10000), post ? post.slug : "sin artículos publicados");
   await page.goto(BASE + "/blog", { waitUntil: "networkidle" });
   await page.waitForTimeout(2500); // ISR: la 1ª visita regenera, la recarga ya lo trae
   await page.reload({ waitUntil: "networkidle" });
-  ok("8i blog público lista el artículo", await visible(page.locator("text=Precios de portes en Albacete"), 15000));
-  await page.goto(BASE + "/blog/precios-portes-albacete", { waitUntil: "networkidle" });
-  ok("8j artículo renderizado", await visible(page.locator("text=Furgoneta pequena"), 15000));
+  ok("8i blog público lista el artículo", !!post && await visible(page.locator(`text=${titleSnippet}`), 15000));
+  if (post) await page.goto(BASE + "/blog/" + post.slug, { waitUntil: "networkidle" });
+  ok("8j artículo renderizado", !!post && await visible(page.locator(`h1:has-text("${titleSnippet}")`), 15000));
   ok("8k CTA a solicitar", await visible(page.locator("text=Solicitar transporte"), 8000));
   await page.goto(BASE + "/admin/stats", { waitUntil: "networkidle" });
   ok("8e estadísticas cargan", await visible(page.locator("text=Horas punta"), 20000));

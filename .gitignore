@@ -46,3 +46,6 @@ next-env.d.ts
 /base44/
 
 .env*
+
+# capturas de las suites E2E
+/shots/
