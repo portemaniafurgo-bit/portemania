@@ -6,6 +6,17 @@ import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { toast } from "@/components/ui/use-toast";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,7 +54,9 @@ export default function OrderDetail() {
       setOrder(res);
       setOrderLoading(false);
       if (res?.driver_id) {
-        const profiles = await base44.entities.DriverProfile.filter({ created_by_id: res.driver_id });
+        // Fila más ANTIGUA = la original del conductor (el orden por defecto
+        // -created_date devolvería la más nueva si hubiera filas duplicadas).
+        const profiles = await base44.entities.DriverProfile.filter({ created_by_id: res.driver_id }, "created_date", 1);
         setDriverProfile(profiles?.[0] || null);
       }
     }).catch(err => {
@@ -59,7 +72,7 @@ export default function OrderDetail() {
         if (event.type === "update") {
           setOrder(prev => ({ ...prev, ...event.data }));
           if (event.data?.driver_id) {
-            base44.entities.DriverProfile.filter({ created_by_id: event.data.driver_id }).then(p => {
+            base44.entities.DriverProfile.filter({ created_by_id: event.data.driver_id }, "created_date", 1).then(p => {
               const prof = p?.[0] || null;
               setDriverProfile(prof);
               if (prof?.current_lat && prof?.current_lng) {
@@ -85,7 +98,7 @@ export default function OrderDetail() {
     if (!statuses.includes(order?.status)) return;
 
     const poll = async () => {
-      const profiles = await base44.entities.DriverProfile.filter({ created_by_id: order.driver_id });
+      const profiles = await base44.entities.DriverProfile.filter({ created_by_id: order.driver_id }, "created_date", 1);
       const prof = profiles?.[0];
       if (prof?.current_lat && prof?.current_lng) {
         setDriverLocation({ lat: prof.current_lat, lng: prof.current_lng });
@@ -508,13 +521,38 @@ export default function OrderDetail() {
 
       {/* Cancel */}
       {order.status === "pending" && (
-        <Button
-          variant="outline"
-          className="w-full rounded-xl border-destructive/30 text-destructive hover:bg-destructive/5"
-          onClick={() => cancelMutation.mutate()}
-        >
-          Cancelar pedido
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              variant="outline"
+              className="w-full rounded-xl border-destructive/30 text-destructive hover:bg-destructive/5"
+            >
+              Cancelar pedido
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="rounded-2xl">
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Seguro que quieres cancelar?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Esta acción no se puede deshacer.
+                {order.payment_status === "paid" && (
+                  <span className="block mt-2 font-medium text-destructive">
+                    Este pedido está pagado. La cancelación NO genera un reembolso automático; contacta con ClicyVoy para gestionar la devolución.
+                  </span>
+                )}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel className="rounded-xl">Volver</AlertDialogCancel>
+              <AlertDialogAction
+                className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                onClick={() => cancelMutation.mutate()}
+              >
+                Sí, cancelar pedido
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       )}
 
       {/* Timestamps */}

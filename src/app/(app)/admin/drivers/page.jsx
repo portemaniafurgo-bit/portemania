@@ -10,12 +10,44 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import StatusBadge from "@/components/common/StatusBadge";
 import { vehicleData } from "@/components/common/VehicleCard";
+import { resolveDriverDocUrl } from "@/lib/driverProfile";
 import {
   UserPlus, Search, Check, X, Shield, Truck, Phone, Mail,
   Loader2, Car, User, Trash2, ChevronDown, ChevronUp
 } from "lucide-react";
 
 const ADMIN_EMAIL = "renato.0550.calero@gmail.com";
+
+// Miniatura de documento: los sensibles se guardan como driver-docs://<path>
+// (bucket privado) y hay que resolverlos a signed URL; las URLs http antiguas
+// se muestran tal cual.
+function DriverDocThumb({ value, title }) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    let active = true;
+    resolveDriverDocUrl(value).then(u => { if (active) setUrl(u); });
+    return () => { active = false; };
+  }, [value]);
+  const isPdf = /\.pdf($|\?)/i.test(value);
+  if (!url) {
+    return (
+      <span className="w-20 h-20 rounded-xl border border-border flex items-center justify-center text-xs text-muted-foreground bg-muted" title={title}>
+        …
+      </span>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" title={title}>
+      {isPdf ? (
+        <span className="w-20 h-20 rounded-xl border border-border hover:border-primary transition-colors flex flex-col items-center justify-center gap-1 text-2xl bg-muted">
+          📄<span className="text-[9px] text-muted-foreground px-1 text-center leading-tight">{title}</span>
+        </span>
+      ) : (
+        <img src={url} alt={title} className="w-20 h-20 rounded-xl object-cover border border-border hover:border-primary transition-colors" />
+      )}
+    </a>
+  );
+}
 
 const emptyForm = {
   nombre: "", apellidos: "", telefono: "", email: "",
@@ -412,15 +444,7 @@ export default function AdminDrivers() {
                         { url: driver.autonomo_receipt_url, title: "Recibo de autónomo" },
                         { url: driver.censal_document_url, title: "Situación censal" },
                       ].filter(d => d.url).map(d => (
-                        <a key={d.title} href={d.url} target="_blank" rel="noopener noreferrer" title={d.title}>
-                          {/\.pdf($|\?)/i.test(d.url) ? (
-                            <span className="w-20 h-20 rounded-xl border border-border hover:border-primary transition-colors flex flex-col items-center justify-center gap-1 text-2xl bg-muted">
-                              📄<span className="text-[9px] text-muted-foreground px-1 text-center leading-tight">{d.title}</span>
-                            </span>
-                          ) : (
-                            <img src={d.url} alt={d.title} className="w-20 h-20 rounded-xl object-cover border border-border hover:border-primary transition-colors" />
-                          )}
-                        </a>
+                        <DriverDocThumb key={d.title} value={d.url} title={d.title} />
                       ))}
                     </div>
                     {!driver.photo_url && !driver.license_photo_url && !driver.id_document_url && !driver.insurance_url && !driver.autonomo_receipt_url && !driver.censal_document_url && (

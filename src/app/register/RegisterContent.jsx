@@ -38,7 +38,7 @@ export default function RegisterContent() {
       await base44.auth.register({ email, password, role: isDriver ? "driver" : undefined });
       setShowOtp(true);
     } catch (err) {
-      setError(err.message || "Registration failed");
+      setError(err.message || "No se pudo completar el registro");
     } finally {
       setLoading(false);
     }
@@ -54,7 +54,7 @@ export default function RegisterContent() {
       }
       window.location.href = redirectUrl;
     } catch (err) {
-      setError(err.message || "Invalid verification code");
+      setError(err.message || "Código de verificación no válido");
     } finally {
       setLoading(false);
     }
@@ -65,11 +65,11 @@ export default function RegisterContent() {
     try {
       await base44.auth.resendOtp(email);
       toast({
-        title: "Code sent",
-        description: "Check your email for the new code.",
+        title: "Código enviado",
+        description: "Revisa tu correo para ver el nuevo código.",
       });
     } catch (err) {
-      setError(err.message || "Failed to resend code");
+      setError(err.message || "No se pudo reenviar el código");
     }
   };
 
@@ -179,7 +179,7 @@ export default function RegisterContent() {
               type="email"
               autoComplete="email"
               autoFocus
-              placeholder="you@example.com"
+              placeholder="tucorreo@ejemplo.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="pl-10 h-12"

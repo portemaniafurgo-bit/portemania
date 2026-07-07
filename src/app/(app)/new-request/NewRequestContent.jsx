@@ -15,6 +15,7 @@ import VehicleCard, { vehicleData } from "@/components/common/VehicleCard";
 import { ArrowLeft, ArrowRight, Camera, MapPin, Package, Shield, AlertCircle, Loader2, CreditCard, Banknote, CheckSquare, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTariffs, estimatePrice } from "@/lib/tariffs";
+import { geocodeAlbacete, distanceKm } from "@/lib/eta";
 
 export default function NewRequestContent() {
   const { user } = useAuth();

@@ -246,6 +246,42 @@ la documentación otra vez.
   subidos por error desde la cuenta del admin (la mezcla ya ocurrida no se
   puede deshacer automáticamente).
 
+### 2026-07-07 (tarde, 2ª ronda) — Auditoría multi-agente: hallazgos restantes corregidos
+
+Tras el fix del perfil cruzado, una auditoría de 33 agentes (4 dimensiones +
+verificación adversarial) confirmó estos problemas adicionales, corregidos:
+
+- **PII a bucket privado (grave)**: TODOS los documentos se subían al bucket
+  público `cargo-photos` (URLs accesibles sin sesión) aunque la 0003 había
+  preparado `driver-docs` privado. Ahora carnet, DNI, seguro, recibo de
+  autónomo y censal se suben a `driver-docs` y se guardan como referencia
+  `driver-docs://<path>`; se abren con signed URLs (helper
+  `resolveDriverDocUrl`, miniaturas `DriverDocThumb` en la ficha del admin).
+  La selfie y las fotos del vehículo siguen públicas (se muestran al cliente).
+  Las URLs públicas antiguas se siguen mostrando por compatibilidad — los
+  ficheros ya subidos permanecen en el bucket público hasta re-subirse.
+- **`/admin/workers`** creaba perfiles sin `created_by_id` (misma raíz del
+  perfil cruzado por otra vía): ahora pasa el uid del invitado.
+- **`/reset-password`**: muestra SIEMPRE de qué cuenta se va a cambiar la
+  contraseña (con una sesión previa de otra cuenta viva en el navegador se
+  podía cambiar la equivocada sin saberlo) y cierra la sesión temporal tras
+  guardar.
+- **`order/[id]`**: la ficha/GPS del conductor tomaba la fila más NUEVA en
+  colisión (orden por defecto `-created_date`); ahora pide la más antigua.
+- **Login conductores**: mensajes de error diferenciados (rate-limit, cuenta
+  sin activar, credenciales) en vez de "credenciales incorrectas" para todo.
+- **Migración `0006`** (aplicada en prod): la policy de INSERT de
+  `driver_profiles` permitía a cualquier autenticado insertarse un perfil
+  `verified` (→ ver pedidos pendientes con PII de clientes); ahora solo staff
+  crea perfiles arbitrarios y el auto-registro nace `pending_verification` y
+  propio. UNIQUE sobre `lower(email)` contra duplicados.
+- `fetchMyDriverProfile`: escapado de comodines LIKE en la búsqueda por email.
+
+Pendiente menor (anotado, no bloquea): mover los ficheros antiguos del bucket
+público al privado (hoy: 2 conductores, re-subirán al caducar), borrar el
+fichero anterior al re-subir (huérfanos), y gestión de caducidad con fechas y
+avisos (diferida al plan de la app Android).
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

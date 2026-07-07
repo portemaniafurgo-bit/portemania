@@ -58,9 +58,14 @@ export default function AdminWorkers() {
         return;
       }
       // Invitar al trabajador como usuario con rol "driver"
-      await base44.users.inviteUser(email, "driver");
+      const invite = await base44.users.inviteUser(email, "driver");
       // Also create a DriverProfile with their data
       await base44.entities.DriverProfile.create({
+        // Vincular al uid del TRABAJADOR invitado; sin esto, el trigger
+        // set_created_by pone el uid del admin y el perfil queda "heredado"
+        // por el admin (mismo bug del perfil cruzado del alta de conductores).
+        created_by_id: invite?.user?.id,
+        created_by: email,
         full_name: `${form.nombre} ${form.apellidos}`,
         phone: form.telefono,
         email: form.email,

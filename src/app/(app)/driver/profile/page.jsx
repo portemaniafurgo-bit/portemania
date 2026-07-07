@@ -12,7 +12,12 @@ import { useState, useEffect } from "react";
 import { Save, Loader2, Upload, CheckCircle2 } from "lucide-react";
 import StatusBadge from "@/components/common/StatusBadge";
 import RatingVans from "@/components/common/RatingVans";
-import { fetchMyDriverProfile } from "@/lib/driverProfile";
+import {
+  fetchMyDriverProfile,
+  PRIVATE_DOC_FIELDS,
+  uploadPrivateDriverDoc,
+  resolveDriverDocUrl,
+} from "@/lib/driverProfile";
 
 const LICENSE_TYPES = ["B", "C", "C1", "CE", "C1E", "D", "D1"];
 
@@ -108,7 +113,12 @@ export default function DriverProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploading(prev => ({ ...prev, [field]: true }));
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    // Documentos sensibles → bucket PRIVADO driver-docs (solo dueño/staff los
+    // leen, vía signed URL). El resto (fotos vehículo, selfie) sigue público
+    // porque se muestra al cliente en su pedido.
+    const file_url = PRIVATE_DOC_FIELDS.has(field)
+      ? await uploadPrivateDriverDoc(file)
+      : (await base44.integrations.Core.UploadFile({ file })).file_url;
     if (existingProfile) {
       // Si ya existe perfil, guardar directamente
       await base44.entities.DriverProfile.update(existingProfile.id, { [field]: file_url });
@@ -146,6 +156,13 @@ export default function DriverProfilePage() {
   const hasSelfie = !!getFileUrl("photo_url");
   const canSave = form.full_name && form.phone && form.license_types.length > 0;
 
+  // Los docs privados guardan una referencia driver-docs://…, no una URL:
+  // se resuelve a signed URL en el momento de abrir.
+  const openDoc = async (value) => {
+    const url = await resolveDriverDocUrl(value);
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+  };
+
   const UploadRow = ({ field, label, pdf }) => {
     const url = getFileUrl(field);
     const accept = pdf ? "image/*,.pdf" : "image/*";
@@ -154,9 +171,9 @@ export default function DriverProfilePage() {
         <span className="text-sm text-foreground">{label}</span>
         {url ? (
           <span className="flex items-center gap-3">
-            <a href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-emerald-600 font-medium flex items-center gap-1 hover:underline">
+            <button type="button" onClick={() => openDoc(url)} className="text-xs text-emerald-600 font-medium flex items-center gap-1 hover:underline">
               <CheckCircle2 className="w-3.5 h-3.5" /> Subido
-            </a>
+            </button>
             {/* Re-subir: los documentos caducan (recibo autónomo, seguro...) y deben poder reemplazarse */}
             <label className="text-xs text-primary font-medium cursor-pointer hover:underline flex items-center gap-1">
               {uploading[field] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Upload className="w-3 h-3" />}

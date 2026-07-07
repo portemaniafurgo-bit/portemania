@@ -23,7 +23,16 @@ export default function LoginConductores() {
       await base44.auth.loginViaEmailPassword(email, password);
       window.location.href = "/driver";
     } catch (err) {
-      setError("Credenciales incorrectas. Contacta con el administrador si no recuerdas tu contraseña.");
+      // No colapsar todos los errores en "credenciales incorrectas": un
+      // invitado sin contraseña o un rate-limit necesitan otro mensaje.
+      const msg = err?.message || "";
+      if (/rate limit|security purposes/i.test(msg)) {
+        setError("Demasiados intentos seguidos. Espera un minuto y vuelve a intentarlo.");
+      } else if (/not confirmed/i.test(msg)) {
+        setError("Tu cuenta aún no está activada. Abre el enlace del correo de invitación o pide uno nuevo en «Restablecerla».");
+      } else {
+        setError("Email o contraseña incorrectos. Si te acaban de invitar, crea tu contraseña desde el enlace del correo; si no la recuerdas, pulsa «Restablecerla» abajo.");
+      }
     } finally {
       setLoading(false);
     }

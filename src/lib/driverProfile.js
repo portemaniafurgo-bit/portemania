@@ -24,6 +24,45 @@ import { supabase } from "@/lib/entities";
  * dato obligatorio. Misma condición que usa el panel del conductor: usarla
  * SIEMPRE que haya que decidir si puede ver/aceptar trabajos.
  */
+/**
+ * Documentos SENSIBLES del conductor (carnet, DNI, seguro, recibo autónomo,
+ * censal): van al bucket PRIVADO driver-docs (la 0003 lo hizo privado; solo
+ * dueño del fichero o staff pueden leer, vía signed URLs). En BD se guarda
+ * una referencia "driver-docs://<path>", no una URL pública. Las URLs http
+ * antiguas (bucket público) se siguen mostrando tal cual por compatibilidad.
+ * La foto de cara y las del vehículo siguen siendo públicas: se muestran al
+ * cliente en su pedido.
+ */
+const PRIVATE_PREFIX = "driver-docs://";
+
+export const PRIVATE_DOC_FIELDS = new Set([
+  "license_photo_url",
+  "id_document_url",
+  "insurance_url",
+  "autonomo_receipt_url",
+  "censal_document_url",
+]);
+
+export async function uploadPrivateDriverDoc(file) {
+  const ext = file.name?.split(".").pop() || "bin";
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+  const { error } = await supabase.storage
+    .from("driver-docs")
+    .upload(path, file, { cacheControl: "3600", upsert: false });
+  if (error) throw error;
+  return PRIVATE_PREFIX + path;
+}
+
+export async function resolveDriverDocUrl(value) {
+  if (!value) return null;
+  if (!value.startsWith(PRIVATE_PREFIX)) return value; // URL pública antigua
+  const { data, error } = await supabase.storage
+    .from("driver-docs")
+    .createSignedUrl(value.slice(PRIVATE_PREFIX.length), 3600);
+  if (error) return null;
+  return data?.signedUrl || null;
+}
+
 export function isDriverProfileIncomplete(profile) {
   return (
     !profile?.photo_url ||
@@ -46,10 +85,12 @@ export async function fetchMyDriverProfile(user) {
   // 1) Por email de login (identidad fiable). Fila más antigua = la original;
   //    los duplicados vacíos que creaba el bug histórico son siempre más nuevos.
   if (loginEmail) {
+    // Escapar comodines de LIKE: un email con "_" no debe hacer match difuso.
+    const emailPattern = loginEmail.replace(/([\\%_])/g, "\\$1");
     const { data: byEmail } = await supabase
       .from("driver_profiles")
       .select("*")
-      .ilike("email", loginEmail)
+      .ilike("email", emailPattern)
       .order("created_date", { ascending: true })
       .limit(1);
     if (byEmail?.[0]) {

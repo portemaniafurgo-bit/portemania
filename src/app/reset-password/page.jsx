@@ -24,6 +24,7 @@ function ResetPasswordInner() {
   // estado: "checking" | "ready" (token válido) | "invalid"
   const [state, setState] = useState("checking");
   const [isInvite, setIsInvite] = useState(false);
+  const [accountEmail, setAccountEmail] = useState("");
 
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -41,13 +42,22 @@ function ResetPasswordInner() {
       if (tokenHash) {
         const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type });
         if (!active) return;
-        setState(error ? "invalid" : "ready");
+        if (error) { setState("invalid"); return; }
+        const { data } = await supabase.auth.getSession();
+        if (!active) return;
+        setAccountEmail(data.session?.user?.email || "");
+        setState("ready");
         return;
       }
 
-      // Compatibilidad: si ya hay sesión (enlace antiguo con hash), también vale
+      // Compatibilidad: si ya hay sesión (refresh tras canjear el token, o
+      // enlace antiguo con hash), también vale — pero mostrando SIEMPRE de
+      // qué cuenta es la contraseña que se va a cambiar: si en el navegador
+      // quedaba la sesión de OTRA cuenta, sin este aviso se cambiaba la
+      // contraseña equivocada sin darse cuenta.
       const { data } = await supabase.auth.getSession();
       if (!active) return;
+      setAccountEmail(data.session?.user?.email || "");
       setState(data.session ? "ready" : "invalid");
     })();
     return () => { active = false; };
@@ -84,6 +94,10 @@ function ResetPasswordInner() {
       } catch {
         // si no se puede leer el rol, se asume cliente
       }
+      // Cerrar la sesión temporal del enlace: el usuario entra ya con su
+      // contraseña nueva desde el login (evita quedarse a medias logueado
+      // con la sesión de recovery).
+      try { await supabase.auth.signOut(); } catch {}
       window.location.href = role === "driver" ? "/login-conductores" : "/login-clientes";
     } catch (err) {
       setError(err.message || "No se pudo guardar la contraseña.");
@@ -125,7 +139,10 @@ function ResetPasswordInner() {
     <AuthLayout
       icon={Lock}
       title={isInvite ? "Crea tu contraseña" : "Nueva contraseña"}
-      subtitle={isInvite ? "Bienvenido a ClicyVoy — elige tu contraseña para entrar" : "Introduce tu nueva contraseña"}
+      subtitle={
+        (isInvite ? "Bienvenido a ClicyVoy — elige tu contraseña para entrar" : "Introduce tu nueva contraseña") +
+        (accountEmail ? ` (cuenta: ${accountEmail})` : "")
+      }
     >
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
