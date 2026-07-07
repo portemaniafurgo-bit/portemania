@@ -12,7 +12,7 @@ import { supabase } from "@/lib/entities";
  * la mercancía) es un suplemento fijo `help_price`.
  */
 export const DEFAULT_TARIFFS = {
-  small: 40,
+  small: 45,
   large: 60,
   extra_hour: 15,
   insurance: 12,
