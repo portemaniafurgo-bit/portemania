@@ -18,6 +18,7 @@ const AVAILABILITY_OPTIONS = [
   "Entre semana",
   "Fines de semana",
   "Solo tardes",
+  "Solo mañanas",
 ];
 
 export default function SerConductorPage() {
