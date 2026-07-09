@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAdminGuard } from "@/lib/useAdminGuard";
@@ -9,11 +9,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Newspaper, Plus, Pencil, Eye, Globe, Loader2, Upload, ArrowLeft, Trash2, CheckCircle2 } from "lucide-react";
+import { Newspaper, Plus, Pencil, Eye, Globe, Loader2, Upload, ArrowLeft, Trash2, CheckCircle2, Bold, Italic, Heading2, Heading3, List, Link2, ImagePlus, Tag, X, Circle, Search } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
-const EMPTY = { title: "", slug: "", excerpt: "", content: "", cover_url: "" };
+const EMPTY = { title: "", slug: "", excerpt: "", content: "", cover_url: "", meta_title: "", focus_keyword: "", cover_alt: "", tags: [] };
+
+// Botón de la barra de formato del editor.
+function ToolBtn({ onClick, title, children, disabled }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      disabled={disabled}
+      className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-background hover:text-foreground transition-colors disabled:opacity-40"
+    >
+      {children}
+    </button>
+  );
+}
 
 export default function AdminBlog() {
   const canRender = useAdminGuard();
@@ -25,6 +40,9 @@ export default function AdminBlog() {
   const [uploading, setUploading] = useState(false);
   const [message, setMessage] = useState(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState(null);
+  const [tagDraft, setTagDraft] = useState("");
+  const [imgInserting, setImgInserting] = useState(false);
+  const contentRef = useRef(null);
 
   const { data: posts = [], isLoading } = useQuery({
     queryKey: ["admin-blog"],
@@ -39,6 +57,10 @@ export default function AdminBlog() {
         excerpt: form.excerpt.trim(),
         content: form.content,
         cover_url: form.cover_url || null,
+        meta_title: form.meta_title.trim() || null,
+        focus_keyword: form.focus_keyword.trim() || null,
+        cover_alt: form.cover_alt.trim() || null,
+        tags: form.tags,
       };
       if (!data.title) throw new Error("El título es obligatorio");
       if (!data.slug) throw new Error("La URL (slug) es obligatoria");
@@ -64,7 +86,7 @@ export default function AdminBlog() {
     onSuccess: (saved) => {
       queryClient.invalidateQueries({ queryKey: ["admin-blog"] });
       setEditing(saved);
-      setForm({ title: saved.title, slug: saved.slug, excerpt: saved.excerpt || "", content: saved.content || "", cover_url: saved.cover_url || "" });
+      setForm({ title: saved.title, slug: saved.slug, excerpt: saved.excerpt || "", content: saved.content || "", cover_url: saved.cover_url || "", meta_title: saved.meta_title || "", focus_keyword: saved.focus_keyword || "", cover_alt: saved.cover_alt || "", tags: saved.tags || [] });
       setMessage({ ok: true, text: saved.published ? "Publicado — visible en /blog" : "Borrador guardado" });
     },
     onError: (e) => setMessage({ ok: false, text: e.message }),
@@ -81,7 +103,7 @@ export default function AdminBlog() {
   const startEdit = (post) => {
     setEditing(post);
     setForm(post.id
-      ? { title: post.title, slug: post.slug, excerpt: post.excerpt || "", content: post.content || "", cover_url: post.cover_url || "" }
+      ? { title: post.title, slug: post.slug, excerpt: post.excerpt || "", content: post.content || "", cover_url: post.cover_url || "", meta_title: post.meta_title || "", focus_keyword: post.focus_keyword || "", cover_alt: post.cover_alt || "", tags: post.tags || [] }
       : EMPTY);
     setSlugTouched(!!post.id);
     setPreview(false);
@@ -112,10 +134,76 @@ export default function AdminBlog() {
     }
   };
 
+  // ---- Barra de formato: inserta Markdown en el textarea de contenido ----
+  // Envuelve la selección (o un texto de ejemplo) entre marcadores: **negrita**, *cursiva*, [enlace]().
+  const surround = (before, after, placeholder) => {
+    const ta = contentRef.current;
+    if (!ta) return;
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    const val = form.content;
+    const sel = val.slice(s, e) || placeholder;
+    update("content", val.slice(0, s) + before + sel + after + val.slice(e));
+    const caret = s + before.length;
+    requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(caret, caret + sel.length); });
+  };
+
+  // Antepone un prefijo a cada línea seleccionada: "## " (H2), "### " (H3), "- " (lista).
+  const prefixLines = (prefix) => {
+    const ta = contentRef.current;
+    if (!ta) return;
+    const s = ta.selectionStart, e = ta.selectionEnd;
+    const val = form.content;
+    const lineStart = val.lastIndexOf("\n", s - 1) + 1;
+    const block = val.slice(lineStart, e) || "Escribe aquí";
+    const prefixed = block.split("\n").map(l => prefix + l.replace(/^(#{1,3}\s|-\s)/, "")).join("\n");
+    update("content", val.slice(0, lineStart) + prefixed + val.slice(e));
+    const caret = lineStart + prefixed.length;
+    requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(caret, caret); });
+  };
+
+  // Sube una imagen y la inserta como Markdown en la posición del cursor.
+  const insertContentImage = async (ev) => {
+    const file = ev.target.files?.[0];
+    ev.target.value = "";
+    if (!file) return;
+    setImgInserting(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file, bucket: "blog-images" });
+      const ta = contentRef.current;
+      const val = form.content;
+      const at = ta ? ta.selectionStart : val.length;
+      const md = `\n\n![${form.title || "imagen"}](${file_url})\n\n`;
+      update("content", val.slice(0, at) + md + val.slice(at));
+    } catch (err) {
+      setMessage({ ok: false, text: "No se pudo subir la imagen: " + (err.message || "error de conexión") });
+    } finally {
+      setImgInserting(false);
+    }
+  };
+
+  const addTag = (raw) => {
+    const t = raw.trim().toLowerCase().replace(/^#/, "");
+    if (t && !form.tags.includes(t)) update("tags", [...form.tags, t]);
+    setTagDraft("");
+  };
+  const removeTag = (t) => update("tags", form.tags.filter(x => x !== t));
+
   if (!canRender) return null;
 
   // ============ EDITOR ============
   if (editing !== null) {
+    // Checklist SEO en vivo según la palabra clave objetivo (guía al redactor).
+    const kw = form.focus_keyword.trim().toLowerCase();
+    const has = (s) => kw && (s || "").toLowerCase().includes(kw);
+    const wordCount = form.content.trim() ? form.content.trim().split(/\s+/).length : 0;
+    const seoChecks = kw ? [
+      { ok: has(form.meta_title || form.title), label: "La palabra clave aparece en el título" },
+      { ok: has(form.excerpt), label: "…y en el extracto (meta descripción)" },
+      { ok: has(form.slug), label: "…y en la URL (slug)" },
+      { ok: has(form.content), label: "…y en el contenido del artículo" },
+      { ok: wordCount >= 300, label: `Artículo de al menos 300 palabras (llevas ${wordCount})` },
+    ] : [];
+
     return (
       <div className="max-w-3xl mx-auto space-y-5">
         <div className="flex items-center gap-3">
@@ -139,7 +227,7 @@ export default function AdminBlog() {
 
         {preview ? (
           <article className="bg-card rounded-2xl border border-border p-6">
-            {form.cover_url && <img src={form.cover_url} alt="" className="rounded-2xl mb-6 w-full max-h-72 object-cover" />}
+            {form.cover_url && <img src={form.cover_url} alt={form.cover_alt || form.title} className="rounded-2xl mb-6 w-full max-h-72 object-cover" />}
             <h1 className="text-3xl font-display font-bold text-foreground mb-2">{form.title || "Sin título"}</h1>
             {form.excerpt && <p className="text-muted-foreground mb-6">{form.excerpt}</p>}
             <div className="text-foreground text-[15px]" dangerouslySetInnerHTML={{ __html: renderMarkdown(form.content) }} />
@@ -172,15 +260,103 @@ export default function AdminBlog() {
                   <input type="file" accept="image/*" className="hidden" onChange={handleCover} />
                 </label>
               </div>
+              {form.cover_url && (
+                <Input
+                  placeholder="Texto alternativo de la imagen (qué se ve en la foto — para Google Imágenes y accesibilidad)"
+                  value={form.cover_alt}
+                  onChange={e => update("cover_alt", e.target.value)}
+                  className="rounded-xl text-sm"
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label>Contenido <span className="text-destructive">*</span></Label>
+              <div className="flex flex-wrap items-center gap-0.5 border border-border rounded-xl p-1 bg-muted/40">
+                <ToolBtn title="Negrita" onClick={() => surround("**", "**", "texto en negrita")}><Bold className="w-4 h-4" /></ToolBtn>
+                <ToolBtn title="Cursiva" onClick={() => surround("*", "*", "texto en cursiva")}><Italic className="w-4 h-4" /></ToolBtn>
+                <span className="w-px h-5 bg-border mx-1" />
+                <ToolBtn title="Título de sección (H2)" onClick={() => prefixLines("## ")}><Heading2 className="w-4 h-4" /></ToolBtn>
+                <ToolBtn title="Subtítulo (H3)" onClick={() => prefixLines("### ")}><Heading3 className="w-4 h-4" /></ToolBtn>
+                <ToolBtn title="Lista con viñetas" onClick={() => prefixLines("- ")}><List className="w-4 h-4" /></ToolBtn>
+                <span className="w-px h-5 bg-border mx-1" />
+                <ToolBtn title="Enlace" onClick={() => surround("[", "](https://)", "texto del enlace")}><Link2 className="w-4 h-4" /></ToolBtn>
+                <label title="Insertar imagen" className="w-9 h-9 flex items-center justify-center rounded-lg text-muted-foreground hover:bg-background hover:text-foreground transition-colors cursor-pointer">
+                  {imgInserting ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" />}
+                  <input type="file" accept="image/*" className="hidden" onChange={insertContentImage} disabled={imgInserting} />
+                </label>
+              </div>
               <Textarea
-                placeholder={"Escribe el artículo. Formato disponible:\n\n## Título de sección\n**negrita** y *cursiva*\n- listas con guiones\n[texto del enlace](https://...)\n![imagen](https://...)"}
+                ref={contentRef}
+                placeholder={"Selecciona texto y usa los botones de arriba, o escribe con formato:\n\n## Título de sección\n**negrita** y *cursiva*\n- listas con guiones\n[texto del enlace](https://...)"}
                 value={form.content}
                 onChange={e => update("content", e.target.value)}
                 className="rounded-xl min-h-[320px] font-mono text-sm"
               />
+              <p className="text-xs text-muted-foreground">Los botones insertan el formato por ti. Usa <b>Vista previa</b> (arriba) para ver cómo queda.</p>
+            </div>
+
+            {/* ===== Ajustes SEO ===== */}
+            <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-primary" />
+                <h2 className="text-sm font-semibold text-foreground">Ajustes SEO <span className="font-normal text-muted-foreground">(para posicionar en Google)</span></h2>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Título SEO <span className="text-xs text-muted-foreground font-normal">(opcional — el que sale en Google; si lo dejas vacío se usa el título)</span></Label>
+                <Input
+                  placeholder={form.title || "Portes baratos en Albacete | ClicyVoy"}
+                  value={form.meta_title}
+                  maxLength={70}
+                  onChange={e => update("meta_title", e.target.value)}
+                  className="rounded-xl"
+                />
+                <p className={`text-xs text-right ${form.meta_title.length > 60 ? "text-amber-600" : "text-muted-foreground"}`}>{form.meta_title.length}/60 recomendado</p>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm flex items-center gap-1.5"><Tag className="w-3.5 h-3.5" /> Etiquetas <span className="text-xs text-muted-foreground font-normal">(temas del artículo; ayudan a enlazar artículos)</span></Label>
+                {form.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {form.tags.map(t => (
+                      <span key={t} className="inline-flex items-center gap-1 bg-primary/10 text-primary text-xs font-medium px-2.5 py-1 rounded-full">
+                        {t}
+                        <button type="button" onClick={() => removeTag(t)} className="hover:text-destructive"><X className="w-3 h-3" /></button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <Input
+                  placeholder="Escribe una etiqueta y pulsa Enter (p. ej. mudanzas, precios, albacete)"
+                  value={tagDraft}
+                  onChange={e => setTagDraft(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === "Enter" || e.key === ",") { e.preventDefault(); addTag(tagDraft); }
+                    else if (e.key === "Backspace" && !tagDraft && form.tags.length) removeTag(form.tags[form.tags.length - 1]);
+                  }}
+                  className="rounded-xl text-sm"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm">Palabra clave objetivo <span className="text-xs text-muted-foreground font-normal">(la búsqueda por la que quieres salir en Google)</span></Label>
+                <Input
+                  placeholder="p. ej. portes baratos albacete"
+                  value={form.focus_keyword}
+                  onChange={e => update("focus_keyword", e.target.value)}
+                  className="rounded-xl"
+                />
+                {seoChecks.length > 0 && (
+                  <ul className="space-y-1.5 pt-1">
+                    {seoChecks.map((c, i) => (
+                      <li key={i} className={`flex items-center gap-2 text-xs ${c.ok ? "text-emerald-600" : "text-muted-foreground"}`}>
+                        {c.ok ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" /> : <Circle className="w-3.5 h-3.5 flex-shrink-0" />}
+                        {c.label}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           </div>
         )}

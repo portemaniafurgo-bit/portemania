@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import VehicleCard, { vehicleData } from "@/components/common/VehicleCard";
-import { ArrowLeft, ArrowRight, Camera, MapPin, Package, Shield, AlertCircle, Loader2, CreditCard, Banknote, CheckSquare, Square } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, Images, MapPin, Package, Shield, AlertCircle, Loader2, CreditCard, Banknote, CheckSquare, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useTariffs, estimatePrice } from "@/lib/tariffs";
 import { geocodeAlbacete, fetchRouteEta } from "@/lib/eta";
@@ -304,8 +304,16 @@ export default function NewRequestContent() {
                     <img src={url} alt="cargo" className="w-full h-full object-cover" />
                   </div>
                 ))}
-                <label className={`w-20 h-20 rounded-xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-colors ${photos.length === 0 ? "border-destructive/60 hover:border-destructive" : "border-border hover:border-primary/40"}`}>
+                {/* Hacer foto directamente con la cámara (en móvil abre la cámara trasera) */}
+                <label className={`w-20 h-20 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${photos.length === 0 ? "border-destructive/60 hover:border-destructive" : "border-border hover:border-primary/40"}`}>
                   <Camera className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground leading-none">Hacer foto</span>
+                  <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
+                </label>
+                {/* Elegir de la galería del dispositivo */}
+                <label className="w-20 h-20 rounded-xl border-2 border-dashed border-border hover:border-primary/40 flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors">
+                  <Images className="w-5 h-5 text-muted-foreground" />
+                  <span className="text-[10px] text-muted-foreground leading-none">Galería</span>
                   <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload} />
                 </label>
               </div>

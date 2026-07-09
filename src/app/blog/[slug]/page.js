@@ -11,9 +11,11 @@ export async function generateMetadata({ params }) {
   const post = await getPublishedPost(slug);
   if (!post) return { title: "Artículo no encontrado — ClicyVoy" };
   const url = `${SITE_URL}/blog/${post.slug}`;
+  const metaTitle = post.meta_title?.trim() || `${post.title} — Blog ClicyVoy`;
   return {
-    title: `${post.title} — Blog ClicyVoy`,
+    title: metaTitle,
     description: post.excerpt || `${post.title} · Blog de portes y mudanzas en Albacete.`,
+    keywords: post.tags?.length ? post.tags : undefined,
     alternates: { canonical: url },
     openGraph: {
       title: post.title,
@@ -21,7 +23,8 @@ export async function generateMetadata({ params }) {
       url,
       type: "article",
       publishedTime: post.published_at || undefined,
-      images: post.cover_url ? [{ url: post.cover_url }] : undefined,
+      tags: post.tags?.length ? post.tags : undefined,
+      images: post.cover_url ? [{ url: post.cover_url, alt: post.cover_alt || post.title }] : undefined,
     },
     twitter: {
       card: post.cover_url ? "summary_large_image" : "summary",
@@ -47,6 +50,7 @@ export default async function BlogPostPage({ params }) {
     dateModified: post.updated_date || undefined,
     author: { "@type": "Organization", name: "ClicyVoy", url: SITE_URL },
     publisher: { "@type": "Organization", name: "ClicyVoy", url: SITE_URL },
+    keywords: post.tags?.length ? post.tags.join(", ") : undefined,
     mainEntityOfPage: `${SITE_URL}/blog/${post.slug}`,
   };
 
@@ -62,7 +66,7 @@ export default async function BlogPostPage({ params }) {
 
         <article>
           {post.cover_url && (
-            <img src={post.cover_url} alt={post.title} className="rounded-2xl w-full max-h-96 object-cover mb-8" />
+            <img src={post.cover_url} alt={post.cover_alt || post.title} className="rounded-2xl w-full max-h-96 object-cover mb-8" />
           )}
           <h1 className="text-3xl sm:text-4xl font-display font-bold text-foreground leading-tight">{post.title}</h1>
           {post.published_at && (
@@ -75,6 +79,16 @@ export default async function BlogPostPage({ params }) {
             className="text-foreground text-[16px] mt-8"
             dangerouslySetInnerHTML={{ __html: renderMarkdown(post.content) }}
           />
+
+          {post.tags?.length > 0 && (
+            <div className="flex flex-wrap gap-2 mt-10 pt-6 border-t border-border">
+              {post.tags.map(tag => (
+                <span key={tag} className="text-xs font-medium text-muted-foreground bg-muted px-3 py-1 rounded-full">
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
         </article>
 
         {/* CTA al final del artículo */}
