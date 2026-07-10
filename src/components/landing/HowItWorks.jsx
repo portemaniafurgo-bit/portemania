@@ -44,7 +44,7 @@ export default function HowItWorks() {
             ¿Cómo funciona?
           </h2>
           <p className="text-muted-foreground mt-3 max-w-lg mx-auto">
-            Solicitar un transporte nunca fue tan fácil. En solo 4 pasos.
+            Solicita una furgoneta con conductor para tu porte en Albacete. En solo 4 pasos.
           </p>
         </motion.div>
 
