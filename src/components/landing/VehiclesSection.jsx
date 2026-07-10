@@ -40,9 +40,9 @@ export default function VehiclesSection() {
           <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground mt-2">
             Furgonetas para portes pequeños
           </h2>
-          <p className="text-muted-foreground mt-3 max-w-lg mx-auto">
+           </h2> <p className="text-muted-foreground mt-3 max-w-lg mx-auto">
             Ideal para portes y pequeñas mudanzas en Albacete.
-            Donde necesitas una furgoneta, ahí está ClicyVoy.
+            Donde necesitas una furgoneta, ahí está ClicyVoy. </h2>
           </p>
         </motion.div>
 
