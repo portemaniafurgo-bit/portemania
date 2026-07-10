@@ -41,7 +41,8 @@ export default function VehiclesSection() {
             Furgonetas para portes pequeños
           </h2>
           <p className="text-muted-foreground mt-3 max-w-lg mx-auto">
-            Ideal para transportar unas pocas piezas. Recogida y entrega siempre a pie de calle.
+            Ideal para portes y pequeñas mudanzas en Albacete.
+            Donde necesitas una furgoneta, ahí está ClicyVoy.
           </p>
         </motion.div>
 
@@ -70,6 +71,10 @@ export default function VehiclesSection() {
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                   <Check className="w-4 h-4 text-emerald-500" />
                   <span>Entrega a pie de calle</span>
+                </div>
+                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Check className="w-4 h-4 text-emerald-500" />
+                  <span>Ayuda del conductor</span>
                 </div>
               </div>
               <div className="mt-5 pt-4 border-t border-border flex items-center justify-between">
