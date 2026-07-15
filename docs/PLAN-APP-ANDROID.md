@@ -2,6 +2,8 @@
 
 > Escrito el 2026-07-06. Complementa a `SEGUIMIENTO.md`.
 > Objetivo: tras validar el negocio con la web, construir la app móvil.
+> **Especificación de producto completa (2026-07-15):** [FUNCIONALIDADES-APP-ANDROID.md](FUNCIONALIDADES-APP-ANDROID.md)
+> — incluye la revisión funcional del código, el servicio de envío de paquetes y los cambios de backend necesarios.
 
 ## Tecnología elegida
 
