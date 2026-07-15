@@ -5,6 +5,7 @@ import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { vehicleData } from "@/components/common/VehicleCard";
+import PaymentInfo from "@/components/common/PaymentInfo";
 import { packageWeightLabel } from "@/lib/tariffs";
 import { Check, MapPin, Package, Loader2 } from "lucide-react";
 import PhotoLightbox from "@/components/common/PhotoLightbox";
@@ -187,6 +188,10 @@ export default function DriverRequests() {
                   <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" />
                   <span className="text-muted-foreground">{req.destination_address}</span>
                 </div>
+              </div>
+
+              <div className="mb-3">
+                <PaymentInfo order={req} variant="compact" />
               </div>
 
               {req.cargo_description && (

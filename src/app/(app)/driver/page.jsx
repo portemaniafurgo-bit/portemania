@@ -8,6 +8,7 @@ import { Switch } from "@/components/ui/switch";
 import StatsCard from "@/components/common/StatsCard";
 import StatusBadge from "@/components/common/StatusBadge";
 import { vehicleData } from "@/components/common/VehicleCard";
+import PaymentInfo from "@/components/common/PaymentInfo";
 import { Truck, DollarSign, Star, Clock, MapPin, ShieldCheck } from "lucide-react";
 import { format, isToday } from "date-fns";
 import { es } from "date-fns/locale";
@@ -224,6 +225,9 @@ export default function DriverDashboard() {
                       {job.destination_address}
                     </p>
                   </div>
+                  <div className="mt-2">
+                    <PaymentInfo order={job} variant="compact" />
+                  </div>
                 </div>
               </Link>
             ))}
@@ -259,6 +263,9 @@ export default function DriverDashboard() {
                 <div className="space-y-1 text-sm mb-3">
                   <p className="text-foreground">{req.origin_address}</p>
                   <p className="text-muted-foreground">→ {req.destination_address}</p>
+                </div>
+                <div className="mb-3">
+                  <PaymentInfo order={req} variant="compact" />
                 </div>
                 {req.cargo_description && (
                   <p className="text-xs text-muted-foreground mb-3">📦 {req.cargo_description}</p>

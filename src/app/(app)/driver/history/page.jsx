@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import StatusBadge from "@/components/common/StatusBadge";
 import RatingStars from "@/components/common/RatingStars";
 import { vehicleData } from "@/components/common/VehicleCard";
+import PaymentInfo from "@/components/common/PaymentInfo";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Clock, Loader2 } from "lucide-react";
@@ -57,6 +58,9 @@ export default function DriverHistory() {
                   <span className="font-bold text-foreground">
                     {((job.final_price || job.estimated_price || 0) * driverShare).toFixed(2)}€
                   </span>
+                </div>
+                <div className="mt-2">
+                  <PaymentInfo order={job} variant="compact" />
                 </div>
                 {job.client_rating && (
                   <div className="mt-2 flex items-center gap-2">

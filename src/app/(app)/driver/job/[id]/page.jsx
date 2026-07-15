@@ -13,6 +13,7 @@ import { ArrowLeft, Send, MapPin, Truck, CheckCircle, Package, MessageCircle, Lo
 import PhotoLightbox from "@/components/common/PhotoLightbox";
 import DriverTrackingMap from "@/components/common/DriverTrackingMap";
 import ReportIncidentButton from "@/components/common/ReportIncidentButton";
+import PaymentInfo from "@/components/common/PaymentInfo";
 import { Textarea } from "@/components/ui/textarea";
 import { fetchRouteEta, geocodeAlbacete, distanceKm } from "@/lib/eta";
 import { fetchMyDriverProfile } from "@/lib/driverProfile";
@@ -365,6 +366,9 @@ export default function ActiveJob() {
           </div>
         </div>
       </div>
+
+      {/* Método de pago: le dice al conductor si tiene que cobrar o no */}
+      {!isFinished && <PaymentInfo order={job} />}
 
       {/* Cargo */}
       {job.cargo_description && (
