@@ -14,7 +14,7 @@ import { es } from "date-fns/locale";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { fetchMyDriverProfile, isDriverProfileIncomplete } from "@/lib/driverProfile";
-import { useTariffs } from "@/lib/tariffs";
+import { useTariffs, packageWeightLabel } from "@/lib/tariffs";
 
 const ADMIN_EMAIL = "renato.0550.calero@gmail.com";
 
@@ -209,7 +209,7 @@ export default function DriverDashboard() {
                 <div className="bg-card rounded-2xl border-2 border-primary/20 p-4">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className="text-xl">{vehicleData[job.vehicle_type]?.icon}</span>
+                      <span className="text-xl">{job.service_type === "package" ? "📦" : vehicleData[job.vehicle_type]?.icon}</span>
                       <StatusBadge status={job.status} />
                     </div>
                     <span className="font-bold text-foreground">{job.estimated_price?.toFixed(2)}€</span>
@@ -247,8 +247,12 @@ export default function DriverDashboard() {
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-xl">{vehicleData[req.vehicle_type]?.icon}</span>
-                    <span className="text-sm font-medium text-foreground">{vehicleData[req.vehicle_type]?.name}</span>
+                    <span className="text-xl">{req.service_type === "package" ? "📦" : vehicleData[req.vehicle_type]?.icon}</span>
+                    <span className="text-sm font-medium text-foreground">
+                      {req.service_type === "package"
+                        ? `Envío de paquete${req.package_weight ? ` · ${packageWeightLabel(req.package_weight)}` : ""}`
+                        : vehicleData[req.vehicle_type]?.name}
+                    </span>
                   </div>
                   <span className="font-bold text-lg text-primary">{req.estimated_price?.toFixed(2)}€</span>
                 </div>

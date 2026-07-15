@@ -18,7 +18,26 @@ export const DEFAULT_TARIFFS = {
   insurance: 12,
   help_price: 30,
   commission_pct: 15,
+  // Servicio de envío de paquetes mismo día (precio fijo por tramo de peso).
+  pkg_light: 4.99,   // 0–9 kg
+  pkg_medium: 7.99,  // 10–19 kg
+  pkg_heavy: 9.99,   // 20–30 kg
 };
+
+// Tramos de peso del envío de paquetes (máx. 30 kg). `priceKey` apunta a la
+// tarifa viva en app_settings; el orden es el que se muestra al cliente.
+export const PACKAGE_WEIGHTS = [
+  { key: "light",  label: "0 – 9 kg",   priceKey: "pkg_light",  hint: "Sobres, paquetes y cajas ligeras" },
+  { key: "medium", label: "10 – 19 kg", priceKey: "pkg_medium", hint: "Cajas medianas" },
+  { key: "heavy",  label: "20 – 30 kg", priceKey: "pkg_heavy",  hint: "Cajas pesadas (máximo 30 kg)" },
+];
+
+const PKG_PRICE_KEY = { light: "pkg_light", medium: "pkg_medium", heavy: "pkg_heavy" };
+
+/** Etiqueta legible del tramo (para conductor/admin/resúmenes). */
+export function packageWeightLabel(weight) {
+  return PACKAGE_WEIGHTS.find(w => w.key === weight)?.label || "";
+}
 
 export async function fetchTariffs() {
   const { data, error } = await supabase
@@ -48,4 +67,11 @@ export function estimatePrice(tariffs, vehicleType, extraHours = 0, insurance = 
     (insurance ? tariffs.insurance : 0) +
     (needsHelp ? (tariffs.help_price ?? DEFAULT_TARIFFS.help_price) : 0)
   );
+}
+
+/** Precio fijo del envío de paquetes según el tramo de peso elegido. */
+export function estimatePackagePrice(tariffs, weight) {
+  const key = PKG_PRICE_KEY[weight];
+  if (!key) return 0;
+  return Number(tariffs?.[key] ?? DEFAULT_TARIFFS[key]);
 }

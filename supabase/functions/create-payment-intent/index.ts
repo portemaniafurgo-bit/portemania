@@ -21,10 +21,20 @@ function json(body: unknown, status = 200) {
 
 const DEFAULT_TARIFFS = {
   small: 40, large: 60, extra_hour: 15, insurance: 12, help_price: 30, commission_pct: 15,
+  pkg_light: 4.99, pkg_medium: 7.99, pkg_heavy: 9.99,
 };
 
-// Misma fórmula que src/lib/tariffs.js estimatePrice (mantener en sincronía).
+const PKG_PRICE_KEY: Record<string, string> = {
+  light: "pkg_light", medium: "pkg_medium", heavy: "pkg_heavy",
+};
+
+// Misma fórmula que src/lib/tariffs.js (mantener en sincronía). Ramifica por
+// service_type: 'package' cobra el precio fijo del tramo de peso.
 function computePrice(t: Record<string, number>, order: Record<string, unknown>): number {
+  if (order.service_type === "package") {
+    const key = PKG_PRICE_KEY[String(order.package_weight)];
+    return key ? Number(t[key] ?? DEFAULT_TARIFFS[key]) : NaN;
+  }
   const vt = order.vehicle_type === "large" ? "large" : "small";
   const base = Number(t[vt] ?? DEFAULT_TARIFFS[vt]);
   const extraHours = Number(order.extra_hours) || 0;
@@ -58,7 +68,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: order } = await admin
     .from("transport_requests")
-    .select("id, created_by_id, status, payment_status, client_name, vehicle_type, extra_hours, insurance_selected, needs_help")
+    .select("id, created_by_id, status, payment_status, client_name, vehicle_type, extra_hours, insurance_selected, needs_help, service_type, package_weight")
     .eq("id", body.order_id)
     .single();
   if (!order) return json({ error: "Pedido no encontrado" }, 404);

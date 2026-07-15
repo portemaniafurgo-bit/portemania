@@ -24,6 +24,7 @@ import StatusBadge from "@/components/common/StatusBadge";
 import RatingVans from "@/components/common/RatingVans";
 import ReportIncidentButton from "@/components/common/ReportIncidentButton";
 import { vehicleData } from "@/components/common/VehicleCard";
+import { packageWeightLabel } from "@/lib/tariffs";
 import { ArrowLeft, Send, MessageCircle, Loader2, CreditCard, Banknote } from "lucide-react";
 import { format, addMinutes } from "date-fns";
 import { es } from "date-fns/locale";
@@ -425,9 +426,9 @@ export default function OrderDetail() {
       {/* Vehicle & Price */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-card rounded-2xl border border-border p-4">
-          <div className="text-3xl mb-2">{vehicle?.icon}</div>
-          <p className="font-semibold text-sm text-foreground">{vehicle?.name}</p>
-          <p className="text-xs text-muted-foreground">{vehicle?.capacity}</p>
+          <div className="text-3xl mb-2">{order.service_type === "package" ? "📦" : vehicle?.icon}</div>
+          <p className="font-semibold text-sm text-foreground">{order.service_type === "package" ? "Envío de paquete" : vehicle?.name}</p>
+          <p className="text-xs text-muted-foreground">{order.service_type === "package" ? packageWeightLabel(order.package_weight) : vehicle?.capacity}</p>
         </div>
         <div className="bg-primary/5 rounded-2xl border border-primary/20 p-4">
           <p className="text-xs text-muted-foreground">Precio</p>

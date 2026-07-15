@@ -92,7 +92,7 @@ export default function Dashboard() {
                 <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md hover:border-primary/20 transition-all">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="text-2xl">{vehicleData[order.vehicle_type]?.icon || "🚐"}</div>
+                      <div className="text-2xl">{order.service_type === "package" ? "📦" : (vehicleData[order.vehicle_type]?.icon || "🚐")}</div>
                       <div>
                         <p className="font-medium text-foreground text-sm">{order.origin_address}</p>
                         <p className="text-xs text-muted-foreground mt-0.5">→ {order.destination_address}</p>
@@ -127,7 +127,7 @@ export default function Dashboard() {
               <div key={order.id} className="bg-card rounded-2xl border border-border p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="text-xl">{vehicleData[order.vehicle_type]?.icon || "🚐"}</div>
+                    <div className="text-xl">{order.service_type === "package" ? "📦" : (vehicleData[order.vehicle_type]?.icon || "🚐")}</div>
                     <div>
                       <p className="font-medium text-foreground text-sm truncate max-w-[200px]">{order.destination_address}</p>
                       <p className="text-xs text-muted-foreground">

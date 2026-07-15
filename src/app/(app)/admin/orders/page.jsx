@@ -76,7 +76,7 @@ export default function AdminOrders() {
             {filtered.map(order => (
               <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/admin/orders/${order.id}`)}>
                 <TableCell className="font-medium">
-                  <span className="mr-1">{vehicleData[order.vehicle_type]?.icon}</span>
+                  <span className="mr-1">{order.service_type === "package" ? "📦" : vehicleData[order.vehicle_type]?.icon}</span>
                   {order.client_name || "—"}
                 </TableCell>
                 <TableCell className="text-sm max-w-[150px] truncate">{order.origin_address}</TableCell>

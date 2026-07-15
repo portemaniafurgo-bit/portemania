@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import StatusBadge from "@/components/common/StatusBadge";
 import { vehicleData } from "@/components/common/VehicleCard";
+import { packageWeightLabel } from "@/lib/tariffs";
 import { ArrowLeft, Send, MapPin, Truck, CheckCircle, Package, MessageCircle, Loader2, XCircle, Navigation } from "lucide-react";
 import PhotoLightbox from "@/components/common/PhotoLightbox";
 import DriverTrackingMap from "@/components/common/DriverTrackingMap";
@@ -352,7 +353,11 @@ export default function ActiveJob() {
         <div className="pt-2 border-t border-border flex items-center justify-between">
           <div>
             <p className="text-xs text-muted-foreground">Vehículo</p>
-            <p className="text-sm font-medium">{vehicle?.name}</p>
+            <p className="text-sm font-medium">
+              {job.service_type === "package"
+                ? `Envío de paquete${job.package_weight ? ` · ${packageWeightLabel(job.package_weight)}` : ""}`
+                : vehicle?.name}
+            </p>
           </div>
           <div className="text-right">
             <p className="text-xs text-muted-foreground">Precio</p>

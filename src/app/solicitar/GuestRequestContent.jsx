@@ -11,9 +11,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import VehicleCard, { vehicleData } from "@/components/common/VehicleCard";
-import { ArrowLeft, ArrowRight, Camera, Images, MapPin, Package, Shield, AlertCircle, Loader2, CreditCard, Banknote, CheckSquare, Square } from "lucide-react";
+import WeightCard from "@/components/common/WeightCard";
+import { ArrowLeft, ArrowRight, Camera, Images, MapPin, Package, Truck, Shield, AlertCircle, Loader2, CreditCard, Banknote, CheckSquare, Square } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useTariffs, estimatePrice } from "@/lib/tariffs";
+import { useTariffs, estimatePrice, estimatePackagePrice, PACKAGE_WEIGHTS, packageWeightLabel } from "@/lib/tariffs";
 import { geocodeAlbacete, fetchRouteEta } from "@/lib/eta";
 
 export default function GuestRequestContent() {
@@ -21,6 +22,7 @@ export default function GuestRequestContent() {
   const tariffs = useTariffs();
   const searchParams = useSearchParams();
   const preselectedVehicle = searchParams.get("vehicle") || "";
+  const preselectedService = searchParams.get("service") === "package" ? "package" : "transport";
   // El paso 3 (furgoneta) se muestra SIEMPRE, aunque venga preseleccionada de
   // la landing: es el único paso donde se contratan horas extra y donde se
   // avisa de cómo cuenta el tiempo — saltarlo dejaba esas opciones inaccesibles.
@@ -34,6 +36,8 @@ export default function GuestRequestContent() {
     destination_address: "",
     cargo_description: "",
     vehicle_type: preselectedVehicle,
+    service_type: preselectedService,
+    package_weight: "",
     insurance_selected: false,
     needs_help: false,
     help_description: "",
@@ -103,7 +107,11 @@ export default function GuestRequestContent() {
     }
   };
 
-  const price = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected, form.needs_help);
+  const isPackage = form.service_type === "package";
+  const selectService = (svc) => setForm(prev => ({ ...prev, service_type: svc }));
+  const price = isPackage
+    ? estimatePackagePrice(tariffs, form.package_weight)
+    : estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected, form.needs_help);
 
   const handlePhotoUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -130,7 +138,9 @@ export default function GuestRequestContent() {
     try {
       // Coordenadas/distancia reales si aún no se calcularon al salir del paso 1
       const dist = form.origin_lat ? null : await computeDistance();
-      const finalPrice = estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected, form.needs_help);
+      const finalPrice = isPackage
+        ? estimatePackagePrice(tariffs, form.package_weight)
+        : estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected, form.needs_help);
 
       // `force` lo interpreta la RPC de invitado para saltarse el aviso de duplicado
       const request = await base44.entities.TransportRequest.create({
@@ -166,8 +176,12 @@ export default function GuestRequestContent() {
 
   const canNext = () => {
     if (step === 1) return form.client_name.trim() && form.client_phone.trim() && hasValidCP(form.origin_address) && hasValidCP(form.destination_address);
-    if (step === 2) return form.cargo_description && form.cargo_description.length >= 10 && photos.length >= 1 && (!form.needs_help || form.help_description.trim().length >= 5) && (form.needs_help || acceptPortal) && acceptTerms;
-    if (step === 3) return form.vehicle_type;
+    if (step === 2) {
+      // Paquete: descripción del contenido + términos (foto opcional, sin ayuda ni pie de calle).
+      if (isPackage) return form.cargo_description && form.cargo_description.length >= 5 && acceptTerms;
+      return form.cargo_description && form.cargo_description.length >= 10 && photos.length >= 1 && (!form.needs_help || form.help_description.trim().length >= 5) && (form.needs_help || acceptPortal) && acceptTerms;
+    }
+    if (step === 3) return isPackage ? form.package_weight : form.vehicle_type;
     return true;
   };
 
@@ -190,7 +204,7 @@ export default function GuestRequestContent() {
           <ArrowLeft className="w-5 h-5 text-foreground" />
         </button>
         <div>
-          <h1 className="text-xl font-display font-bold text-foreground">Solicitar transporte</h1>
+          <h1 className="text-xl font-display font-bold text-foreground">{isPackage ? "Enviar un paquete" : "Solicitar transporte"}</h1>
           <p className="text-sm text-muted-foreground">Paso {step} de {totalSteps} · Como invitado</p>
         </div>
       </div>
@@ -206,11 +220,33 @@ export default function GuestRequestContent() {
         {/* Step 1: Datos personales + direcciones */}
         {step === 1 && (
           <motion.div key="step1" variants={stepVariants} initial="initial" animate="animate" exit="exit" className="space-y-5">
+            {/* Selector de servicio */}
+            <div className="grid grid-cols-2 gap-3">
+              <button type="button" onClick={() => selectService("transport")} className={`rounded-2xl border-2 p-4 text-left transition-all ${!isPackage ? "border-primary shadow-md bg-card" : "border-border bg-card hover:border-primary/40"}`}>
+                <Truck className={`w-6 h-6 mb-2 ${!isPackage ? "text-primary" : "text-muted-foreground"}`} />
+                <p className="font-heading font-semibold text-foreground text-sm">Transporte</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Furgoneta con conductor</p>
+              </button>
+              <button type="button" onClick={() => selectService("package")} className={`rounded-2xl border-2 p-4 text-left transition-all ${isPackage ? "border-primary shadow-md bg-card" : "border-border bg-card hover:border-primary/40"}`}>
+                <Package className={`w-6 h-6 mb-2 ${isPackage ? "text-primary" : "text-muted-foreground"}`} />
+                <p className="font-heading font-semibold text-foreground text-sm">Enviar paquete</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Mismo día · hasta 30 kg</p>
+              </button>
+            </div>
             <div className="flex gap-3 p-4 rounded-xl bg-blue-50 border border-blue-200">
               <MapPin className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-blue-800">
-                <p className="font-semibold mb-1">Servicio de portes en Albacete capital</p>
-                <p>Operamos exclusivamente dentro de <strong>Albacete capital</strong>. Recogida y entrega <strong>a pie de calle</strong>.</p>
+                {isPackage ? (
+                  <>
+                    <p className="font-semibold mb-1">Envío de paquetes el mismo día</p>
+                    <p>Recogemos y entregamos tu paquete (hasta <strong>30 kg</strong>) dentro de <strong>Albacete capital</strong> el mismo día.</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold mb-1">Servicio de portes en Albacete capital</p>
+                    <p>Operamos exclusivamente dentro de <strong>Albacete capital</strong>. Recogida y entrega <strong>a pie de calle</strong>.</p>
+                  </>
+                )}
               </div>
             </div>
 
@@ -239,15 +275,15 @@ export default function GuestRequestContent() {
         {step === 2 && (
           <motion.div key="step2" variants={stepVariants} initial="initial" animate="animate" exit="exit" className="space-y-5">
             <div className="space-y-2">
-              <Label className="flex items-center gap-2"><Package className="w-4 h-4 text-primary" /> Descripción de la carga <span className="text-destructive">*</span></Label>
-              <Textarea placeholder="Describe qué necesitas transportar: tipo de objetos, cantidad, peso aproximado..." value={form.cargo_description} onChange={e => update("cargo_description", e.target.value)} className="rounded-xl min-h-[100px]" />
-              {form.cargo_description.length > 0 && form.cargo_description.length < 10 && (
-                <p className="text-xs text-destructive">Mínimo 10 caracteres ({form.cargo_description.length}/10)</p>
+              <Label className="flex items-center gap-2"><Package className="w-4 h-4 text-primary" /> {isPackage ? "¿Qué envías?" : "Descripción de la carga"} <span className="text-destructive">*</span></Label>
+              <Textarea placeholder={isPackage ? "Describe el contenido del paquete: qué es, tamaño aproximado, si es frágil…" : "Describe qué necesitas transportar: tipo de objetos, cantidad, peso aproximado..."} value={form.cargo_description} onChange={e => update("cargo_description", e.target.value)} className="rounded-xl min-h-[100px]" />
+              {form.cargo_description.length > 0 && form.cargo_description.length < (isPackage ? 5 : 10) && (
+                <p className="text-xs text-destructive">Mínimo {isPackage ? 5 : 10} caracteres ({form.cargo_description.length}/{isPackage ? 5 : 10})</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label className="flex items-center gap-2"><Camera className="w-4 h-4 text-primary" /> Fotos de la mercancía <span className="text-destructive">*</span></Label>
-              <p className="text-xs text-muted-foreground">Al menos 1 foto requerida.</p>
+              <Label className="flex items-center gap-2"><Camera className="w-4 h-4 text-primary" /> {isPackage ? "Foto del paquete" : "Fotos de la mercancía"} {isPackage ? <span className="text-xs text-muted-foreground font-normal">(opcional)</span> : <span className="text-destructive">*</span>}</Label>
+              <p className="text-xs text-muted-foreground">{isPackage ? "Opcional, pero ayuda al repartidor a identificar el paquete." : "Al menos 1 foto requerida."}</p>
               <div className="flex gap-3 flex-wrap">
                 {photos.map((url, i) => (
                   <div key={i} className="w-20 h-20 rounded-xl overflow-hidden border border-border">
@@ -255,7 +291,7 @@ export default function GuestRequestContent() {
                   </div>
                 ))}
                 {/* Hacer foto directamente con la cámara (en móvil abre la cámara trasera) */}
-                <label className={`w-20 h-20 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${photos.length === 0 ? "border-destructive/60 hover:border-destructive" : "border-border hover:border-primary/40"}`}>
+                <label className={`w-20 h-20 rounded-xl border-2 border-dashed flex flex-col items-center justify-center gap-1 cursor-pointer transition-colors ${!isPackage && photos.length === 0 ? "border-destructive/60 hover:border-destructive" : "border-border hover:border-primary/40"}`}>
                   <Camera className="w-5 h-5 text-muted-foreground" />
                   <span className="text-[10px] text-muted-foreground leading-none">Hacer foto</span>
                   <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoUpload} />
@@ -267,10 +303,11 @@ export default function GuestRequestContent() {
                   <input type="file" accept="image/*" multiple className="hidden" onChange={handlePhotoUpload} />
                 </label>
               </div>
-              {photos.length === 0 && <p className="text-xs text-destructive">Debes subir al menos 1 foto</p>}
+              {!isPackage && photos.length === 0 && <p className="text-xs text-destructive">Debes subir al menos 1 foto</p>}
             </div>
 
-            {/* ¿Necesita ayuda del conductor? El autónomo la ve antes de aceptar y decide. */}
+            {/* ¿Necesita ayuda del conductor? Solo para transporte (el paquete lo lleva el repartidor). */}
+            {!isPackage && (
             <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
               <div className="flex items-center justify-between">
                 <div>
@@ -294,9 +331,10 @@ export default function GuestRequestContent() {
                 </div>
               )}
             </div>
+            )}
 
             <div className="space-y-3">
-              {form.needs_help ? (
+              {!isPackage && (form.needs_help ? (
                 <div className="flex gap-2 p-3 rounded-xl bg-emerald-50 border border-emerald-200">
                   <span className="flex-shrink-0">🤝</span>
                   <p className="text-xs text-emerald-800">
@@ -316,7 +354,7 @@ export default function GuestRequestContent() {
                     </p>
                   </div>
                 </>
-              )}
+              ))}
               <button type="button" onClick={() => setAcceptTerms(v => !v)} className="flex items-start gap-3 w-full text-left">
                 {acceptTerms ? <CheckSquare className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" /> : <Square className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />}
                 <span className="text-sm text-foreground">
@@ -334,6 +372,21 @@ export default function GuestRequestContent() {
         {/* Step 3: Vehículo */}
         {step === 3 && (
           <motion.div key="step3" variants={stepVariants} initial="initial" animate="animate" exit="exit" className="space-y-4">
+            {isPackage ? (
+              <>
+                <p className="text-sm text-muted-foreground">Elige el peso aproximado de tu paquete (máximo 30 kg)</p>
+                <div className="grid grid-cols-1 gap-3">
+                  {PACKAGE_WEIGHTS.map(b => (
+                    <WeightCard key={b.key} bracket={b} price={tariffs[b.priceKey]} selected={form.package_weight === b.key} onClick={(k) => update("package_weight", k)} />
+                  ))}
+                </div>
+                <div className="flex gap-2 p-3 rounded-xl bg-blue-50 border border-blue-200">
+                  <AlertCircle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-blue-800">Envío el <strong>mismo día</strong> dentro de Albacete capital. Un repartidor recoge tu paquete y lo entrega en la dirección indicada.</p>
+                </div>
+              </>
+            ) : (
+              <>
             <p className="text-sm text-muted-foreground">Selecciona el tipo de vehículo adecuado para tu carga</p>
             {form.needs_help ? (
               <div className="flex gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
@@ -379,6 +432,8 @@ export default function GuestRequestContent() {
                 </div>
               </div>
             )}
+              </>
+            )}
           </motion.div>
         )}
 
@@ -402,18 +457,30 @@ export default function GuestRequestContent() {
               </div>
             </div>
 
-            <div className="bg-card rounded-2xl border border-border overflow-hidden">
-              <img src={vehicleData[form.vehicle_type]?.photo} alt={vehicleData[form.vehicle_type]?.name} className="w-full h-32 object-cover" />
-              <div className="p-4 flex items-center justify-between">
-                <div>
-                  <p className="font-semibold text-foreground">{vehicleData[form.vehicle_type]?.name}</p>
-                  <p className="text-xs text-muted-foreground">{vehicleData[form.vehicle_type]?.capacity}</p>
+            {isPackage ? (
+              <div className="bg-card rounded-2xl border border-border p-5 flex items-center gap-4">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Package className="w-6 h-6 text-primary" />
                 </div>
-                <p className="text-sm font-semibold text-foreground">{2 + form.extra_hours}h totales</p>
+                <div className="flex-1">
+                  <p className="font-semibold text-foreground">Envío de paquete</p>
+                  <p className="text-xs text-muted-foreground">{packageWeightLabel(form.package_weight)} · el mismo día</p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="bg-card rounded-2xl border border-border overflow-hidden">
+                <img src={vehicleData[form.vehicle_type]?.photo} alt={vehicleData[form.vehicle_type]?.name} className="w-full h-32 object-cover" />
+                <div className="p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-foreground">{vehicleData[form.vehicle_type]?.name}</p>
+                    <p className="text-xs text-muted-foreground">{vehicleData[form.vehicle_type]?.capacity}</p>
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">{2 + form.extra_hours}h totales</p>
+                </div>
+              </div>
+            )}
 
-            {form.needs_help ? (
+            {!isPackage && (form.needs_help ? (
               <div className="flex gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200">
                 <span className="flex-shrink-0">🤝</span>
                 <p className="text-sm text-emerald-800">Con <strong>ayuda del conductor</strong>: te ayudará a subir/bajar la mercancía.</p>
@@ -423,29 +490,40 @@ export default function GuestRequestContent() {
                 <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <p className="text-sm text-amber-800">Recogida y entrega <strong>a pie de calle</strong>.</p>
               </div>
-            )}
+            ))}
 
-            <div className="bg-card rounded-2xl border border-border p-5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">Seguro de mercancía (+{tariffs.insurance}€)</span>
+            {!isPackage && (
+              <div className="bg-card rounded-2xl border border-border p-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-sm">Seguro de mercancía (+{tariffs.insurance}€)</span>
+                  </div>
+                  <Switch checked={form.insurance_selected} onCheckedChange={v => update("insurance_selected", v)} />
                 </div>
-                <Switch checked={form.insurance_selected} onCheckedChange={v => update("insurance_selected", v)} />
               </div>
-            </div>
+            )}
 
             <div className="bg-primary/5 rounded-2xl border-2 border-primary/20 p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-muted-foreground">Precio estimado</p>
+                  <p className="text-sm text-muted-foreground">{isPackage ? "Precio del envío" : "Precio estimado"}</p>
                   <p className="text-3xl font-display font-bold text-foreground">{price.toFixed(2)}€</p>
                 </div>
                 <div className="text-right text-xs text-muted-foreground space-y-0.5">
-                  <p>Base (2h): {tariffs[form.vehicle_type]}€</p>
-                  {form.extra_hours > 0 && <p>Horas extra: +{form.extra_hours * tariffs.extra_hour}€</p>}
-                  {form.insurance_selected && <p>Seguro: +{tariffs.insurance}€</p>}
-                  {form.needs_help && <p>Ayuda del conductor: +{tariffs.help_price}€</p>}
+                  {isPackage ? (
+                    <>
+                      <p>Envío de paquete</p>
+                      <p>{packageWeightLabel(form.package_weight)}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>Base (2h): {tariffs[form.vehicle_type]}€</p>
+                      {form.extra_hours > 0 && <p>Horas extra: +{form.extra_hours * tariffs.extra_hour}€</p>}
+                      {form.insurance_selected && <p>Seguro: +{tariffs.insurance}€</p>}
+                      {form.needs_help && <p>Ayuda del conductor: +{tariffs.help_price}€</p>}
+                    </>
+                  )}
                 </div>
               </div>
             </div>

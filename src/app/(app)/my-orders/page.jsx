@@ -54,7 +54,7 @@ export default function MyOrders() {
               <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md hover:border-primary/20 transition-all mb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="text-2xl flex-shrink-0">{vehicleData[order.vehicle_type]?.icon || "🚐"}</div>
+                    <div className="text-2xl flex-shrink-0">{order.service_type === "package" ? "📦" : (vehicleData[order.vehicle_type]?.icon || "🚐")}</div>
                     <div className="min-w-0">
                       <p className="font-medium text-foreground text-sm truncate">{order.origin_address}</p>
                       <p className="text-xs text-muted-foreground truncate">→ {order.destination_address}</p>

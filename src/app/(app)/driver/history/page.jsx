@@ -46,7 +46,7 @@ export default function DriverHistory() {
               <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md transition-all mb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">{vehicleData[job.vehicle_type]?.icon}</span>
+                    <span className="text-xl">{job.service_type === "package" ? "📦" : vehicleData[job.vehicle_type]?.icon}</span>
                     <div>
                       <p className="font-medium text-sm text-foreground truncate max-w-[200px]">{job.destination_address}</p>
                       <p className="text-xs text-muted-foreground">

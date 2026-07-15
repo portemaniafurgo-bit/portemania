@@ -8,7 +8,7 @@ import { vehicleData } from "@/components/common/VehicleCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Percent, CreditCard, Globe, Loader2, Save } from "lucide-react";
+import { Percent, CreditCard, Globe, Loader2, Save, Package } from "lucide-react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
 
 const FIELDS = [
@@ -17,6 +17,13 @@ const FIELDS = [
   { key: "extra_hour", label: "Hora extra (€)" },
   { key: "insurance", label: "Seguro de mercancía (€)" },
   { key: "help_price", label: "Ayuda del conductor (€)" },
+];
+
+// Envío de paquetes mismo día: precio fijo por tramo de peso.
+const PACKAGE_FIELDS = [
+  { key: "pkg_light", label: "0 – 9 kg (€)" },
+  { key: "pkg_medium", label: "10 – 19 kg (€)" },
+  { key: "pkg_heavy", label: "20 – 30 kg (€)" },
 ];
 
 export default function AdminSettings() {
@@ -101,6 +108,30 @@ export default function AdminSettings() {
                 type="number"
                 min="0"
                 step="1"
+                value={form[f.key]}
+                onChange={e => update(f.key, e.target.value)}
+                className="rounded-xl"
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-card rounded-2xl border border-border p-5 space-y-4">
+        <h3 className="font-heading font-semibold text-foreground flex items-center gap-2">
+          <Package className="w-4 h-4 text-primary" /> Envío de paquetes (mismo día)
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          Precio fijo por tramo de peso (máx. 30 kg). Se aplica en el formulario de envío y en el cobro.
+        </p>
+        <div className="grid grid-cols-3 gap-4">
+          {PACKAGE_FIELDS.map(f => (
+            <div key={f.key} className="space-y-1">
+              <Label className="text-xs">{f.label}</Label>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
                 value={form[f.key]}
                 onChange={e => update(f.key, e.target.value)}
                 className="rounded-xl"

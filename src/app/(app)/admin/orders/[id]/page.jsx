@@ -8,6 +8,7 @@ import StatusBadge from "@/components/common/StatusBadge";
 import PhotoLightbox from "@/components/common/PhotoLightbox";
 import RatingVans from "@/components/common/RatingVans";
 import { vehicleData } from "@/components/common/VehicleCard";
+import { packageWeightLabel } from "@/lib/tariffs";
 import {
   ArrowLeft, Phone, Banknote, CreditCard, Loader2, MessageCircle,
   CheckCircle2, Circle, XCircle, UserCog,
@@ -246,7 +247,10 @@ export default function AdminOrderDetail() {
       <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Carga</p>
         <p className="text-sm text-foreground">
-          {vehicleData[order.vehicle_type]?.icon} {vehicleData[order.vehicle_type]?.name || order.vehicle_type}
+          {order.service_type === "package" ? "📦" : vehicleData[order.vehicle_type]?.icon}{" "}
+          {order.service_type === "package"
+            ? `Envío de paquete${order.package_weight ? ` · ${packageWeightLabel(order.package_weight)}` : ""}`
+            : (vehicleData[order.vehicle_type]?.name || order.vehicle_type)}
           {order.cargo_description ? ` — ${order.cargo_description}` : ""}
         </p>
         {order.needs_help && (

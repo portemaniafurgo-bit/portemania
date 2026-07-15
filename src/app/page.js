@@ -3,6 +3,7 @@ import HeroSection from "@/components/landing/HeroSection";
 import HowItWorks from "@/components/landing/HowItWorks";
 import DriversMapSection from "@/components/landing/DriversMapSection";
 import VehiclesSection from "@/components/landing/VehiclesSection";
+import PackageSection from "@/components/landing/PackageSection";
 import Footer from "@/components/landing/Footer";
 
 export default function LandingPage() {
@@ -13,6 +14,7 @@ export default function LandingPage() {
       <HowItWorks />
       <DriversMapSection />
       <VehiclesSection />
+      <PackageSection />
       <Footer />
     </div>
   );
