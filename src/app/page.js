@@ -1,4 +1,5 @@
-﻿import HeroSection from "@/components/landing/HeroSection";
+﻿import { Suspense } from "react";
+import HeroSection from "@/components/landing/HeroSection";
 import LandingNavbar from "@/components/landing/LandingNavbar";
 import HowItWorks from "@/components/landing/HowItWorks";
 import DriversSection from "@/components/landing/DriversSection";
@@ -8,7 +9,9 @@ import Footer from "@/components/landing/Footer";
 export default function LandingPage() {
   return (
     <div className="min-h-screen">
-      <HeroSection />
+      <Suspense fallback={<div className="h-[600px] bg-purple-100 animate-pulse" />}>
+        <HeroSection />
+      </Suspense>
       <LandingNavbar />
       <HowItWorks />
       <ServicesSection />
