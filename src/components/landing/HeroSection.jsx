@@ -1,13 +1,12 @@
 ﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion, AnimatePresence } from "framer-motion";
 
-// Wizard logic & UI imports (same as GuestRequestContent)
 import { base44 } from "@/api/base44Client";
 import { supabase } from "@/lib/entities";
 import { Button } from "@/components/ui/button";
@@ -28,7 +27,6 @@ import {
 import { geocodeAlbacete, fetchRouteEta } from "@/lib/eta";
 import {
   buildRequestHref,
-  hasRequestDraft,
   readRequestDraft,
   resolveRequestIntent,
 } from "@/lib/requestIntent";
@@ -49,6 +47,8 @@ import {
   Banknote,
   CheckSquare,
   Square,
+  LogIn,
+  UserPlus,
 } from "lucide-react";
 
 const DriversMapInner = dynamic(
@@ -58,18 +58,45 @@ const DriversMapInner = dynamic(
     loading: () => (
       <div className="w-full h-full bg-neutral-200 animate-pulse" />
     ),
-  }
+  },
 );
 
 const services = [
-  { key: "porte", icon: "local_shipping", label: "Porte", desc: "Directo A a B" },
-  { key: "mini_mudanza", icon: "home", label: "Mini mudanza", desc: "Habitaciones" },
-  { key: "compra_tienda", icon: "store", label: "Compra en tienda", desc: "Voluminosos" },
-  { key: "envio_paquete", icon: "inventory_2", label: "Envío de paquete", desc: "Hasta 30 kg" },
+  {
+    key: "porte",
+    icon: "local_shipping",
+    label: "Porte",
+    desc: "Directo A a B",
+  },
+  {
+    key: "mini_mudanza",
+    icon: "home",
+    label: "Mini mudanza",
+    desc: "Habitaciones",
+  },
+  {
+    key: "compra_tienda",
+    icon: "store",
+    label: "Compra en tienda",
+    desc: "Voluminosos",
+  },
+  {
+    key: "envio_paquete",
+    icon: "inventory_2",
+    label: "Envío de paquete",
+    desc: "Hasta 30 kg",
+  },
 ];
 
 const ALBACETE_CP = [
-  "02001", "02002", "02003", "02004", "02005", "02006", "02007", "02008",
+  "02001",
+  "02002",
+  "02003",
+  "02004",
+  "02005",
+  "02006",
+  "02007",
+  "02008",
 ];
 
 const extractCPs = (address) => address.match(/\b\d{5}\b/g) || [];
@@ -121,7 +148,7 @@ export default function HeroSection() {
   const [cpError, setCpError] = useState({ origin: "", destination: "" });
 
   const isPackage = form.service_type === "package";
-  const totalSteps = 4;
+  const totalSteps = 5;
 
   const handleSelectService = (key) => {
     setSelectedService(key);
@@ -196,7 +223,9 @@ export default function HeroSection() {
     const files = Array.from(e.target.files);
     try {
       for (const file of files) {
-        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+        const { file_url } = await base44.integrations.Core.UploadFile({
+          file,
+        });
         setPhotos((prev) => [...prev, file_url]);
       }
     } catch (err) {
@@ -224,7 +253,7 @@ export default function HeroSection() {
             form.vehicle_type,
             form.extra_hours,
             form.insurance_selected,
-            form.needs_help
+            form.needs_help,
           );
 
       const request = await base44.entities.TransportRequest.create({
@@ -252,7 +281,7 @@ export default function HeroSection() {
       } else {
         console.error("Error al enviar la solicitud:", err);
         alert(
-          "Hubo un error al enviar tu solicitud. Por favor inténtalo de nuevo."
+          "Hubo un error al enviar tu solicitud. Por favor inténtalo de nuevo.",
         );
       }
     } finally {
@@ -268,7 +297,7 @@ export default function HeroSection() {
         hasValidCP(form.origin_address) &&
         hasValidCP(form.destination_address)
       );
-    if (step === 2) {
+    if (step === 3) {
       if (isPackage)
         return (
           form.cargo_description &&
@@ -284,7 +313,7 @@ export default function HeroSection() {
         acceptTerms
       );
     }
-    if (step === 3) return isPackage ? form.package_weight : form.vehicle_type;
+    if (step === 4) return isPackage ? form.package_weight : form.vehicle_type;
     return true;
   };
 
@@ -295,18 +324,14 @@ export default function HeroSection() {
 
   const prevStep = () => setStep((s) => s - 1);
 
+  // Si está autenticado salta el paso 2 (auth) y va directo al 3 (carga)
   const handleContinueStep1 = () => {
     if (!canNext()) return;
-    if (!isAuthenticated) {
-      setShowModal(true);
+    if (isAuthenticated) {
+      setStep(3);
     } else {
       setStep(2);
     }
-  };
-
-  const handleGuestContinue = () => {
-    setShowModal(false);
-    setStep(2);
   };
 
   const requestParamsForUrl = {
@@ -327,7 +352,7 @@ export default function HeroSection() {
         form.vehicle_type,
         form.extra_hours,
         form.insurance_selected,
-        form.needs_help
+        form.needs_help,
       );
 
   const stepVariants = {
@@ -355,13 +380,15 @@ export default function HeroSection() {
               <h2 className="font-bold text-xl text-white">
                 {step === 1
                   ? "Solicitar transporte"
-                  : isPackage
-                  ? "Enviar un paquete"
-                  : "Solicitar transporte"}
+                  : step === 2
+                    ? "¿Cómo quieres continuar?"
+                    : isPackage
+                      ? "Enviar un paquete"
+                      : "Solicitar transporte"}
               </h2>
               <p className="text-sm text-white/70">
                 Paso {step} de {totalSteps}
-                {step > 1 ? " · Como invitado" : ""}
+                {step > 2 ? " · Como invitado" : ""}
               </p>
             </div>
           </div>
@@ -445,7 +472,9 @@ export default function HeroSection() {
                       {isPackage ? (
                         <>
                           Recogemos y entregamos tu paquete (hasta{" "}
-                          <span className="text-white font-semibold">30 kg</span>
+                          <span className="text-white font-semibold">
+                            30 kg
+                          </span>
                           ) dentro de{" "}
                           <span className="text-white font-semibold">
                             Albacete capital
@@ -484,7 +513,8 @@ export default function HeroSection() {
 
                 <div className="space-y-2">
                   <label className="block text-sm font-semibold text-white">
-                    Teléfono de contacto <span className="text-white/70">*</span>
+                    Teléfono de contacto{" "}
+                    <span className="text-white/70">*</span>
                   </label>
                   <input
                     className="w-full bg-white/10 border border-white/40 rounded-xl px-4 py-3 text-white placeholder:text-white/50 focus:border-white focus:ring-1 focus:ring-white outline-none transition-all"
@@ -531,9 +561,7 @@ export default function HeroSection() {
                   </label>
                   <input
                     className={`w-full bg-white/10 border rounded-xl px-4 py-3 text-white placeholder:text-white/50 focus:border-white focus:ring-1 focus:ring-white outline-none transition-all ${
-                      cpError.destination
-                        ? "border-red-400"
-                        : "border-white/40"
+                      cpError.destination ? "border-red-400" : "border-white/40"
                     }`}
                     placeholder="Calle, número, piso, puerta — Albacete"
                     type="text"
@@ -568,10 +596,71 @@ export default function HeroSection() {
               </motion.div>
             )}
 
-            {/* STEP 2: Cargo details */}
+            {/* STEP 2: Auth options (formerly modal content) */}
             {step === 2 && (
               <motion.div
                 key="step2"
+                variants={stepVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="space-y-5"
+              >
+                <div className="text-center mb-2">
+                  <div className="text-3xl mb-2">🚐</div>
+                  <p className="text-sm text-muted-foreground">
+                    Elige una opción para solicitar tu transporte
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <Link href={loginHref} onClick={() => setStep(1)}>
+                    <button className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-primary/30 bg-primary/5 hover:bg-primary/10 transition-colors text-left">
+                      <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center flex-shrink-0">
+                        <LogIn className="w-5 h-5 text-primary-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground">
+                          Iniciar sesión
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Accede a tu cuenta para seguimiento completo
+                        </p>
+                      </div>
+                    </button>
+                  </Link>
+
+                  <Link href={registerHref} onClick={() => setStep(1)}>
+                    <button className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-border hover:border-primary/30 hover:bg-muted transition-colors text-left">
+                      <div className="w-10 h-10 rounded-xl bg-secondary flex items-center justify-center flex-shrink-0">
+                        <UserPlus className="w-5 h-5 text-foreground" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-foreground">
+                          Crear cuenta
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Gratis · Gestiona tus pedidos online
+                        </p>
+                      </div>
+                    </button>
+                  </Link>
+                </div>
+
+                <Button
+                  variant="outline"
+                  className="rounded-xl w-full"
+                  onClick={prevStep}
+                >
+                  Atrás
+                </Button>
+              </motion.div>
+            )}
+
+            {/* STEP 3: Cargo details (old step 2) */}
+            {step === 3 && (
+              <motion.div
+                key="step3"
                 variants={stepVariants}
                 initial="initial"
                 animate="animate"
@@ -591,15 +680,16 @@ export default function HeroSection() {
                         : "Describe qué necesitas transportar: tipo de objetos, cantidad, peso aproximado..."
                     }
                     value={form.cargo_description}
-                    onChange={(e) => update("cargo_description", e.target.value)}
+                    onChange={(e) =>
+                      update("cargo_description", e.target.value)
+                    }
                     className="rounded-xl min-h-[100px]"
                   />
                   {form.cargo_description.length > 0 &&
                     form.cargo_description.length < (isPackage ? 5 : 10) && (
                       <p className="text-xs text-destructive">
                         Mínimo {isPackage ? 5 : 10} caracteres (
-                        {form.cargo_description.length}/
-                        {isPackage ? 5 : 10})
+                        {form.cargo_description.length}/{isPackage ? 5 : 10})
                       </p>
                     )}
                 </div>
@@ -607,9 +697,7 @@ export default function HeroSection() {
                 <div className="space-y-2">
                   <Label className="flex items-center gap-2">
                     <Camera className="w-4 h-4 text-primary" />{" "}
-                    {isPackage
-                      ? "Foto del paquete"
-                      : "Fotos de la mercancía"}{" "}
+                    {isPackage ? "Foto del paquete" : "Fotos de la mercancía"}{" "}
                     {isPackage ? (
                       <span className="text-xs text-muted-foreground font-normal">
                         (opcional)
@@ -813,10 +901,10 @@ export default function HeroSection() {
               </motion.div>
             )}
 
-            {/* STEP 3: Vehicle / Package weight */}
-            {step === 3 && (
+            {/* STEP 4: Vehicle / Package weight (old step 3) */}
+            {step === 4 && (
               <motion.div
-                key="step3"
+                key="step4"
                 variants={stepVariants}
                 initial="initial"
                 animate="animate"
@@ -905,7 +993,7 @@ export default function HeroSection() {
                             onClick={() =>
                               update(
                                 "extra_hours",
-                                Math.max(0, form.extra_hours - 1)
+                                Math.max(0, form.extra_hours - 1),
                               )
                             }
                             className="w-9 h-9 rounded-xl border border-border bg-background flex items-center justify-center text-lg font-bold hover:bg-muted disabled:opacity-50"
@@ -939,9 +1027,9 @@ export default function HeroSection() {
                           <p className="text-xs text-orange-700">
                             <strong>Importante:</strong> El tiempo empieza a
                             contar desde que el conductor llega a tu puerta. Si
-                            el servicio se extiende más de las horas contratadas,
-                            las horas adicionales se abonarán directamente al
-                            transportista a razón de{" "}
+                            el servicio se extiende más de las horas
+                            contratadas, las horas adicionales se abonarán
+                            directamente al transportista a razón de{" "}
                             <strong>{tariffs.extra_hour}€/hora</strong>.
                           </p>
                         </div>
@@ -969,10 +1057,10 @@ export default function HeroSection() {
               </motion.div>
             )}
 
-            {/* STEP 4: Summary */}
-            {step === 4 && (
+            {/* STEP 5: Summary (old step 4) */}
+            {step === 5 && (
               <motion.div
-                key="step4"
+                key="step5"
                 variants={stepVariants}
                 initial="initial"
                 animate="animate"
@@ -1057,8 +1145,7 @@ export default function HeroSection() {
                     <div className="flex gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200">
                       <AlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                       <p className="text-sm text-amber-800">
-                        Recogida y entrega{" "}
-                        <strong>a pie de calle</strong>.
+                        Recogida y entrega <strong>a pie de calle</strong>.
                       </p>
                     </div>
                   ))}
@@ -1074,9 +1161,7 @@ export default function HeroSection() {
                       </div>
                       <Switch
                         checked={form.insurance_selected}
-                        onCheckedChange={(v) =>
-                          update("insurance_selected", v)
-                        }
+                        onCheckedChange={(v) => update("insurance_selected", v)}
                       />
                     </div>
                   </div>
@@ -1096,9 +1181,7 @@ export default function HeroSection() {
                       {isPackage ? (
                         <>
                           <p>Envío de paquete</p>
-                          <p>
-                            {packageWeightLabel(form.package_weight)}
-                          </p>
+                          <p>{packageWeightLabel(form.package_weight)}</p>
                         </>
                       ) : (
                         <>
@@ -1113,9 +1196,7 @@ export default function HeroSection() {
                             <p>Seguro: +{tariffs.insurance}€</p>
                           )}
                           {form.needs_help && (
-                            <p>
-                              Ayuda del conductor: +{tariffs.help_price}€
-                            </p>
+                            <p>Ayuda del conductor: +{tariffs.help_price}€</p>
                           )}
                         </>
                       )}
@@ -1275,13 +1356,13 @@ export default function HeroSection() {
         </div>
       </div>
 
-      {/* Access Modal */}
+      {/* Access Modal (solo para clic en conductor del mapa) */}
       <AccessModal
         open={showModal}
         onClose={() => setShowModal(false)}
-        loginHref={loginHref}
-        registerHref={registerHref}
-        onGuestContinue={handleGuestContinue}
+        loginHref="/login-clientes"
+        registerHref="/register"
+        guestHref="/solicitar"
       />
     </section>
   );
