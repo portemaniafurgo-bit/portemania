@@ -10,6 +10,7 @@ import { LogIn, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { destinoTrasLogin } from "@/lib/postLogin";
+import { buildRequestHref, hasRequestDraft } from "@/lib/requestIntent";
 
 export default function LoginClientes() {
   const [email, setEmail] = useState("");
@@ -34,7 +35,11 @@ export default function LoginClientes() {
   };
 
   const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", "/dashboard");
+    const searchParams = new URLSearchParams(window.location.search);
+    const redirectUrl = hasRequestDraft(searchParams)
+      ? buildRequestHref("/new-request", searchParams)
+      : "/dashboard";
+    base44.auth.loginWithProvider("google", redirectUrl);
   };
 
   return (

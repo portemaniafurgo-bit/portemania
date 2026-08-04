@@ -4,18 +4,21 @@ export const metadata = {
   title: "Términos y Condiciones — ClicyVoy",
 };
 
+// Correo de contacto público (debe coincidir con el de la Política de Privacidad).
+const CONTACT_EMAIL = "portemaniafurgo@gmail.com";
+
 export default function TerminosPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-12 space-y-8">
       <div>
         <h1 className="text-3xl font-display font-bold text-foreground">Términos y Condiciones</h1>
-        <p className="text-sm text-muted-foreground mt-2">Última actualización: junio de 2026</p>
+        <p className="text-sm text-muted-foreground mt-2">Última actualización: julio de 2026</p>
       </div>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-heading font-semibold text-foreground">1. Objeto del servicio</h2>
+        <h2 className="text-xl font-heading font-semibold text-foreground">1. Objeto del servicio e identificación</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          ClicyVoy es una plataforma digital que conecta a particulares y empresas con conductores autónomos verificados para la realización de servicios de transporte de mercancías y mudanzas dentro del municipio de <strong>Albacete capital</strong> (códigos postales 02001–02008). ClicyVoy actúa únicamente como intermediario y no es parte del contrato de transporte entre el cliente y el conductor.
+          <strong>ClicyVoy</strong> (con sede en Albacete, España; web <strong>https://clicyvoy.es</strong>; contacto <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">{CONTACT_EMAIL}</a>) es una plataforma digital que conecta a particulares y empresas con conductores autónomos verificados para la realización de servicios de transporte de mercancías y mudanzas dentro del municipio de <strong>Albacete capital</strong> (códigos postales 02001–02008). ClicyVoy actúa únicamente como intermediario y no es parte del contrato de transporte entre el cliente y el conductor.
         </p>
       </section>
 
@@ -60,30 +63,44 @@ export default function TerminosPage() {
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-heading font-semibold text-foreground">7. Cancelaciones</h2>
+        <h2 className="text-xl font-heading font-semibold text-foreground">7. Cuenta de usuario y acceso</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Para usar determinadas funciones es necesario registrarse. Puede crear su cuenta con correo y contraseña o mediante la opción «Continuar con Google». Si utiliza el inicio de sesión con Google, dicho acceso queda sujeto también a los términos de Google, y ClicyVoy tratará los datos recibidos conforme a su <a href="/privacidad" className="text-primary hover:underline">Política de Privacidad</a>. El usuario es responsable de mantener la confidencialidad de sus credenciales y de la actividad realizada desde su cuenta.
+        </p>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-heading font-semibold text-foreground">8. Cancelaciones</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           El cliente puede cancelar una solicitud mientras esté en estado <em>pendiente</em> (sin conductor asignado) sin coste alguno. Una vez aceptada por un conductor, la cancelación puede implicar cargos según la política vigente en el momento del servicio.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-heading font-semibold text-foreground">8. Responsabilidad</h2>
+        <h2 className="text-xl font-heading font-semibold text-foreground">9. Responsabilidad</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           ClicyVoy no se responsabiliza de daños a la mercancía salvo que se haya contratado el seguro opcional. En caso de incidencia, el cliente debe reportarla a través de la plataforma en un plazo máximo de 24 horas tras la entrega. El seguro cubre hasta el valor declarado de los bienes transportados, sujeto a las condiciones del asegurador.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-heading font-semibold text-foreground">9. Modificaciones</h2>
+        <h2 className="text-xl font-heading font-semibold text-foreground">10. Modificaciones</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           ClicyVoy se reserva el derecho a modificar estos términos en cualquier momento. Los cambios serán comunicados a los usuarios registrados por correo electrónico con un preaviso mínimo de 15 días.
         </p>
       </section>
 
       <section className="space-y-3">
-        <h2 className="text-xl font-heading font-semibold text-foreground">10. Legislación aplicable</h2>
+        <h2 className="text-xl font-heading font-semibold text-foreground">11. Legislación aplicable</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Estos términos se rigen por la legislación española. Para cualquier controversia, las partes se someten a los juzgados y tribunales de Albacete.
+        </p>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-heading font-semibold text-foreground">12. Contacto</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Para cualquier consulta sobre estas condiciones puede escribir a <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">{CONTACT_EMAIL}</a>.
         </p>
       </section>
     </div>

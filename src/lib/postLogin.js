@@ -1,6 +1,7 @@
 "use client";
 
 import { supabase } from "@/lib/entities";
+import { buildRequestHref, hasRequestDraft } from "@/lib/requestIntent";
 
 /**
  * Destino tras iniciar sesión según el rol del usuario: un conductor o el
@@ -24,9 +25,11 @@ export async function destinoTrasLogin(userId) {
   }
   if (role === "driver") return "/driver";
   if (role === "admin" || role === "staff") return "/admin";
-  const vehicle =
+  const searchParams =
     typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("vehicle")
+      ? new URLSearchParams(window.location.search)
       : null;
-  return vehicle ? `/new-request?vehicle=${encodeURIComponent(vehicle)}` : "/dashboard";
+  return hasRequestDraft(searchParams)
+    ? buildRequestHref("/new-request", searchParams)
+    : "/dashboard";
 }

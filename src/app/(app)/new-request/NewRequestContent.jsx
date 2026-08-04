@@ -17,23 +17,25 @@ import { ArrowLeft, ArrowRight, Camera, Images, MapPin, Package, Truck, Shield, 
 import { motion, AnimatePresence } from "framer-motion";
 import { useTariffs, estimatePrice, estimatePackagePrice, PACKAGE_WEIGHTS, packageWeightLabel } from "@/lib/tariffs";
 import { geocodeAlbacete, fetchRouteEta } from "@/lib/eta";
+import { readRequestDraft } from "@/lib/requestIntent";
 
 export default function NewRequestContent() {
   const { user } = useAuth();
   const tariffs = useTariffs();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const preselectedVehicle = searchParams.get("vehicle") || "";
-  const preselectedService = searchParams.get("service") === "package" ? "package" : "transport";
+  const requestDraft = readRequestDraft(searchParams);
+  const preselectedVehicle = requestDraft.vehicle;
+  const preselectedService = requestDraft.service;
   // El paso 3 (furgoneta) se muestra SIEMPRE, aunque venga preseleccionada:
   // es el único paso donde se contratan horas extra.
   const totalSteps = 4;
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
-    origin_address: "",
-    destination_address: "",
-    client_phone: "",
+    origin_address: requestDraft.origin_address,
+    destination_address: requestDraft.destination_address,
+    client_phone: requestDraft.client_phone,
     cargo_description: "",
     vehicle_type: preselectedVehicle,
     service_type: preselectedService,
@@ -109,7 +111,13 @@ export default function NewRequestContent() {
   };
 
   const isPackage = form.service_type === "package";
-  const selectService = (svc) => setForm(prev => ({ ...prev, service_type: svc }));
+  const selectService = (svc) => setForm(prev => ({
+    ...prev,
+    service_type: svc,
+    ...(svc === "package"
+      ? { vehicle_type: "", extra_hours: 0, insurance_selected: false, needs_help: false, help_description: "" }
+      : { package_weight: "" }),
+  }));
   const price = isPackage
     ? estimatePackagePrice(tariffs, form.package_weight)
     : estimatePrice(tariffs, form.vehicle_type, form.extra_hours, form.insurance_selected, form.needs_help);

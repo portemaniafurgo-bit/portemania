@@ -1,20 +1,18 @@
+﻿import HeroSection from "@/components/landing/HeroSection";
 import LandingNavbar from "@/components/landing/LandingNavbar";
-import HeroSection from "@/components/landing/HeroSection";
 import HowItWorks from "@/components/landing/HowItWorks";
-import DriversMapSection from "@/components/landing/DriversMapSection";
-import VehiclesSection from "@/components/landing/VehiclesSection";
-import PackageSection from "@/components/landing/PackageSection";
+import DriversSection from "@/components/landing/DriversSection";
+import ServicesSection from "@/components/landing/ServicesSection";
 import Footer from "@/components/landing/Footer";
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen">
-      <LandingNavbar />
       <HeroSection />
+      <LandingNavbar />
       <HowItWorks />
-      <DriversMapSection />
-      <VehiclesSection />
-      <PackageSection />
+      <ServicesSection />
+      <DriversSection />
       <Footer />
     </div>
   );

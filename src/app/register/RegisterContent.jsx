@@ -12,6 +12,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
 import { toast } from "@/components/ui/use-toast";
+import { buildRequestHref, hasRequestDraft } from "@/lib/requestIntent";
 
 export default function RegisterContent() {
   const [email, setEmail] = useState("");
@@ -24,11 +25,10 @@ export default function RegisterContent() {
 
   const searchParams = useSearchParams();
   const isDriver = searchParams.get("role") === "driver";
-  const vehicle = searchParams.get("vehicle");
   const redirectUrl = isDriver
     ? "/driver/profile"
-    : vehicle
-    ? `/new-request?vehicle=${encodeURIComponent(vehicle)}`
+    : hasRequestDraft(searchParams)
+    ? buildRequestHref("/new-request", searchParams)
     : "/new-request";
 
   const handleSubmit = async (e) => {
