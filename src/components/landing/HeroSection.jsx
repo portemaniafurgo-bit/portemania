@@ -366,75 +366,39 @@ export default function HeroSection() {
       {/* LEFT PANEL: Wizard */}
       <div className="w-full md:w-[400px] lg:w-[450px] bg-[#7145d6] flex-shrink-0 flex flex-col z-20 shadow-2xl h-full overflow-hidden">
         {/* Header */}
-        <div className="flex-shrink-0 p-6 pb-14">
-          {/* Logo pequeño */}
-          <div className="mb-2">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 900 220"
-              className="h-12 w-auto"
-              aria-label="ClicYVoy"
-            >
-              <defs>
-                <style>{`.black{fill:#111111;}.yellow{fill:#F5B400;}.txt{font-family:'Poppins','Montserrat','Arial',sans-serif;font-weight:700;font-size:108px;}`}</style>
-              </defs>
-              <g transform="translate(20 15)">
-                <path
-                  className="black"
-                  d="M90 20 C55 20 28 47 28 82 V145 H58 V82 C58 64 72 50 90 50 H110 C128 50 142 64 142 82 V145 H172 V82 C172 47 145 20 110 20 Z"
-                />
-                <path
-                  className="yellow"
-                  d="M28 160 H58 V178 C58 202 76 220 100 220 C124 220 142 202 142 178 V160 H172 V178 C172 217 143 250 100 278 C57 250 28 217 28 178 Z"
-                  transform="translate(0 -60)"
-                />
-                <path className="yellow" d="M100 188 L74 162 H126 Z" />
-                <circle className="yellow" cx="100" cy="102" r="16" />
-              </g>
-              <text x="225" y="145" className="txt">
-                <tspan className="black">Clicy</tspan>
-                <tspan className="yellow">Voy</tspan>
-              </text>
-            </svg>
-          </div>
-
-          <div className="flex items-center gap-3 mb-3 mt-10">
-            {step > 1 && (
-              <button
-                onClick={prevStep}
-                className="text-white/80 hover:text-white transition-colors"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </button>
-            )}
-            <div>
-              <h2 className="font-bold text-xl text-white">
-                {step === 1
-                  ? "Solicitar transporte"
-                  : step === 2
-                    ? "¿Cómo quieres continuar?"
-                    : isPackage
-                      ? "Enviar un paquete"
-                      : "Solicitar transporte"}
-              </h2>
-              <p className="text-sm text-white/70">
-                Paso {step} de {totalSteps}
-                {step > 2 ? " · Como invitado" : ""}
-              </p>
-            </div>
-          </div>
-          {/* Progress */}
-          <div className="flex gap-1.5">
-            {Array.from({ length: totalSteps }).map((_, i) => (
-              <div
-                key={i}
-                className={`h-1.5 flex-1 rounded-full transition-colors ${
-                  i + 1 <= step ? "bg-white" : "bg-white/20"
-                }`}
-              />
-            ))}
-          </div>
-        </div>
+     <div className="flex-shrink-0 p-4 md:p-6 pb-4 md:pb-14">
+  {/* Logo centrado en móvil, alineado a la izquierda en desktop */}
+  <div className="flex justify-center md:justify-start mb-2">
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 0 900 220"
+      className="h-10 md:h-12 w-auto"
+      aria-label="ClicYVoy"
+    >
+      <defs>
+        <style>{`.black{fill:#111111;}.yellow{fill:#F5B400;}.txt{font-family:'Poppins','Montserrat','Arial',sans-serif;font-weight:700;font-size:108px;}`}</style>
+      </defs>
+      <g transform="translate(0 15)">
+        <path
+          className="black"
+          d="M90 20 C55 20 28 47 28 82 V145 H58 V82 C58 64 72 50 90 50 H110 C128 50 142 64 142 82 V145 H172 V82 C172 47 145 20 110 20 Z"
+        />
+        <path
+          className="yellow"
+          d="M28 160 H58 V178 C58 202 76 220 100 220 C124 220 142 202 142 178 V160 H172 V178 C172 217 143 250 100 278 C57 250 28 217 28 178 Z"
+          transform="translate(0 -60)"
+        />
+        <path className="yellow" d="M100 188 L74 162 H126 Z" />
+        <circle className="yellow" cx="100" cy="102" r="16" />
+      </g>
+      <text x="225" y="145" className="txt">
+        <tspan className="black">Clicy</tspan>
+        <tspan className="yellow">Voy</tspan>
+      </text>
+    </svg>
+  </div>
+  {/* ... resto del header ... */}
+</div>
 
         {/* Content */}
         <div
@@ -1311,8 +1275,8 @@ export default function HeroSection() {
       </div>
 
       {/* RIGHT PANEL: Map */}
-      <div className="flex-1 relative bg-neutral-900 overflow-hidden hidden md:block h-full">
-        <DriversMapInner onDriverClick={() => setShowModal(true)} />
+<div className="flex-1 relative bg-neutral-900 overflow-hidden h-full">
+  <DriversMapInner onDriverClick={() => setShowModal(true)} />
         {!isAuthenticated && (
           <div className="absolute top-8 right-8 z-[1000] flex items-center gap-6 bg-white/20 backdrop-blur-md p-3 rounded-2xl border border-white/30 shadow-xl">
             <div className="flex items-center gap-3">

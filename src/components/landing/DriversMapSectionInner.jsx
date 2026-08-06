@@ -1,7 +1,13 @@
 "use client";
 
 import "leaflet/dist/leaflet.css";
-import { MapContainer, TileLayer, Marker, Tooltip, useMap } from "react-leaflet";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Tooltip,
+  useMap,
+} from "react-leaflet";
 import L from "leaflet";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -43,8 +49,10 @@ const visitorIcon = L.divIcon({
 
 function inZone([lat, lng]) {
   return (
-    lat >= ZONE_BOUNDS[0][0] && lat <= ZONE_BOUNDS[1][0] &&
-    lng >= ZONE_BOUNDS[0][1] && lng <= ZONE_BOUNDS[1][1]
+    lat >= ZONE_BOUNDS[0][0] &&
+    lat <= ZONE_BOUNDS[1][0] &&
+    lng >= ZONE_BOUNDS[0][1] &&
+    lng <= ZONE_BOUNDS[1][1]
   );
 }
 
@@ -84,7 +92,7 @@ export default function DriversMapSectionInner({ onDriverClick }) {
         if (inZone(pos)) setVisitorPos(pos);
       },
       () => {},
-      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 }
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 300000 },
     );
   }, []);
 
@@ -115,7 +123,9 @@ export default function DriversMapSectionInner({ onDriverClick }) {
             <>
               <PanTo position={visitorPos} />
               <Marker position={visitorPos} icon={visitorIcon}>
-                <Tooltip direction="top" offset={[0, -10]}>Estás aquí</Tooltip>
+                <Tooltip direction="top" offset={[0, -10]}>
+                  Estás aquí
+                </Tooltip>
               </Marker>
             </>
           )}
