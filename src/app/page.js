@@ -13,8 +13,8 @@ export default function LandingPage() {
         <HeroSection />
       </Suspense>
       <LandingNavbar />
-      <HowItWorks />
-      <ServicesSection />
+       <ServicesSection />
+      <HowItWorks />     
       <DriversSection />
       <Footer />
     </div>
