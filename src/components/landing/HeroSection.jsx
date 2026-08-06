@@ -362,43 +362,43 @@ export default function HeroSection() {
   };
 
   return (
-    <section className="relative h-[600px] flex overflow-hidden">
+    <section className="relative flex flex-col md:flex-row h-auto md:h-[600px] overflow-hidden">
       {/* LEFT PANEL: Wizard */}
       <div className="w-full md:w-[400px] lg:w-[450px] bg-[#7145d6] flex-shrink-0 flex flex-col z-20 shadow-2xl h-full overflow-hidden">
         {/* Header */}
-     <div className="flex-shrink-0 p-4 md:p-6 pb-4 md:pb-14">
-  {/* Logo centrado en móvil, alineado a la izquierda en desktop */}
-  <div className="flex justify-center md:justify-start mb-2">
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 900 220"
-      className="h-10 md:h-12 w-auto"
-      aria-label="ClicYVoy"
-    >
-      <defs>
-        <style>{`.black{fill:#111111;}.yellow{fill:#F5B400;}.txt{font-family:'Poppins','Montserrat','Arial',sans-serif;font-weight:700;font-size:108px;}`}</style>
-      </defs>
-      <g transform="translate(0 15)">
-        <path
-          className="black"
-          d="M90 20 C55 20 28 47 28 82 V145 H58 V82 C58 64 72 50 90 50 H110 C128 50 142 64 142 82 V145 H172 V82 C172 47 145 20 110 20 Z"
-        />
-        <path
-          className="yellow"
-          d="M28 160 H58 V178 C58 202 76 220 100 220 C124 220 142 202 142 178 V160 H172 V178 C172 217 143 250 100 278 C57 250 28 217 28 178 Z"
-          transform="translate(0 -60)"
-        />
-        <path className="yellow" d="M100 188 L74 162 H126 Z" />
-        <circle className="yellow" cx="100" cy="102" r="16" />
-      </g>
-      <text x="225" y="145" className="txt">
-        <tspan className="black">Clicy</tspan>
-        <tspan className="yellow">Voy</tspan>
-      </text>
-    </svg>
-  </div>
-  {/* ... resto del header ... */}
-</div>
+        <div className="flex-shrink-0 p-4 md:p-6 pb-4 md:pb-14">
+          {/* Logo centrado en móvil, alineado a la izquierda en desktop */}
+          <div className="flex justify-center md:justify-start mb-2">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 900 220"
+              className="h-10 md:h-12 w-auto"
+              aria-label="ClicYVoy"
+            >
+              <defs>
+                <style>{`.black{fill:#111111;}.yellow{fill:#F5B400;}.txt{font-family:'Poppins','Montserrat','Arial',sans-serif;font-weight:700;font-size:108px;}`}</style>
+              </defs>
+              <g transform="translate(0 15)">
+                <path
+                  className="black"
+                  d="M90 20 C55 20 28 47 28 82 V145 H58 V82 C58 64 72 50 90 50 H110 C128 50 142 64 142 82 V145 H172 V82 C172 47 145 20 110 20 Z"
+                />
+                <path
+                  className="yellow"
+                  d="M28 160 H58 V178 C58 202 76 220 100 220 C124 220 142 202 142 178 V160 H172 V178 C172 217 143 250 100 278 C57 250 28 217 28 178 Z"
+                  transform="translate(0 -60)"
+                />
+                <path className="yellow" d="M100 188 L74 162 H126 Z" />
+                <circle className="yellow" cx="100" cy="102" r="16" />
+              </g>
+              <text x="225" y="145" className="txt">
+                <tspan className="black">Clicy</tspan>
+                <tspan className="yellow">Voy</tspan>
+              </text>
+            </svg>
+          </div>
+          {/* ... resto del header ... */}
+        </div>
 
         {/* Content */}
         <div
@@ -1275,73 +1275,74 @@ export default function HeroSection() {
       </div>
 
       {/* RIGHT PANEL: Map */}
-<div className="flex-1 relative bg-neutral-900 overflow-hidden h-full">
-  <DriversMapInner onDriverClick={() => setShowModal(true)} />
+      {/* RIGHT PANEL: Map - VISIBLE EN MÓVIL CON ALTURA FIJA */}
+      <div className="flex-1 relative bg-neutral-900 overflow-hidden min-h-[300px] md:min-h-full">
+        <DriversMapInner onDriverClick={() => setShowModal(true)} />
         {!isAuthenticated && (
-          <div className="absolute top-8 right-8 z-[1000] flex items-center gap-6 bg-white/20 backdrop-blur-md p-3 rounded-2xl border border-white/30 shadow-xl">
-            <div className="flex items-center gap-3">
+          <div className="absolute top-4 right-4 md:top-8 md:right-8 z-[1000] flex items-center gap-3 md:gap-6 bg-white/20 backdrop-blur-md p-2 md:p-3 rounded-2xl border border-white/30 shadow-xl">
+            <div className="flex items-center gap-2 md:gap-3">
               <Link
                 href="/login-clientes"
-                className="bg-white/90 backdrop-blur-sm text-black hover:bg-white font-bold text-sm transition-all px-6 py-3 rounded-xl shadow-sm border border-white/40"
+                className="bg-white/90 backdrop-blur-sm text-black hover:bg-white font-bold text-xs md:text-sm transition-all px-3 md:px-6 py-2 md:py-3 rounded-xl shadow-sm border border-white/40"
               >
                 Entrar
               </Link>
               <Link
                 href="/register"
-                className="bg-black text-white hover:opacity-90 font-bold text-sm transition-all px-6 py-3 rounded-xl shadow-sm"
+                className="bg-black text-white hover:opacity-90 font-bold text-xs md:text-sm transition-all px-3 md:px-6 py-2 md:py-3 rounded-xl shadow-sm"
               >
                 Registrarse
               </Link>
             </div>
           </div>
         )}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 w-11/12 max-w-4xl bg-white/80 backdrop-blur-md rounded-2xl shadow-2xl p-6 z-[1000] border border-white/40">
+        <div className="absolute bottom-4 md:bottom-8 left-1/2 transform -translate-x-1/2 w-[95%] md:w-11/12 max-w-4xl bg-white/80 backdrop-blur-md rounded-2xl shadow-2xl p-3 md:p-6 z-[1000] border border-white/40">
           <div className="w-full">
-            <h3 className="font-semibold text-xl text-gray-900 mb-4">
+            <h3 className="font-semibold text-base md:text-xl text-gray-900 mb-2 md:mb-4">
               Conductores en Albacete
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-primary text-2xl">
+            <div className="grid grid-cols-3 gap-2 md:gap-6 w-full">
+              <div className="flex flex-col md:flex-row items-center gap-1 md:gap-4">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-primary text-lg md:text-2xl">
                     person_pin_circle
                   </span>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500 mb-0.5">
+                <div className="text-center md:text-left">
+                  <div className="text-[8px] md:text-xs text-gray-500 mb-0.5">
                     Conductores Activos
                   </div>
-                  <div className="font-semibold text-sm text-gray-900">
+                  <div className="font-semibold text-[10px] md:text-sm text-gray-900">
                     12 disponibles ahora
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-primary text-2xl">
+              <div className="flex flex-col md:flex-row items-center gap-1 md:gap-4">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-primary text-lg md:text-2xl">
                     schedule
                   </span>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500 mb-0.5">
+                <div className="text-center md:text-left">
+                  <div className="text-[8px] md:text-xs text-gray-500 mb-0.5">
                     Tiempo de espera
                   </div>
-                  <div className="font-semibold text-sm text-gray-900">
+                  <div className="font-semibold text-[10px] md:text-sm text-gray-900">
                     ~ 8 minutos
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-primary text-2xl">
+              <div className="flex flex-col md:flex-row items-center gap-1 md:gap-4">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <span className="material-symbols-outlined text-primary text-lg md:text-2xl">
                     verified
                   </span>
                 </div>
-                <div>
-                  <div className="text-xs text-gray-500 mb-0.5">
+                <div className="text-center md:text-left">
+                  <div className="text-[8px] md:text-xs text-gray-500 mb-0.5">
                     Zona de cobertura
                   </div>
-                  <div className="font-semibold text-sm text-gray-900">
+                  <div className="font-semibold text-[10px] md:text-sm text-gray-900">
                     Toda la ciudad
                   </div>
                 </div>
