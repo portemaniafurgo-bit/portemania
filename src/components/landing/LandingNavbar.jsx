@@ -16,9 +16,11 @@ export default function LandingNavbar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <nav className="w-full bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
+    <nav className="w-full bg-white border-b border-gray-200 shadow-sm">
+      {" "}
+      {/* ← sin sticky */}
       <div className="flex justify-between items-center h-20 px-6 max-w-7xl mx-auto">
-        {/* Logo con SVG inline - TEXTO NEGRO */}
+        {/* Logo */}
         <div className="flex-shrink-0">
           <Link href="/" className="block">
             <svg
@@ -51,7 +53,7 @@ export default function LandingNavbar() {
           </Link>
         </div>
 
-        {/* Menú desktop - CENTRADO */}
+        {/* Menú desktop */}
         <div className="hidden md:flex items-center justify-center flex-1 gap-8 ml-8">
           <div className="relative group">
             <button className="text-gray-600 hover:text-[#7145d6] transition-colors font-medium text-sm flex items-center">
@@ -92,7 +94,7 @@ export default function LandingNavbar() {
           </Link>
         </div>
 
-        {/* Botones de autenticación - Desktop (derecha) */}
+        {/* Botones desktop */}
         <div className="hidden md:flex items-center gap-3">
           <Link href="/login-clientes">
             <button className="text-gray-600 hover:text-[#7145d6] transition-colors font-medium text-sm px-4 py-2">
@@ -106,7 +108,7 @@ export default function LandingNavbar() {
           </Link>
         </div>
 
-        {/* Hamburguesa móvil - ARRIBA DERECHA */}
+        {/* Hamburguesa móvil */}
         <button
           onClick={() => setOpen((v) => !v)}
           className="md:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors"
@@ -119,7 +121,6 @@ export default function LandingNavbar() {
           )}
         </button>
       </div>
-
       {/* Menú móvil desplegable */}
       <AnimatePresence>
         {open && (
@@ -129,7 +130,6 @@ export default function LandingNavbar() {
             exit={{ opacity: 0, height: 0 }}
             className="md:hidden bg-white border-t border-gray-100 px-6 py-4 space-y-2 overflow-hidden"
           >
-            {/* Enlaces de servicios */}
             {serviceLinks.map((s) => (
               <Link
                 key={s.label}
@@ -140,9 +140,7 @@ export default function LandingNavbar() {
                 {s.label}
               </Link>
             ))}
-
             <hr className="border-gray-100" />
-
             <Link
               href="/#como-funciona"
               onClick={() => setOpen(false)}
@@ -157,10 +155,7 @@ export default function LandingNavbar() {
             >
               Quiero conducir
             </Link>
-
-            {/* Separador y botones de autenticación en móvil */}
             <hr className="border-gray-200 my-2" />
-
             <Link
               href="/login-clientes"
               onClick={() => setOpen(false)}
@@ -169,7 +164,6 @@ export default function LandingNavbar() {
               <LogIn className="w-4 h-4" />
               Entrar
             </Link>
-
             <Link
               href="/register"
               onClick={() => setOpen(false)}

@@ -73,12 +73,28 @@ export default function DriversMapSectionInner({ onDriverClick }) {
   const [drivers, setDrivers] = useState([]);
   const [visitorPos, setVisitorPos] = useState(null);
   const [isMounted, setIsMounted] = useState(false);
+  const [mapKey, setMapKey] = useState(0);
 
-  // 🔥 IMPORTANTE: Marcar que el componente está montado
+  // Forzar montaje
   useEffect(() => {
     setIsMounted(true);
   }, []);
 
+  // Forzar re-render del mapa después del montaje y en resize
+  useEffect(() => {
+    if (isMounted) {
+      const timer = setTimeout(() => setMapKey((prev) => prev + 1), 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isMounted]);
+
+  useEffect(() => {
+    const handleResize = () => setMapKey((prev) => prev + 1);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  // Cargar conductores
   useEffect(() => {
     let active = true;
     const load = async () => {
@@ -97,6 +113,7 @@ export default function DriversMapSectionInner({ onDriverClick }) {
     };
   }, []);
 
+  // Geolocalización
   useEffect(() => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
@@ -119,20 +136,26 @@ export default function DriversMapSectionInner({ onDriverClick }) {
     }
   };
 
-  // 🔥 Si no está montado, muestra un placeholder
   if (!isMounted) {
-    return <div className="w-full h-full bg-neutral-200 animate-pulse" />;
+    return (
+      <div className="w-full h-full min-h-[300px] bg-neutral-200 animate-pulse" />
+    );
   }
 
   return (
-    <div className="w-full h-full">
-      <div className="relative w-full h-full z-0">
+    <div className="w-full h-full min-h-[300px]">
+      <div className="relative w-full h-full min-h-[300px] z-0">
         <MapContainer
-          key={visitorPos ? "map-with-pos" : "map-default"}
+          key={mapKey}
           center={visitorPos || ALBACETE_CENTER}
           zoom={14}
           minZoom={13}
-          style={{ height: "100%", width: "100%", zIndex: 1 }}
+          style={{
+            height: "100%",
+            width: "100%",
+            zIndex: 1,
+            minHeight: "300px", // 🔥 FORZAMOS ALTURA MÍNIMA EN PÍXELES
+          }}
           maxBounds={ZONE_BOUNDS}
           maxBoundsViscosity={1.0}
           scrollWheelZoom={false}
