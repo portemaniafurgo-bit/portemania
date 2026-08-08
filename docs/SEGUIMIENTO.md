@@ -413,6 +413,7 @@ Revisión punto por punto contra `FUNCIONALIDADES-PROPUESTA.md` §1 y remate de 
 - Fix de suite: con ayuda contratada es obligatorio responder «¿Hay ascensor?» en ambas direcciones (la suite no lo rellenaba). Cuentas de prueba recreadas por SQL y **borradas al terminar** — gotchas del seed documentados en [e2e/README.md](../e2e/README.md).
 - BD final: solo datos reales (6 usuarios, 3 conductores, 12 pedidos, 0 restos de prueba).
 - ⚠️ El token de Vercel del negocio (2026-07-04) **no tiene scope del team** — el deploy por CLI/API falla con «Not authorized … portemaniafurgo-7893s-projects». No bloquea (el deploy va por git push), pero para operar Vercel por API hay que regenerar el token con acceso al team.
+- **Reseñas de Google visibles sin la Places API** (commit `8224331`, verificado en prod): la home muestra el volcado estático de las reseñas REALES de la ficha «Clicyvoy» (5,0 · 4 valoraciones) — las dos con texto, sin la respuesta del dueño ni valoraciones sin texto. Descubierto por el camino: el enlace corto guardado (maps.app.goo.gl/CEs2fNnTqzqcBkb4A) apuntaba a la DIRECCIÓN C. Gerona 15, no a la ficha de empresa; corregido al perfil real (`/g/11zgsd09_c`). Si llegan reseñas nuevas, actualizar a mano `src/lib/reviews.js`; al configurar `GOOGLE_PLACES_API_KEY`+`GOOGLE_PLACE_ID` pasan a leerse en vivo y el volcado deja de usarse.
 
 ## 5. Pendientes / roadmap
 
