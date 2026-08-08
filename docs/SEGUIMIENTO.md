@@ -405,6 +405,15 @@ Revisión punto por punto contra `FUNCIONALIDADES-PROPUESTA.md` §1 y remate de 
 
 **Estado: la Fase 1 está completa en código y SIN desplegar.** Para publicarla: aplicar `0010` por la Management API (cuenta del negocio) y hacer push/deploy **en la misma ventana** (ver aviso de arriba), luego correr las suites. Pendiente de negocio (no bloquea): fotos reales de la furgoneta para la landing de mini mudanzas, `GOOGLE_PLACES_API_KEY`/`GOOGLE_PLACE_ID` para las reseñas, y la elección formal entre las 2 direcciones de diseño (1.1) si se quiere presentar alternativa a la actual.
 
+### 2026-08-08 — FASE 1 DESPLEGADA EN PRODUCCIÓN y verificada (72/72)
+
+- La migración `0010` ya estaba aplicada en producción de una sesión anterior (verificado: `compute_quote`, triggers de precio y `final_price`, columnas nuevas y tarifario por servicio, pedidos migrados a `porte`/`mini_mudanza`/`paquete`). Solo faltaba el código.
+- **Commit `ac97329`** (65 archivos, toda la Fase 1) pusheado → deploy automático de Vercel. Verificado en vivo: las 4 landings SEO responden 200 en clicyvoy.es y el sitemap las incluye.
+- **Suites E2E contra producción: `flows.cjs` 34/34 + `admin.cjs` 38/38** (comprobaciones nuevas del flujo: selector de servicios, aviso «trabajo de dos», accesos ascensor/plantas, hora extra a 25 € en vivo, desglose con ayuda, etiqueta de servicio en la tarjeta del conductor, hero con contador real, tarifario por servicio en Ajustes).
+- Fix de suite: con ayuda contratada es obligatorio responder «¿Hay ascensor?» en ambas direcciones (la suite no lo rellenaba). Cuentas de prueba recreadas por SQL y **borradas al terminar** — gotchas del seed documentados en [e2e/README.md](../e2e/README.md).
+- BD final: solo datos reales (6 usuarios, 3 conductores, 12 pedidos, 0 restos de prueba).
+- ⚠️ El token de Vercel del negocio (2026-07-04) **no tiene scope del team** — el deploy por CLI/API falla con «Not authorized … portemaniafurgo-7893s-projects». No bloquea (el deploy va por git push), pero para operar Vercel por API hay que regenerar el token con acceso al team.
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

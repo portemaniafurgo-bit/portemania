@@ -102,6 +102,9 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   ok("1e-pre checkbox pie de calle oculto con ayuda", !(await page.locator("button:has-text('Acepto que la mercancía')").isVisible().catch(() => false)));
   ok("1e-pre2 aviso 'trabajo de dos' visible", await visible(page.locator("text=trabajo de dos"), 5000));
   ok("1e-pre3 accesos (ascensor/plantas) visibles", await visible(page.locator("text=Accesos"), 5000));
+  // Con ayuda contratada es OBLIGATORIO responder si hay ascensor en cada dirección
+  await page.locator("button:has-text('Hay ascensor')").nth(0).click();
+  await page.locator("button:has-text('Hay ascensor')").nth(1).click();
   await page.locator("button:has-text('Acepto los')").click({ position: { x: 12, y: 12 } });
   await page.waitForTimeout(300);
   ok("1e continuar habilitado paso 2", await page.locator("button:has-text('Continuar')").isEnabled());
