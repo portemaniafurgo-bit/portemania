@@ -6,13 +6,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import StatusBadge from "@/components/common/StatusBadge";
-import { vehicleData } from "@/components/common/VehicleCard";
 import { Search } from "lucide-react";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAdminGuard } from "@/lib/useAdminGuard";
+import { serviceOf } from "@/lib/services";
 
 export default function AdminOrders() {
   const canRender = useAdminGuard({ allowStaff: true });
@@ -76,7 +76,7 @@ export default function AdminOrders() {
             {filtered.map(order => (
               <TableRow key={order.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/admin/orders/${order.id}`)}>
                 <TableCell className="font-medium">
-                  <span className="mr-1">{order.service_type === "package" ? "📦" : vehicleData[order.vehicle_type]?.icon}</span>
+                  <span className="mr-1">{serviceOf(order).emoji}</span>
                   {order.client_name || "—"}
                 </TableCell>
                 <TableCell className="text-sm max-w-[150px] truncate">{order.origin_address}</TableCell>

@@ -5,13 +5,13 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import StatusBadge from "@/components/common/StatusBadge";
 import RatingStars from "@/components/common/RatingStars";
-import { vehicleData } from "@/components/common/VehicleCard";
 import PaymentInfo from "@/components/common/PaymentInfo";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { Clock, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useTariffs } from "@/lib/tariffs";
+import { serviceOf } from "@/lib/services";
 
 export default function DriverHistory() {
   const { user } = useAuth();
@@ -47,7 +47,7 @@ export default function DriverHistory() {
               <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md transition-all mb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">{job.service_type === "package" ? "📦" : vehicleData[job.vehicle_type]?.icon}</span>
+                    <span className="text-xl">{serviceOf(job).emoji}</span>
                     <div>
                       <p className="font-medium text-sm text-foreground truncate max-w-[200px]">{job.destination_address}</p>
                       <p className="text-xs text-muted-foreground">

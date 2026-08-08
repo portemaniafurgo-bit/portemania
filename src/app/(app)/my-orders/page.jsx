@@ -5,12 +5,12 @@ import { base44 } from "@/api/base44Client";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import StatusBadge from "@/components/common/StatusBadge";
-import { vehicleData } from "@/components/common/VehicleCard";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState } from "react";
 import { Package } from "lucide-react";
+import { serviceOf } from "@/lib/services";
 
 export default function MyOrders() {
   const { user } = useAuth();
@@ -54,7 +54,7 @@ export default function MyOrders() {
               <div className="bg-card rounded-2xl border border-border p-4 hover:shadow-md hover:border-primary/20 transition-all mb-3">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="text-2xl flex-shrink-0">{order.service_type === "package" ? "📦" : (vehicleData[order.vehicle_type]?.icon || "🚐")}</div>
+                    <div className="text-2xl flex-shrink-0">{serviceOf(order).emoji}</div>
                     <div className="min-w-0">
                       <p className="font-medium text-foreground text-sm truncate">{order.origin_address}</p>
                       <p className="text-xs text-muted-foreground truncate">→ {order.destination_address}</p>

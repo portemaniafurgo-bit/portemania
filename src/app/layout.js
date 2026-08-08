@@ -2,9 +2,30 @@
 import Providers from "@/components/Providers";
 
 export const metadata = {
-  title: "ClicyVoy — Tu transporte en minutos",
+  metadataBase: new URL("https://clicyvoy.es"),
+  title: {
+    default: "Portes y mini mudanzas en Albacete | ClicyVoy",
+    template: "%s | ClicyVoy",
+  },
   description:
-    "La forma más rápida y segura de transportar tus cosas. Furgonetas para portes y mudanzas con conductores verificados.",
+    "Furgoneta con conductor en Albacete para portes, mini mudanzas, entregas para tiendas y envío de paquetes. Precio cerrado, reserva online y seguimiento en tiempo real.",
+  keywords: [
+    "portes Albacete",
+    "mini mudanzas Albacete",
+    "furgoneta con conductor Albacete",
+    "envío de paquetes Albacete",
+    "transporte Villarrobledo",
+  ],
+  alternates: { canonical: "/" },
+  openGraph: {
+    type: "website",
+    locale: "es_ES",
+    siteName: "ClicyVoy",
+    url: "https://clicyvoy.es",
+    title: "Portes y mini mudanzas en Albacete | ClicyVoy",
+    description:
+      "Reserva una furgoneta con conductor en Albacete en minutos. Portes, mini mudanzas, entregas para tiendas y envío de paquetes con precio cerrado.",
+  },
 };
 
 export default function RootLayout({ children }) {

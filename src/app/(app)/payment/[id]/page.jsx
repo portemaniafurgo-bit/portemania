@@ -9,9 +9,9 @@ import { useQuery } from "@tanstack/react-query";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { Button } from "@/components/ui/button";
-import { vehicleData } from "@/components/common/VehicleCard";
-import { packageWeightLabel } from "@/lib/tariffs";
+import { serviceSummary } from "@/lib/tariffs";
 import { ArrowLeft, Shield, Loader2, CheckCircle, CreditCard } from "lucide-react";
+import { serviceOf } from "@/lib/services";
 
 const stripePromise = process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY
   ? loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLIC_KEY)
@@ -216,8 +216,6 @@ export default function Payment() {
     );
   }
 
-  const vehicle = vehicleData[order.vehicle_type];
-
   return (
     <div className="max-w-md mx-auto space-y-6">
       {/* Header */}
@@ -235,12 +233,10 @@ export default function Payment() {
       <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Resumen del pedido</p>
         <div className="flex items-center gap-3">
-          <span className="text-2xl">{order.service_type === "package" ? "📦" : vehicle?.icon}</span>
+          <span className="text-2xl">{serviceOf(order).emoji}</span>
           <div className="flex-1">
             <p className="font-semibold text-foreground">
-              {order.service_type === "package"
-                ? `Envío de paquete${order.package_weight ? ` · ${packageWeightLabel(order.package_weight)}` : ""}`
-                : vehicle?.name}
+              {serviceSummary(order)}
             </p>
             <p className="text-xs text-muted-foreground truncate">{order.origin_address} → {order.destination_address}</p>
           </div>

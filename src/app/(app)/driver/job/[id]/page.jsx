@@ -7,8 +7,10 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import StatusBadge from "@/components/common/StatusBadge";
-import { vehicleData } from "@/components/common/VehicleCard";
-import { packageWeightLabel } from "@/lib/tariffs";
+import { serviceSummary } from "@/lib/tariffs";
+import ServiceExtras from "@/components/common/ServiceExtras";
+import SignaturePad from "@/components/driver/SignaturePad";
+import { uploadSignature } from "@/lib/deliveryProof";
 import { ArrowLeft, Send, MapPin, Truck, CheckCircle, Package, MessageCircle, Loader2, XCircle, Navigation } from "lucide-react";
 import PhotoLightbox from "@/components/common/PhotoLightbox";
 import DriverTrackingMap from "@/components/common/DriverTrackingMap";
@@ -19,6 +21,7 @@ import { fetchRouteEta, geocodeAlbacete, distanceKm } from "@/lib/eta";
 import { fetchMyDriverProfile } from "@/lib/driverProfile";
 import { format, addMinutes } from "date-fns";
 import { useState, useEffect, useRef, useCallback } from "react";
+import { serviceOf } from "@/lib/services";
 
 const STEPS = [
   { from: "accepted",   to: "in_transit",  label: "Iniciar viaje →",   icon: Truck,        color: "bg-blue-600 hover:bg-blue-700" },
@@ -150,6 +153,22 @@ export default function ActiveJob() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["job", id] }),
   });
 
+  // Entrega firmada: la firma se sube ANTES de dar el servicio por entregado,
+  // para que no quede un pedido cerrado sin su justificante.
+  const deliverWithSignatureMutation = useMutation({
+    mutationFn: async ({ blob, name }) => {
+      const signatureRef = await uploadSignature(id, blob);
+      await base44.entities.TransportRequest.update(id, {
+        status: "delivered",
+        delivery_time: new Date().toISOString(),
+        proof_signature_url: signatureRef,
+        delivered_signature_at: new Date().toISOString(),
+        recipient_name: name,
+      });
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["job", id] }),
+  });
+
   const sendMutation = useMutation({
     mutationFn: (msg) => base44.entities.ChatMessage.create({
       request_id: id,
@@ -227,7 +246,6 @@ export default function ActiveJob() {
   );
 
   const nextStep = STEPS.find(s => s.from === job.status);
-  const vehicle = vehicleData[job.vehicle_type];
   const isFinished = job.status === "delivered" || job.status === "cancelled";
 
   return (
@@ -355,9 +373,7 @@ export default function ActiveJob() {
           <div>
             <p className="text-xs text-muted-foreground">Vehículo</p>
             <p className="text-sm font-medium">
-              {job.service_type === "package"
-                ? `Envío de paquete${job.package_weight ? ` · ${packageWeightLabel(job.package_weight)}` : ""}`
-                : vehicle?.name}
+              {serviceSummary(job)}
             </p>
           </div>
           <div className="text-right">
@@ -366,6 +382,10 @@ export default function ActiveJob() {
           </div>
         </div>
       </div>
+
+      {/* Paradas, plantas sin ascensor, receptor y desglose: lo que el
+          conductor necesita saber antes de bajarse de la furgoneta. */}
+      <ServiceExtras order={job} />
 
       {/* Método de pago: le dice al conductor si tiene que cobrar o no */}
       {!isFinished && <PaymentInfo order={job} />}
@@ -396,16 +416,31 @@ export default function ActiveJob() {
         </div>
       )}
 
-      {/* Action button */}
+      {/* Cierre del servicio. En los envíos de paquete y las entregas para
+          tiendas no hay botón de "finalizado": se cierra con la firma. */}
       {nextStep && !isFinished && (
-        <Button
-          className={`w-full h-14 rounded-2xl text-base font-semibold gap-2 text-white ${nextStep.color}`}
-          onClick={() => advanceMutation.mutate(nextStep.to)}
-          disabled={advanceMutation.isPending}
-        >
-          {advanceMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <nextStep.icon className="w-5 h-5" />}
-          {nextStep.label}
-        </Button>
+        nextStep.to === "delivered" && job.signature_required ? (
+          <SignaturePad
+            defaultName={job.recipient_name || ""}
+            submitting={deliverWithSignatureMutation.isPending}
+            onConfirm={(payload) => deliverWithSignatureMutation.mutate(payload)}
+          />
+        ) : (
+          <Button
+            className={`w-full h-14 rounded-2xl text-base font-semibold gap-2 text-white ${nextStep.color}`}
+            onClick={() => advanceMutation.mutate(nextStep.to)}
+            disabled={advanceMutation.isPending}
+          >
+            {advanceMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <nextStep.icon className="w-5 h-5" />}
+            {nextStep.label}
+          </Button>
+        )
+      )}
+
+      {deliverWithSignatureMutation.isError && (
+        <p className="text-sm text-destructive text-center">
+          No se pudo guardar la firma. Comprueba tu conexión e inténtalo de nuevo.
+        </p>
       )}
 
       {/* Cancelar antes de recoger: el pedido se libera con motivo */}

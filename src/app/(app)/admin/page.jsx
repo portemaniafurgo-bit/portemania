@@ -6,7 +6,6 @@ import { useQuery } from "@tanstack/react-query";
 import { useTariffs } from "@/lib/tariffs";
 import AdminLiveMap from "@/components/admin/AdminLiveMap";
 import StatusBadge from "@/components/common/StatusBadge";
-import { vehicleData } from "@/components/common/VehicleCard";
 import {
   LayoutDashboard, AlertTriangle, Truck, Euro, Star, PackageOpen, ArrowRight,
 } from "lucide-react";
@@ -14,6 +13,7 @@ import { format, isAfter, startOfDay, startOfMonth, differenceInMinutes } from "
 import { es } from "date-fns/locale";
 import { useAdminGuard } from "@/lib/useAdminGuard";
 import { useAuth } from "@/lib/AuthContext";
+import { serviceOf } from "@/lib/services";
 
 const PENDING_ALERT_MIN = 10;
 
@@ -134,7 +134,7 @@ export default function AdminDashboard() {
           {orders.slice(0, 5).map(o => (
             <Link key={o.id} href={`/admin/orders/${o.id}`} className="block">
               <div className="bg-card rounded-2xl border border-border p-4 flex items-center gap-3 hover:border-primary/40 transition-colors">
-                <span className="text-xl flex-shrink-0">{o.service_type === "package" ? "📦" : (vehicleData[o.vehicle_type]?.icon || "🚐")}</span>
+                <span className="text-xl flex-shrink-0">{serviceOf(o).emoji}</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-foreground truncate">
                     {o.client_name || "—"} · {(o.final_price || o.estimated_price)?.toFixed(0)}€

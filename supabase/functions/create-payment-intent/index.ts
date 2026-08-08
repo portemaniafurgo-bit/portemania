@@ -19,30 +19,6 @@ function json(body: unknown, status = 200) {
   });
 }
 
-const DEFAULT_TARIFFS = {
-  small: 40, large: 60, extra_hour: 15, insurance: 12, help_price: 30, commission_pct: 15,
-  pkg_light: 4.99, pkg_medium: 7.99, pkg_heavy: 9.99,
-};
-
-const PKG_PRICE_KEY: Record<string, string> = {
-  light: "pkg_light", medium: "pkg_medium", heavy: "pkg_heavy",
-};
-
-// Misma fórmula que src/lib/tariffs.js (mantener en sincronía). Ramifica por
-// service_type: 'package' cobra el precio fijo del tramo de peso.
-function computePrice(t: Record<string, number>, order: Record<string, unknown>): number {
-  if (order.service_type === "package") {
-    const key = PKG_PRICE_KEY[String(order.package_weight)];
-    return key ? Number(t[key] ?? DEFAULT_TARIFFS[key]) : NaN;
-  }
-  const vt = order.vehicle_type === "large" ? "large" : "small";
-  const base = Number(t[vt] ?? DEFAULT_TARIFFS[vt]);
-  const extraHours = Number(order.extra_hours) || 0;
-  const insurance = order.insurance_selected ? Number(t.insurance ?? DEFAULT_TARIFFS.insurance) : 0;
-  const help = order.needs_help ? Number(t.help_price ?? DEFAULT_TARIFFS.help_price) : 0;
-  return base + extraHours * Number(t.extra_hour ?? DEFAULT_TARIFFS.extra_hour) + insurance + help;
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -68,7 +44,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: order } = await admin
     .from("transport_requests")
-    .select("id, created_by_id, status, payment_status, client_name, vehicle_type, extra_hours, insurance_selected, needs_help, service_type, package_weight")
+    .select("*")
     .eq("id", body.order_id)
     .single();
   if (!order) return json({ error: "Pedido no encontrado" }, 404);
@@ -76,12 +52,16 @@ Deno.serve(async (req: Request) => {
   if (order.payment_status === "paid") return json({ error: "Ya está pagado" }, 400);
   if (order.status === "cancelled") return json({ error: "El pedido está cancelado" }, 400);
 
-  // Importe recalculado en servidor desde las tarifas vigentes (no el del cliente).
-  const { data: settings } = await admin
-    .from("app_settings").select("value").eq("key", "tariffs").maybeSingle();
-  const tariffs = { ...DEFAULT_TARIFFS, ...((settings?.value as Record<string, number>) || {}) };
-  const price = computePrice(tariffs, order);
-  const amount = Math.round(price * 100);
+  // Importe recalculado por la MISMA función que fija el precio al crear el
+  // pedido (public.compute_quote, migración 0010). Antes esta fórmula estaba
+  // duplicada aquí y se desincronizaba con la del resto de la aplicación.
+  const { data: quote, error: quoteError } = await admin.rpc("compute_quote", { payload: order });
+  if (quoteError) {
+    console.error("compute_quote error:", quoteError.message);
+    return json({ error: "No se pudo calcular el importe" }, 500);
+  }
+
+  const amount = Math.round(Number(quote?.total) * 100);
   if (!Number.isFinite(amount) || amount < 50) return json({ error: "Importe no válido" }, 400);
 
   const params = new URLSearchParams({

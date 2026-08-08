@@ -4,13 +4,12 @@ import { useState } from "react";
 import Link from "next/link";
 import { Menu, X, LogIn, UserPlus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import Logo from "@/components/landing/Logo";
+import { SERVICE_LIST, serviceHref } from "@/lib/services";
 
-const serviceLinks = [
-  { label: "Porte", href: "/solicitar?service=porte" },
-  { label: "Mini Mudanza", href: "/solicitar?service=mini_mudanza" },
-  { label: "Compra en tienda", href: "/solicitar?service=compra_tienda" },
-  { label: "Envío de paquete", href: "/solicitar?service=envio_paquete" },
-];
+// El menú lleva a la página de cada servicio (indexable) y no directo al
+// formulario: quien navega por aquí todavía está decidiendo.
+const serviceLinks = SERVICE_LIST.map((s) => ({ label: s.label, href: serviceHref(s.key) }));
 
 export default function LandingNavbar() {
   const [open, setOpen] = useState(false);
@@ -23,33 +22,7 @@ export default function LandingNavbar() {
         {/* Logo */}
         <div className="flex-shrink-0">
           <Link href="/" className="block">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 900 220"
-              className="h-10 w-auto"
-              aria-label="ClicYVoy"
-            >
-              <defs>
-                <style>{`.black{fill:#111111;}.yellow{fill:#F5B400;}.txt{font-family:'Poppins','Montserrat','Arial',sans-serif;font-weight:700;font-size:108px;}`}</style>
-              </defs>
-              <g transform="translate(0 15)">
-                <path
-                  className="black"
-                  d="M90 20 C55 20 28 47 28 82 V145 H58 V82 C58 64 72 50 90 50 H110 C128 50 142 64 142 82 V145 H172 V82 C172 47 145 20 110 20 Z"
-                />
-                <path
-                  className="yellow"
-                  d="M28 160 H58 V178 C58 202 76 220 100 220 C124 220 142 202 142 178 V160 H172 V178 C172 217 143 250 100 278 C57 250 28 217 28 178 Z"
-                  transform="translate(0 -60)"
-                />
-                <path className="yellow" d="M100 188 L74 162 H126 Z" />
-                <circle className="yellow" cx="100" cy="102" r="16" />
-              </g>
-              <text x="225" y="145" className="txt">
-                <tspan className="black">Clicy</tspan>
-                <tspan className="yellow">Voy</tspan>
-              </text>
-            </svg>
+            <Logo className="h-10 w-auto" />
           </Link>
         </div>
 

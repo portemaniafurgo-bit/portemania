@@ -77,8 +77,9 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   const consoleErrors = [];
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text().slice(0, 200)); });
 
-  // ===== 1. Invitado: /solicitar completo =====
-  await page.goto(BASE + "/solicitar", { waitUntil: "networkidle" });
+  // ===== 1. Invitado: /solicitar completo (mini mudanza: ayuda + horas + accesos) =====
+  await page.goto(BASE + "/solicitar?service=mini_mudanza", { waitUntil: "networkidle" });
+  ok("1-0 selector de servicios visible", await visible(page.locator("text=¿Qué necesitas transportar hoy?"), 10000));
   await page.fill('input[placeholder*="nombre y apellidos"]', "INVITADO E2E");
   await page.fill('input[type="tel"]', "6" + String(Date.now()).slice(-8));
   // CP obligatorio: sin CP el botón sigue deshabilitado
@@ -93,24 +94,26 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   // Paso 2
   await page.fill("textarea >> nth=0", "INVITADO E2E mudanza de cajas de prueba");
   await page.setInputFiles('input[type="file"]', { name: "foto.png", mimeType: "image/png", buffer: PNG });
-  ok("1d foto subida", await visible(page.locator("img[alt='cargo']"), 20000));
-  // ayuda
+  ok("1d foto subida", await visible(page.locator("img[alt^='Carga']"), 20000));
+  // ayuda del conductor (+39€)
   await page.locator("button[role='switch']").first().click();
   await page.fill("textarea >> nth=1", "Bajar cajas de un 2º, hay ascensor");
   // Con ayuda activada, el checkbox de pie de calle desaparece (feature 2026-07-04)
   ok("1e-pre checkbox pie de calle oculto con ayuda", !(await page.locator("button:has-text('Acepto que la mercancía')").isVisible().catch(() => false)));
-  ok("1e-pre2 aviso conductor ayuda visible", await visible(page.locator("text=sube/baja la mercancía contigo"), 5000));
+  ok("1e-pre2 aviso 'trabajo de dos' visible", await visible(page.locator("text=trabajo de dos"), 5000));
+  ok("1e-pre3 accesos (ascensor/plantas) visibles", await visible(page.locator("text=Accesos"), 5000));
   await page.locator("button:has-text('Acepto los')").click({ position: { x: 12, y: 12 } });
   await page.waitForTimeout(300);
   ok("1e continuar habilitado paso 2", await page.locator("button:has-text('Continuar')").isEnabled());
   await page.click("button:has-text('Continuar')");
-  // Paso 3: vehículo
-  await page.click("text=Furgoneta pequeña");
-  await page.waitForTimeout(300);
+  // Paso 3: detalles del servicio (mini mudanza: horas extra a 25€)
+  await page.click("button[aria-label='Añadir una hora']");
+  ok("1e2 hora extra sumada en vivo", await visible(page.locator("text=+1h extra"), 5000));
   await page.click("button:has-text('Continuar')");
   // Paso 4: confirmar
-  ok("1f resumen con precio", await visible(page.locator("text=Precio estimado"), 10000));
-  ok("1f2 suplemento de ayuda en el desglose", await visible(page.locator("text=Ayuda del conductor:"), 5000));
+  ok("1f resumen con desglose", await visible(page.locator("text=Precio total"), 10000));
+  ok("1f2 suplemento de ayuda en el desglose", await visible(page.locator("text=Ayuda del conductor"), 5000));
+  ok("1f3 hora extra en el desglose", await visible(page.locator("text=1 h extra"), 5000));
   await page.click("button:has-text('Confirmar solicitud')");
   ok("1g solicitud enviada", await visible(page.locator("text=/Solicitud enviada|solicitud-enviada/i").or(page.locator("text=¡Solicitud enviada!")), 25000) || page.url().includes("solicitud-enviada"));
   await shot("10-invitado-enviado");
@@ -124,6 +127,7 @@ const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR
   await page.goto(BASE + "/driver/requests", { waitUntil: "networkidle" });
   const reqCard = page.locator("div.bg-card", { hasText: "INVITADO E2E" }).first();
   ok("2a conductor ve el pendiente", await visible(reqCard, 20000));
+  ok("2a2 servicio etiquetado en la tarjeta", await visible(reqCard.locator("text=Mini mudanza"), 5000));
   ok("2b recuadro ámbar de ayuda", await visible(reqCard.locator("text=Pide ayuda del conductor"), 5000));
   await page.waitForTimeout(1000);
   await reqCard.locator("button:has-text('Aceptar servicio')").click();

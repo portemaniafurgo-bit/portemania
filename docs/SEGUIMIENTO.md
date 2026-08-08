@@ -1,6 +1,6 @@
 # ClicyVoy — Documento de seguimiento
 
-> Historial de todo lo construido, el estado actual y lo que queda. Actualizado: **2026-07-07**.
+> Historial de todo lo construido, el estado actual y lo que queda. Actualizado: **2026-08-08**.
 > Documentación técnica de referencia: [README.md](../README.md).
 > Resumen legible para entrega: [INFORME-ENTREGA.md](INFORME-ENTREGA.md).
 
@@ -363,6 +363,47 @@ ACTIVAS con ESZIP y arranque verificado):
   contraseña del dueño — las suites aceptan E2E_ADMIN_EMAIL/PASS) y se
   BORRARON al terminar. Estado final de la BD: solo datos reales (4 usuarios,
   2 conductores, 1 pedido de prueba del dueño).
+
+
+### 2026-08-07 — Rediseño web (Fase 1 de la propuesta ClicyVoy)
+
+Alcance completo en [FUNCIONALIDADES-PROPUESTA.md](FUNCIONALIDADES-PROPUESTA.md).
+
+**Catálogo real de servicios.** Hasta ahora la BD solo distinguía `transport` y `package`: mini mudanza, porte y compra en tienda eran la misma fila. Ahora `service_type` vale `porte` | `mini_mudanza` | `porte_tienda` | `paquete`, definidos en `src/lib/services.js` (única fuente: nombres, iconos, qué pasos activa cada uno y a qué landing corresponde).
+
+**Un solo precio.** Los precios vivían en cinco sitios que se contradecían — la landing anunciaba la mini mudanza a 99 € mientras el asistente cobraba 60 €. Ahora:
+- `app_settings.tariffs` es tarifario por servicio (porte 40 €, mini mudanza 99 €/2 h, hora extra 25 €, ayuda 39 €, planta sin ascensor 15 €, parada 20 €, tienda 30 €, paquetes 4,99/7,99/9,99 € y Villarrobledo 19,99 €).
+- La fórmula vive en `public.compute_quote` (migración 0010) y un trigger `BEFORE INSERT` fija `estimated_price` y `price_breakdown` en **todos** los pedidos. Antes solo el invitado tenía el precio recalculado en servidor; el cliente autenticado mandaba el suyo.
+- `create-payment-intent` ya no duplica la fórmula: llama a la misma función.
+- `src/lib/pricing.js` la replica en el navegador **solo para enseñar el desglose en vivo**. Si se toca una regla, hay que tocarla en los dos sitios.
+
+**Servicios nuevos en el flujo:** paradas intermedias (+20 €), ascensor y plantas por dirección (15 €/planta, solo con ayuda contratada), límite de 6 objetos en el porte, receptor y firma obligatoria en paquetes y entregas a tiendas, y envío a Villarrobledo (02600, hasta 10 kg, 24 h).
+
+**Un solo asistente.** Los tres formularios duplicados (hero, invitado y cliente con cuenta, ~2.700 líneas que se desincronizaban) se sustituyen por `RequestWizard` + el hook `useRequestForm`. El hero pasa a ser un arranque rápido: eliges servicio, pones las dos direcciones y entras al asistente.
+
+**Regla de UX aplicada:** la home y las landings solo enseñan precio y ventajas. Las condiciones que frenan al cliente (que la ayuda es un trabajo de dos, el recargo por plantas, el aviso de que declarar mal la carga se recalcula como mudanza) están dentro del proceso de compra, con el precio actualizándose en vivo.
+
+**SEO:** cuatro landings indexables (`/portes-albacete`, `/mini-mudanzas-albacete`, `/portes-para-tiendas`, `/envio-paquetes-albacete-villarrobledo`) con metadatos, Open Graph, JSON-LD de Service y FAQPage, precios reales leídos en servidor y enlazadas desde el sitemap, el menú, el pie y el bloque de texto de la home (que ahora es el H1).
+
+**Datos honestos:** el panel del mapa mostraba «12 conductores disponibles» y «~8 minutos» hardcodeados; ahora sale de `get_public_drivers()`. Los tres badges de Google Play enlazaban a `/ser-conductor` para una app que no existe; se sustituyen por el formulario real y un «próximamente».
+
+**Reseñas de Google:** sección al final de la home. Lee la ficha real vía Places API si se configuran `GOOGLE_PLACES_API_KEY` y `GOOGLE_PLACE_ID`; sin ellas muestra el enlace al perfil, nunca testimonios inventados.
+
+**Firma de entrega:** el conductor la captura en el panel web y se guarda en el bucket privado `delivery-proofs` (dato personal), visible solo para el cliente del pedido, su conductor y el staff.
+
+> ⚠️ **Orden de despliegue.** La migración `0010` renombra `service_type` de `package`→`paquete` y `transport`→`porte`/`mini_mudanza`. El código anterior compara con `"package"`, así que **BD y web tienen que subir juntas**: aplicar la migración y desplegar en la misma ventana, no antes.
+
+### 2026-08-08 — Cierre de la Fase 1 (rediseño web completo, listo para desplegar)
+
+Revisión punto por punto contra `FUNCIONALIDADES-PROPUESTA.md` §1 y remate de lo que faltaba:
+
+- **`final_price` al cerrar el servicio** (punto 1.10, era lo único sin implementar): sección 9 de la migración `0010` — trigger `trg_stamp_final_price` que, al pasar el pedido a `delivered`, estampa `final_price = estimated_price` si nadie lo fijó antes. Corre después de `trg_protect_order_payment_fields` (orden alfabético de triggers), así que primero se descarta cualquier valor que intentara colar el cliente y después lo escribe el servidor. Backfill de los pedidos ya entregados incluido. Los extras de la app del conductor (horas excedidas, ayuda añadida) partirán de este valor.
+- **Lint a 0 errores** (había 6): `Msg` del perfil subido a nivel de módulo (no crear componentes durante el render) y directivas puntuales con justificación en los `setState`-en-efecto intencionados (AuthContext, mapa de la home, ETA del pedido). Las 26 warnings restantes son preexistentes (hooks deps, `<img>`, etc.).
+- **Suites E2E adaptadas al flujo nuevo** (`e2e/flows.cjs` y `e2e/admin.cjs`): el invitado ahora entra por `/solicitar?service=mini_mudanza` y comprueba selector de servicios, aviso "trabajo de dos", accesos por dirección, hora extra sumada en vivo y el desglose (`Precio total` + líneas de ayuda y hora extra); el admin comprueba el hero nuevo (mapa "Conductores en Albacete", contador real o "Servicio bajo demanda") y el tarifario por servicio en Ajustes (porte 40, mudanza 99, Villarrobledo 19.99). ⚠️ Solo pueden ejecutarse **después** de desplegar (van contra producción) y exigen recrear `cliente.test`/`conductor.test` (borradas en la limpieza del 2026-07-06).
+- **Limpieza**: borrado `DriversMapSection.jsx` (huérfano desde que el mapa vive en el hero); el comentario de `pricing.js` apuntaba a una función inexistente (`quote_request` → `compute_quote`).
+- **Verificación**: `npm run build` ✓ (42 rutas, las 4 landings estáticas) y `npm run lint` ✓ (0 errores).
+
+**Estado: la Fase 1 está completa en código y SIN desplegar.** Para publicarla: aplicar `0010` por la Management API (cuenta del negocio) y hacer push/deploy **en la misma ventana** (ver aviso de arriba), luego correr las suites. Pendiente de negocio (no bloquea): fotos reales de la furgoneta para la landing de mini mudanzas, `GOOGLE_PLACES_API_KEY`/`GOOGLE_PLACE_ID` para las reseñas, y la elección formal entre las 2 direcciones de diseño (1.1) si se quiere presentar alternativa a la actual.
 
 ## 5. Pendientes / roadmap
 

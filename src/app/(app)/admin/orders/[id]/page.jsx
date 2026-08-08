@@ -8,7 +8,8 @@ import StatusBadge from "@/components/common/StatusBadge";
 import PhotoLightbox from "@/components/common/PhotoLightbox";
 import RatingVans from "@/components/common/RatingVans";
 import { vehicleData } from "@/components/common/VehicleCard";
-import { packageWeightLabel } from "@/lib/tariffs";
+import { serviceSummary } from "@/lib/tariffs";
+import ServiceExtras from "@/components/common/ServiceExtras";
 import {
   ArrowLeft, Phone, Banknote, CreditCard, Loader2, MessageCircle,
   CheckCircle2, Circle, XCircle, UserCog,
@@ -19,6 +20,7 @@ import { useState } from "react";
 import { useAdminGuard } from "@/lib/useAdminGuard";
 import { supabase } from "@/lib/entities";
 import { toast } from "@/components/ui/use-toast";
+import { serviceOf } from "@/lib/services";
 
 function TimelineStep({ label, time, done }) {
   return (
@@ -247,10 +249,7 @@ export default function AdminOrderDetail() {
       <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
         <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Carga</p>
         <p className="text-sm text-foreground">
-          {order.service_type === "package" ? "📦" : vehicleData[order.vehicle_type]?.icon}{" "}
-          {order.service_type === "package"
-            ? `Envío de paquete${order.package_weight ? ` · ${packageWeightLabel(order.package_weight)}` : ""}`
-            : (vehicleData[order.vehicle_type]?.name || order.vehicle_type)}
+          {serviceOf(order).emoji} {serviceSummary(order)}
           {order.cargo_description ? ` — ${order.cargo_description}` : ""}
         </p>
         {order.needs_help && (
@@ -265,6 +264,9 @@ export default function AdminOrderDetail() {
         {order.notes && <p className="text-sm text-muted-foreground italic">Notas: {order.notes}</p>}
         {order.cargo_photos?.length > 0 && <PhotoLightbox photos={order.cargo_photos} />}
       </div>
+
+      {/* Paradas, accesos, receptor y desglose del precio cobrado */}
+      <ServiceExtras order={order} />
 
       {/* Cancelación previa de un conductor */}
       {order.driver_cancel_reason && (

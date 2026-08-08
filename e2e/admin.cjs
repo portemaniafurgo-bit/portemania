@@ -28,7 +28,7 @@ async function seedOrder() {
     body: JSON.stringify({ payload: {
       client_name: "PRUEBA ADMIN", client_phone: "600999888",
       origin_address: "Calle Ancha 2, 02001 Albacete", destination_address: "Calle Mayor 5, 02002 Albacete",
-      cargo_description: "PRUEBA ADMIN caja grande", vehicle_type: "small", estimated_price: 40,
+      cargo_description: "PRUEBA ADMIN caja grande", service_type: "mini_mudanza",
       needs_help: true, help_description: "Subir caja a un 2º sin ascensor", force: true,
     } }),
   });
@@ -83,14 +83,16 @@ async function shot(name) {
   const consoleErrors = [];
   page.on("console", (m) => { if (m.type() === "error") consoleErrors.push(m.text().slice(0, 200)); });
 
-  // ---------- 1. Landing ----------
+  // ---------- 1. Landing (hero con mapa en vivo, datos reales) ----------
   await page.goto(BASE, { waitUntil: "networkidle", timeout: 60000 });
   ok("1a landing carga", await visible(page.locator("text=Quiero ser conductor")));
-  ok("1b sección mapa presente", await visible(page.locator("text=Conductores en tu zona")));
-  await page.locator("text=Conductores en tu zona").scrollIntoViewIfNeeded();
+  ok("1b mapa del hero presente", await visible(page.locator("text=Conductores en Albacete")));
   await page.waitForTimeout(4000);
-  const badge = await page.locator("text=/conductor(es)? disponible/").first().textContent().catch(() => "");
-  ok("1c contador de conductores", /\d+ conductor/.test(badge || ""), badge?.trim());
+  // El contador sale de get_public_drivers(): o "N disponible(s) ahora" o el
+  // mensaje neutro si no hay nadie conectado. Nunca la cifra inventada de antes.
+  const badge = await page.locator("text=/disponible(s)? ahora|Servicio bajo demanda/").first().textContent().catch(() => "");
+  ok("1c contador con dato real", /disponible|bajo demanda/.test(badge || ""), badge?.trim());
+  ok("1d selector de servicios en el hero", await visible(page.locator("text=¿Qué necesitas transportar hoy?"), 8000));
   await shot("01-landing-mapa");
 
   // ---------- 2. Login admin ----------
@@ -150,14 +152,19 @@ async function shot(name) {
   }
   await shot("06-admin-drivers");
 
-  // ---------- 7. Ajustes ----------
+  // ---------- 7. Ajustes (tarifario por servicio) ----------
   await page.goto(BASE + "/admin/settings", { waitUntil: "networkidle" });
-  const smallInput = page.locator("div:has(> label:has-text('pequeña')) input").first();
-  const inputVisible = await visible(smallInput, 20000);
-  ok("7a tarifas cargan", inputVisible);
+  const porteInput = page.locator("div:has(> label:has-text('Precio del porte')) input").first();
+  const inputVisible = await visible(porteInput, 20000);
+  ok("7a tarifario por servicio carga", inputVisible);
   if (inputVisible) {
-    const val = await smallInput.inputValue();
-    ok("7b pequeña = 40", val === "40", "valor: " + val);
+    ok("7b porte = 40", (await porteInput.inputValue()) === "40", "valor: " + (await porteInput.inputValue()));
+    const mudanzaInput = page.locator("div:has(> label:has-text('Precio base, 2 h incluidas')) input").first();
+    const mVal = await mudanzaInput.inputValue().catch(() => "");
+    ok("7c mini mudanza = 99", mVal === "99", "valor: " + mVal);
+    const vrInput = page.locator("div:has(> label:has-text('Villarrobledo')) input").first();
+    const vrVal = await vrInput.inputValue().catch(() => "");
+    ok("7d Villarrobledo = 19.99", vrVal === "19.99", "valor: " + vrVal);
   }
   await shot("07-admin-settings");
 

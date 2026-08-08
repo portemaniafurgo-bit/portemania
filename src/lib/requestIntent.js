@@ -1,12 +1,16 @@
-const VALID_VEHICLES = new Set(["small", "large"]);
+import { SERVICES, SERVICE_KEYS } from "@/lib/services";
 
-const SERVICE_DEFAULTS = {
-  porte: { service: "transport", vehicle: "small" },
-  mini_mudanza: { service: "transport", vehicle: "large" },
-  compra_tienda: { service: "transport", vehicle: "large" },
-  envio_paquete: { service: "package", vehicle: "" },
-  package: { service: "package", vehicle: "" },
-  transport: { service: "transport", vehicle: "" },
+/**
+ * Traspaso del servicio elegido en la landing al asistente de compra, y de ahí
+ * al login/registro y de vuelta, sin perder lo que el cliente ya había escrito.
+ */
+
+// Claves antiguas que siguen circulando en enlaces y marcadores.
+const ALIASES = {
+  transport: "porte",
+  package: "paquete",
+  envio_paquete: "paquete",
+  compra_tienda: "porte_tienda",
 };
 
 const REQUEST_FIELDS = [
@@ -22,25 +26,24 @@ function getParamValue(input, key) {
   return input[key] || "";
 }
 
-export function resolveRequestIntent(input = {}) {
-  const rawService = getParamValue(input, "service") || "transport";
-  const preset = SERVICE_DEFAULTS[rawService] || SERVICE_DEFAULTS.transport;
-  const service = preset.service;
-  const requestedVehicle = getParamValue(input, "vehicle");
-  const vehicle =
-    service === "transport" && VALID_VEHICLES.has(requestedVehicle)
-      ? requestedVehicle
-      : preset.vehicle;
+/** Servicio pedido en la URL, normalizado. Por defecto, porte. */
+export function resolveServiceKey(input = {}) {
+  const raw = getParamValue(input, "service");
+  const key = ALIASES[raw] || raw;
+  return SERVICE_KEYS.includes(key) ? key : "porte";
+}
 
-  return { service, vehicle };
+export function resolveRequestIntent(input = {}) {
+  const service = resolveServiceKey(input);
+  return { service, vehicle: SERVICES[service].vehicle || "" };
 }
 
 export function buildRequestSearchParams(input = {}) {
   const params = new URLSearchParams();
-  const { service, vehicle } = resolveRequestIntent(input);
+  params.set("service", resolveServiceKey(input));
 
-  params.set("service", service);
-  if (vehicle) params.set("vehicle", vehicle);
+  const zone = getParamValue(input, "zone");
+  if (zone === "villarrobledo") params.set("zone", zone);
 
   REQUEST_FIELDS.forEach((field) => {
     const value = getParamValue(input, field).trim();
@@ -51,22 +54,23 @@ export function buildRequestSearchParams(input = {}) {
 }
 
 export function buildRequestHref(path, input = {}) {
-  const params = buildRequestSearchParams(input);
-  const query = params.toString();
+  const query = buildRequestSearchParams(input).toString();
   return query ? `${path}?${query}` : path;
 }
 
 export function hasRequestDraft(input = {}) {
-  return ["service", "vehicle", ...REQUEST_FIELDS].some((field) =>
-    Boolean(getParamValue(input, field).trim())
+  return ["service", ...REQUEST_FIELDS].some((field) =>
+    Boolean(getParamValue(input, field).trim()),
   );
 }
 
 export function readRequestDraft(searchParams) {
-  const { service, vehicle } = resolveRequestIntent(searchParams);
+  const service = resolveServiceKey(searchParams);
   return {
     service,
-    vehicle,
+    vehicle: SERVICES[service].vehicle || "",
+    destination_zone:
+      getParamValue(searchParams, "zone") === "villarrobledo" ? "villarrobledo" : "albacete",
     client_name: getParamValue(searchParams, "client_name"),
     client_phone: getParamValue(searchParams, "client_phone"),
     origin_address: getParamValue(searchParams, "origin_address"),

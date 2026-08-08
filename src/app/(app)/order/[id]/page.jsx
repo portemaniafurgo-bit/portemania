@@ -25,12 +25,14 @@ import RatingVans from "@/components/common/RatingVans";
 import ReportIncidentButton from "@/components/common/ReportIncidentButton";
 import { vehicleData } from "@/components/common/VehicleCard";
 import { packageWeightLabel } from "@/lib/tariffs";
+import ServiceExtras from "@/components/common/ServiceExtras";
 import { ArrowLeft, Send, MessageCircle, Loader2, CreditCard, Banknote } from "lucide-react";
 import { format, addMinutes } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState, useEffect, useRef } from "react";
 import DriverTrackingMap from "@/components/common/DriverTrackingMap";
 import { fetchRouteEta, geocodeAlbacete, distanceKm } from "@/lib/eta";
+import { serviceOf } from "@/lib/services";
 
 export default function OrderDetail() {
   const { id } = useParams();
@@ -122,6 +124,8 @@ export default function OrderDetail() {
     const lat = goingToPickup ? order.origin_lat : order.destination_lat;
     const lng = goingToPickup ? order.origin_lng : order.destination_lng;
     if (lat && lng) {
+      // Coordenadas ya conocidas: fijarlas aquí evita la petición de geocodificación.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTargetCoords({ lat, lng, label: goingToPickup ? "la recogida" : "la entrega" });
       return;
     }
@@ -140,6 +144,8 @@ export default function OrderDetail() {
   useEffect(() => {
     if (!driverLocation || !targetCoords) return;
     if (!["accepted", "in_transit", "picked_up"].includes(order?.status)) {
+      // El pedido dejó de estar activo: retirar el ETA mostrado es el propósito del efecto.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEta(null);
       return;
     }
@@ -423,12 +429,17 @@ export default function OrderDetail() {
         )}
       </div>
 
+      {/* Paradas, accesos, receptor y desglose del precio */}
+      <ServiceExtras order={order} />
+
       {/* Vehicle & Price */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-card rounded-2xl border border-border p-4">
-          <div className="text-3xl mb-2">{order.service_type === "package" ? "📦" : vehicle?.icon}</div>
-          <p className="font-semibold text-sm text-foreground">{order.service_type === "package" ? "Envío de paquete" : vehicle?.name}</p>
-          <p className="text-xs text-muted-foreground">{order.service_type === "package" ? packageWeightLabel(order.package_weight) : vehicle?.capacity}</p>
+          <div className="text-3xl mb-2">{serviceOf(order).emoji}</div>
+          <p className="font-semibold text-sm text-foreground">{serviceOf(order).label}</p>
+          <p className="text-xs text-muted-foreground">
+            {order.service_type === "paquete" ? packageWeightLabel(order.package_weight) : vehicle?.capacity}
+          </p>
         </div>
         <div className="bg-primary/5 rounded-2xl border border-primary/20 p-4">
           <p className="text-xs text-muted-foreground">Precio</p>

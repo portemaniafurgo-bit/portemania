@@ -1,8 +1,10 @@
 import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// Dos tamaños de cara al cliente: pequeña y grande. Las fotos son solo una
-// referencia orientativa del tamaño (no el modelo exacto del conductor).
+// Dos tamaños de furgoneta. Desde la migración 0010 el cliente ya no elige
+// vehículo —lo determina el servicio—, así que esto solo describe la flota:
+// lo usan el alta de conductores, el mapa y las pantallas de seguimiento.
+// Las fotos son una referencia orientativa del tamaño, no el modelo exacto.
 const vehicleData = {
   small: {
     name: "Furgoneta pequeña",
@@ -10,8 +12,6 @@ const vehicleData = {
     description: "Ideal para cajas, electrodomésticos y muebles sueltos",
     capacity: "Tamaño orientativo · carga pequeña",
     photo: "/vehicles/pequena.jpeg",
-    basePrice: 40,
-    includedHours: 2,
   },
   large: {
     name: "Furgoneta grande",
@@ -19,15 +19,13 @@ const vehicleData = {
     description: "Para mudanzas pequeñas y cargas voluminosas",
     capacity: "Tamaño orientativo · carga grande",
     photo: "/vehicles/grande.jpeg",
-    basePrice: 60,
-    includedHours: 2,
   },
 };
 
 export { vehicleData };
 
-// `price` (opcional) sobreescribe el precio por defecto con la tarifa viva
-// de app_settings (ver src/lib/tariffs.js).
+// `price` (opcional) muestra un importe junto al vehículo. Si no se pasa, no se
+// enseña precio: es preferible a inventar uno que ya no corresponde a nada.
 export default function VehicleCard({ type, selected, onClick, price }) {
   const vehicle = vehicleData[type];
   if (!vehicle) return null;
@@ -57,7 +55,9 @@ export default function VehicleCard({ type, selected, onClick, price }) {
         <p className="text-sm text-muted-foreground mt-0.5">{vehicle.description}</p>
         <div className="mt-2 flex items-center justify-between">
           <span className="text-xs text-muted-foreground">{vehicle.capacity}</span>
-          <span className="font-semibold text-primary">{price ?? vehicle.basePrice}€ / 2h</span>
+          {Number.isFinite(Number(price)) && (
+            <span className="font-semibold text-primary">{price}€ / 2h</span>
+          )}
         </div>
       </div>
     </button>

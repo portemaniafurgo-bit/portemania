@@ -11,8 +11,8 @@ import {
 import L from "leaflet";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/entities";
 import { useAuth } from "@/lib/AuthContext";
+import { useAvailableDrivers } from "@/lib/useDrivers";
 import { vehicleData } from "@/components/common/VehicleCard";
 
 const ALBACETE_CENTER = [38.9943, -1.8585];
@@ -20,7 +20,6 @@ const ZONE_BOUNDS = [
   [38.945, -1.91],
   [39.03, -1.81],
 ];
-const REFRESH_MS = 30000;
 
 // Icono de conductor (furgoneta)
 const driverIcon = L.divIcon({
@@ -70,13 +69,15 @@ function PanTo({ position }) {
 export default function DriversMapSectionInner({ onDriverClick }) {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
-  const [drivers, setDrivers] = useState([]);
+  // Misma consulta que alimenta el contador del hero: una sola cada 30 s.
+  const { drivers } = useAvailableDrivers();
   const [visitorPos, setVisitorPos] = useState(null);
   const [isMounted, setIsMounted] = useState(false);
   const [mapKey, setMapKey] = useState(0);
 
-  // Forzar montaje
+  // Forzar montaje: Leaflet solo puede montarse en cliente, tras el primer render.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMounted(true);
   }, []);
 
@@ -92,25 +93,6 @@ export default function DriversMapSectionInner({ onDriverClick }) {
     const handleResize = () => setMapKey((prev) => prev + 1);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  // Cargar conductores
-  useEffect(() => {
-    let active = true;
-    const load = async () => {
-      try {
-        const { data, error } = await supabase.rpc("get_public_drivers");
-        if (!error && active) setDrivers(data || []);
-      } catch (err) {
-        console.error("Error cargando conductores:", err);
-      }
-    };
-    load();
-    const interval = setInterval(load, REFRESH_MS);
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
   }, []);
 
   // Geolocalización

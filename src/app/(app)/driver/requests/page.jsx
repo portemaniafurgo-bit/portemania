@@ -4,9 +4,8 @@ import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { vehicleData } from "@/components/common/VehicleCard";
 import PaymentInfo from "@/components/common/PaymentInfo";
-import { packageWeightLabel } from "@/lib/tariffs";
+import { serviceSummary } from "@/lib/tariffs";
 import { Check, MapPin, Package, Loader2 } from "lucide-react";
 import PhotoLightbox from "@/components/common/PhotoLightbox";
 import { motion } from "framer-motion";
@@ -15,6 +14,7 @@ import Link from "next/link";
 import { supabase } from "@/lib/entities";
 import { fetchMyDriverProfile, isDriverProfileIncomplete } from "@/lib/driverProfile";
 import { toast } from "@/components/ui/use-toast";
+import { serviceOf } from "@/lib/services";
 
 export default function DriverRequests() {
   const { user } = useAuth();
@@ -37,7 +37,9 @@ export default function DriverRequests() {
   // furgoneta grande solo los ven conductores con furgón grande. Los envíos de
   // paquete (máx. 30 kg) los ve cualquier conductor: caben en cualquier vehículo.
   const myVehicle = profile?.vehicle_type;
-  const requests = allRequests.filter(r => r.service_type === "package" || r.vehicle_type !== "large" || myVehicle === "large");
+  // `vehicle_type` lo fija el servidor según el servicio: 'large' solo en mini
+  // mudanza y null en los envíos de paquete, que caben en cualquier furgoneta.
+  const requests = allRequests.filter(r => r.vehicle_type !== "large" || myVehicle === "large");
   const isUnavailable = profile?.is_available === false;
 
   const acceptMutation = useMutation({
@@ -66,13 +68,14 @@ export default function DriverRequests() {
       // Obtener datos del pedido para el email
       const req = requests.find(r => r.id === requestId);
       if (req && user?.email) {
-        const vehicle = vehicleData[req.vehicle_type];
+        const service = serviceOf(req);
+        const stops = (req.stops || []).filter(s => s?.address);
         // El email es informativo: si falla, el servicio ya está aceptado
         await base44.integrations.Core.SendEmail({
           to: user.email,
           from_name: "ClicyVoy",
-          subject: req.service_type === "package" ? "📦 Nuevo envío asignado" : "🚐 Nuevo trabajo asignado",
-          body: `Hola ${user?.full_name?.split(" ")[0] || "conductor"},\n\nSe te ha asignado un nuevo servicio.\n\n📍 Recogida: ${req.origin_address}\n🏁 Entrega: ${req.destination_address}\n${req.service_type === "package" ? `📦 Envío de paquete (${packageWeightLabel(req.package_weight)})` : `🚐 Vehículo: ${vehicle?.name || req.vehicle_type}`}\n💶 Precio estimado: ${req.estimated_price?.toFixed(2)}€${req.cargo_description ? `\n📦 Contenido: ${req.cargo_description}` : ""}${req.distance_km ? `\n📏 Distancia: ${req.distance_km} km` : ""}\n\nAccede a la app para ver todos los detalles y gestionar el servicio.\n\n¡Mucho éxito!\nEl equipo de ClicyVoy`,
+          subject: `${service.emoji} Nuevo servicio asignado · ${service.label}`,
+          body: `Hola ${user?.full_name?.split(" ")[0] || "conductor"},\n\nSe te ha asignado un nuevo servicio.\n\n${service.emoji} ${serviceSummary(req)}\n📍 Recogida: ${req.origin_address}\n${stops.map((s, i) => `🔸 Parada ${i + 1}: ${s.address}\n`).join("")}🏁 Entrega: ${req.destination_address}\n💶 Precio: ${req.estimated_price?.toFixed(2)}€${req.needs_help ? "\n🤝 Ayuda del conductor contratada" : ""}${req.signature_required ? "\n✍️ Firma del receptor obligatoria" : ""}${req.cargo_description ? `\n📦 Contenido: ${req.cargo_description}` : ""}${req.distance_km ? `\n📏 Distancia: ${req.distance_km} km` : ""}\n\nAccede a la app para ver todos los detalles y gestionar el servicio.\n\n¡Mucho éxito!\nEl equipo de ClicyVoy`,
         }).catch(() => {});
       }
 
@@ -173,8 +176,8 @@ export default function DriverRequests() {
             >
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl">{req.service_type === "package" ? "📦" : vehicleData[req.vehicle_type]?.icon}</span>
-                  <span className="font-semibold text-foreground">{req.service_type === "package" ? `Paquete · ${packageWeightLabel(req.package_weight)}` : vehicleData[req.vehicle_type]?.name}</span>
+                  <span className="text-2xl">{serviceOf(req).emoji}</span>
+                  <span className="font-semibold text-foreground">{serviceSummary(req)}</span>
                 </div>
                 <span className="text-xl font-bold text-primary">{req.estimated_price?.toFixed(2)}€</span>
               </div>

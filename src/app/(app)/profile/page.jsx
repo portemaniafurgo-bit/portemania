@@ -16,6 +16,14 @@ const ROLE_LABELS = {
   staff: "Empleado",
 };
 
+const Msg = ({ msg }) =>
+  msg ? (
+    <p className={`text-sm rounded-lg px-3 py-2 flex items-center gap-2 ${msg.ok ? "bg-emerald-50 text-emerald-700" : "bg-destructive/10 text-destructive"}`}>
+      {msg.ok && <CheckCircle2 className="w-4 h-4" />}
+      {msg.text}
+    </p>
+  ) : null;
+
 export default function Profile() {
   const { user } = useAuth();
   const [phone, setPhone] = useState(user?.phone || "");
@@ -63,14 +71,6 @@ export default function Profile() {
       setChangingPass(false);
     }
   };
-
-  const Msg = ({ msg }) =>
-    msg ? (
-      <p className={`text-sm rounded-lg px-3 py-2 flex items-center gap-2 ${msg.ok ? "bg-emerald-50 text-emerald-700" : "bg-destructive/10 text-destructive"}`}>
-        {msg.ok && <CheckCircle2 className="w-4 h-4" />}
-        {msg.text}
-      </p>
-    ) : null;
 
   return (
     <div className="max-w-lg mx-auto space-y-6">
