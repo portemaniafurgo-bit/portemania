@@ -1,69 +1,487 @@
-import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { useState } from "react";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
+import { useAuth } from "../../lib/auth";
+import { useRequestForm } from "../../lib/useRequestForm";
 import { SERVICE_KEYS, SERVICES } from "../../lib/services";
-import { fetchTariffs, servicePriceFrom } from "../../lib/tariffs";
-import { Caption, Card, Heading, Screen, Title } from "../../components/ui";
+import { servicePriceFrom } from "../../lib/tariffs";
+import { pickPhotos, takePhoto } from "../../lib/photos";
+import { Body, Button, Caption, Card, ErrorText, Field, Heading, Title } from "../../components/ui";
+import { Counter, Option, PriceSummary, Steps, Toggle } from "../../components/wizard";
 import { colors, radius, spacing } from "../../theme";
 
 /**
- * Elección de servicio — primer paso del asistente de pedido.
+ * Asistente de pedido. Cuatro pasos tras elegir servicio:
+ *   0 servicio · 1 contacto y direcciones · 2 carga · 3 detalles · 4 resumen
  *
- * Lee el catálogo de `lib/services.js` y los precios de `app_settings.tariffs`,
- * los MISMOS que la web: si el admin cambia una tarifa en Ajustes, la app lo
- * refleja sin tocar código. Los precios que se ven aquí son informativos; el
- * importe real lo fija `compute_quote` en el servidor.
- *
- * El asistente completo (pasos, direcciones, fotos, pago) es la Etapa 2.
+ * Las validaciones y el cálculo viven en `lib/useRequestForm.js`, compartidos
+ * con la web. Esta pantalla solo presenta. El precio que se ve es informativo:
+ * el que se cobra lo fija el servidor al crear el pedido.
  */
-export default function PedirServicio() {
-  const [tariffs, setTariffs] = useState(null);
+const TOTAL_STEPS = 5;
 
-  useEffect(() => {
-    let active = true;
-    fetchTariffs().then(t => {
-      if (active) setTariffs(t);
-    });
-    return () => {
-      active = false;
-    };
-  }, []);
+export default function Pedir() {
+  const router = useRouter();
+  const { user } = useAuth();
+  const wizard = useRequestForm({ user });
+  const {
+    form,
+    update,
+    service,
+    setService,
+    setZone,
+    tariffs,
+    quote,
+    photos,
+    addPhotos,
+    removePhoto,
+    uploading,
+    addressErrors,
+    acceptPortal,
+    setAcceptPortal,
+    acceptTerms,
+    setAcceptTerms,
+    validateStep,
+    findRecentDuplicate,
+    submit,
+    clearDraft,
+    weightOptions,
+    destinationZoneKey,
+  } = wizard;
+
+  const [step, setStep] = useState(0);
+  const [error, setError] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const next = () => {
+    const { ok, reason } = validateStep(step);
+    if (!ok) {
+      setError(reason);
+      return;
+    }
+    setError("");
+    setStep(s => Math.min(TOTAL_STEPS - 1, s + 1));
+  };
+
+  const back = () => {
+    setError("");
+    setStep(s => Math.max(0, s - 1));
+  };
+
+  const create = async () => {
+    setError("");
+    setSending(true);
+    try {
+      const duplicate = await findRecentDuplicate();
+      if (duplicate) {
+        setSending(false);
+        Alert.alert(
+          "Ya tienes un pedido en marcha",
+          "Hace menos de 30 minutos creaste otro pedido que sigue activo. ¿Quieres crear este también?",
+          [
+            { text: "Ver mis pedidos", onPress: () => router.push("/(cliente)/orders") },
+            { text: "Crear igualmente", style: "destructive", onPress: () => reallyCreate() },
+          ],
+        );
+        return;
+      }
+      await reallyCreate();
+    } catch (err) {
+      setError("No se pudo crear el pedido: " + (err.message || "error de conexión"));
+      setSending(false);
+    }
+  };
+
+  const reallyCreate = async () => {
+    setSending(true);
+    try {
+      await submit();
+      setStep(0);
+      router.push("/(cliente)/orders");
+    } catch (err) {
+      setError("No se pudo crear el pedido: " + (err.message || "error de conexión"));
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const addFromCamera = async () => {
+    try {
+      await addPhotos(await takePhoto());
+    } catch (err) {
+      setError("No se pudo subir la foto: " + (err.message || "error de conexión"));
+    }
+  };
+
+  const addFromGallery = async () => {
+    try {
+      await addPhotos(await pickPhotos());
+    } catch (err) {
+      setError("No se pudo subir la foto: " + (err.message || "error de conexión"));
+    }
+  };
 
   return (
-    <Screen>
-      <View style={{ gap: spacing.xs, marginTop: spacing.sm }}>
-        <Heading>¿Qué necesitas mover?</Heading>
-        <Caption>Albacete capital · furgoneta y conductor</Caption>
-      </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right"]}>
+      <ScrollView
+        contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Steps current={step} total={TOTAL_STEPS} />
 
-      {SERVICE_KEYS.map(key => {
-        const service = SERVICES[key];
-        const price = tariffs ? servicePriceFrom(tariffs, key) : null;
-        return (
-          <Pressable key={key} disabled>
+        {/* ---------- Paso 0: servicio ---------- */}
+        {step === 0 && (
+          <>
+            <View style={{ gap: spacing.xs }}>
+              <Heading>¿Qué necesitas mover?</Heading>
+              <Caption>Albacete capital · furgoneta y conductor</Caption>
+            </View>
+            {SERVICE_KEYS.map(key => {
+              const item = SERVICES[key];
+              const price = servicePriceFrom(tariffs, key);
+              const selected = form.service === key;
+              return (
+                <Pressable key={key} onPress={() => setService(key)}>
+                  <Card style={selected ? { borderColor: colors.primary, borderWidth: 2 } : null}>
+                    <View style={styles.row}>
+                      <Text style={styles.emoji}>{item.emoji}</Text>
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Title>{item.label}</Title>
+                        <Caption>{item.tagline}</Caption>
+                      </View>
+                      <View style={{ alignItems: "flex-end" }}>
+                        <Caption>desde</Caption>
+                        <Text style={styles.price}>{price} €</Text>
+                      </View>
+                    </View>
+                  </Card>
+                </Pressable>
+              );
+            })}
+          </>
+        )}
+
+        {/* ---------- Paso 1: contacto y direcciones ---------- */}
+        {step === 1 && (
+          <>
+            <Heading>¿Dónde recogemos y dónde llevamos?</Heading>
             <Card>
-              <View style={styles.row}>
-                <Text style={styles.emoji}>{service.emoji}</Text>
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Title>{service.label}</Title>
-                  <Caption>{service.tagline}</Caption>
+              <Field
+                label="Teléfono de contacto"
+                value={form.client_phone}
+                onChangeText={v => update("client_phone", v)}
+                placeholder="600 000 000"
+                keyboardType="phone-pad"
+                inputMode="tel"
+              />
+              <Field
+                label="Dirección de recogida"
+                value={form.origin_address}
+                onChangeText={v => update("origin_address", v)}
+                placeholder="Calle, número y código postal"
+                error={form.origin_address ? addressErrors.origin : ""}
+              />
+
+              {service.hasZones && (
+                <View style={{ gap: spacing.sm }}>
+                  <Caption>Zona de entrega</Caption>
+                  <Option
+                    label="Albacete capital"
+                    description="Entrega el mismo día"
+                    selected={destinationZoneKey === "albacete"}
+                    onPress={() => setZone("albacete")}
+                  />
+                  <Option
+                    label="Villarrobledo"
+                    description="Hasta 10 kg · entrega en 24 h"
+                    selected={destinationZoneKey === "villarrobledo"}
+                    onPress={() => setZone("villarrobledo")}
+                  />
                 </View>
-                <View style={{ alignItems: "flex-end" }}>
-                  <Caption>desde</Caption>
-                  <Text style={styles.price}>{price != null ? `${price} €` : "—"}</Text>
+              )}
+
+              <Field
+                label="Dirección de entrega"
+                value={form.destination_address}
+                onChangeText={v => update("destination_address", v)}
+                placeholder="Calle, número y código postal"
+                error={form.destination_address ? addressErrors.destination : ""}
+              />
+            </Card>
+            <Caption>
+              De momento la dirección se escribe a mano, igual que en la web. El autocompletado y el
+              punto en el mapa llegan enseguida.
+            </Caption>
+          </>
+        )}
+
+        {/* ---------- Paso 2: la carga ---------- */}
+        {step === 2 && (
+          <>
+            <Heading>¿Qué transportamos?</Heading>
+            <Card>
+              <Field
+                label="Describe la carga"
+                value={form.cargo_description}
+                onChangeText={v => update("cargo_description", v)}
+                placeholder="Ej.: un sofá de 2 plazas y dos cajas medianas"
+                multiline
+                numberOfLines={3}
+                style={{ minHeight: 90, textAlignVertical: "top" }}
+              />
+
+              <View style={{ gap: spacing.sm }}>
+                <Caption>Fotos de la carga{service.needsPhotos ? " (al menos 1)" : " (opcional)"}</Caption>
+                <View style={styles.photos}>
+                  {photos.map((url, i) => (
+                    <Pressable key={url} onPress={() => removePhoto(i)}>
+                      <Image source={{ uri: url }} style={styles.photo} />
+                      <View style={styles.photoRemove}>
+                        <Text style={styles.photoRemoveText}>×</Text>
+                      </View>
+                    </Pressable>
+                  ))}
                 </View>
+                <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                  <Button title="Cámara" variant="plain" onPress={addFromCamera} loading={uploading} style={{ flex: 1 }} />
+                  <Button title="Galería" variant="plain" onPress={addFromGallery} loading={uploading} style={{ flex: 1 }} />
+                </View>
+                <Caption>Toca una foto para quitarla. Se comprimen antes de subirlas.</Caption>
               </View>
             </Card>
-          </Pressable>
-        );
-      })}
 
-      <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
-        <Caption>
-          El asistente de pedido llega en la Etapa 2. De momento esta pantalla comprueba que la app
-          lee el catálogo y las tarifas reales del mismo backend que la web.
-        </Caption>
-      </Card>
-    </Screen>
+            {service.hasHelp && (
+              <Card>
+                <Toggle
+                  label="Necesito ayuda del conductor"
+                  description={`El conductor sube y baja la carga contigo (+${tariffs.mudanza_help} €)`}
+                  value={form.needs_help}
+                  onValueChange={v => update("needs_help", v)}
+                />
+                {form.needs_help ? (
+                  <>
+                    <Field
+                      label="¿Con qué necesitas ayuda?"
+                      value={form.help_description}
+                      onChangeText={v => update("help_description", v)}
+                      placeholder="Ej.: bajar un armario desde un tercero sin ascensor"
+                    />
+                    {service.hasAccess && (
+                      <>
+                        <Toggle
+                          label="¿Hay ascensor en la recogida?"
+                          value={form.origin_has_lift === true}
+                          onValueChange={v => update("origin_has_lift", v)}
+                        />
+                        {form.origin_has_lift === false && (
+                          <Counter
+                            label="Plantas en la recogida"
+                            value={form.origin_floors}
+                            onChange={v => update("origin_floors", v)}
+                            min={0}
+                            max={12}
+                          />
+                        )}
+                        <Toggle
+                          label="¿Hay ascensor en la entrega?"
+                          value={form.destination_has_lift === true}
+                          onValueChange={v => update("destination_has_lift", v)}
+                        />
+                        {form.destination_has_lift === false && (
+                          <Counter
+                            label="Plantas en la entrega"
+                            value={form.destination_floors}
+                            onChange={v => update("destination_floors", v)}
+                            min={0}
+                            max={12}
+                          />
+                        )}
+                      </>
+                    )}
+                  </>
+                ) : null}
+              </Card>
+            )}
+
+            {(!service.hasHelp || !form.needs_help) &&
+              service.key !== "paquete" &&
+              service.key !== "porte_tienda" && (
+                <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
+                  <Toggle
+                    label="La carga está a pie de calle"
+                    description="Sin ayuda contratada, el conductor no sube a domicilio: la mercancía tiene que estar preparada abajo."
+                    value={acceptPortal}
+                    onValueChange={setAcceptPortal}
+                  />
+                </Card>
+              )}
+
+            <Card>
+              <Toggle
+                label="Acepto los términos y la política de privacidad"
+                value={acceptTerms}
+                onValueChange={setAcceptTerms}
+              />
+            </Card>
+          </>
+        )}
+
+        {/* ---------- Paso 3: detalles del servicio ---------- */}
+        {step === 3 && (
+          <>
+            <Heading>Últimos detalles</Heading>
+            <Card>
+              {service.hasWeights && (
+                <View style={{ gap: spacing.sm }}>
+                  <Caption>Peso del paquete</Caption>
+                  {weightOptions.map(w => (
+                    <Option
+                      key={w.key}
+                      label={w.label}
+                      description={`${tariffs[w.priceKey]} €`}
+                      selected={form.package_weight === w.key}
+                      onPress={() => update("package_weight", w.key)}
+                    />
+                  ))}
+                </View>
+              )}
+
+              {service.hasItemsLimit && (
+                <Counter
+                  label={`Objetos a transportar (máx. ${service.maxItems})`}
+                  value={form.items_count}
+                  onChange={v => update("items_count", v)}
+                  min={1}
+                  max={service.maxItems}
+                />
+              )}
+
+              {service.hasExtraHours && (
+                <Counter
+                  label={`Horas extra (+${tariffs.mudanza_extra_hour} €/h)`}
+                  value={form.extra_hours}
+                  onChange={v => update("extra_hours", v)}
+                  min={0}
+                  max={8}
+                />
+              )}
+
+              {service.hasInsurance && (
+                <Toggle
+                  label="Seguro de mercancía"
+                  description={`Cobertura adicional por ${tariffs.insurance} €`}
+                  value={form.insurance_selected}
+                  onValueChange={v => update("insurance_selected", v)}
+                />
+              )}
+
+              {service.needsRecipient && (
+                <>
+                  <Field
+                    label="¿Quién recibe el envío?"
+                    value={form.recipient_name}
+                    onChangeText={v => update("recipient_name", v)}
+                    placeholder="Nombre y apellidos"
+                  />
+                  <Field
+                    label="Teléfono del destinatario"
+                    value={form.recipient_phone}
+                    onChangeText={v => update("recipient_phone", v)}
+                    placeholder="600 000 000"
+                    keyboardType="phone-pad"
+                    inputMode="tel"
+                  />
+                </>
+              )}
+
+              <Field
+                label="Notas para el conductor (opcional)"
+                value={form.notes}
+                onChangeText={v => update("notes", v)}
+                placeholder="Ej.: el portal es el del fondo"
+              />
+            </Card>
+          </>
+        )}
+
+        {/* ---------- Paso 4: resumen y pago ---------- */}
+        {step === 4 && (
+          <>
+            <Heading>Resumen del pedido</Heading>
+            <Card>
+              <Title>
+                {service.emoji} {service.label}
+              </Title>
+              <Caption>Recogida: {form.origin_address}</Caption>
+              <Caption>Entrega: {form.destination_address}</Caption>
+              <Caption>{form.cargo_description}</Caption>
+            </Card>
+
+            <Card>
+              <PriceSummary quote={quote} />
+            </Card>
+
+            <Card>
+              <Caption>¿Cómo quieres pagar?</Caption>
+              <Option
+                label="Efectivo al conductor"
+                description="Pagas al terminar el servicio"
+                selected={form.payment_method === "cash"}
+                onPress={() => update("payment_method", "cash")}
+              />
+              <Option
+                label="Tarjeta"
+                description="Se paga desde la app al confirmar el pedido"
+                selected={form.payment_method === "card"}
+                onPress={() => update("payment_method", "card")}
+              />
+              {form.payment_method === "card" ? (
+                <Caption>
+                  El cobro con tarjeta desde la app llega en el siguiente paso del desarrollo. De
+                  momento el pedido se crea como pendiente de pago y puedes pagarlo desde
+                  clicyvoy.es.
+                </Caption>
+              ) : null}
+            </Card>
+          </>
+        )}
+
+        <ErrorText>{error}</ErrorText>
+
+        {/* ---------- Navegación ---------- */}
+        <View style={{ flexDirection: "row", gap: spacing.sm }}>
+          {step > 0 && <Button title="Atrás" variant="plain" onPress={back} style={{ flex: 1 }} />}
+          {step < TOTAL_STEPS - 1 ? (
+            <Button title="Continuar" onPress={next} style={{ flex: 2 }} />
+          ) : (
+            <Button title="Confirmar pedido" onPress={create} loading={sending} style={{ flex: 2 }} />
+          )}
+        </View>
+
+        {step > 0 && (
+          <Pressable
+            onPress={() =>
+              Alert.alert("Empezar de cero", "Se borrará lo que has escrito en este pedido.", [
+                { text: "Seguir aquí", style: "cancel" },
+                {
+                  text: "Empezar de cero",
+                  style: "destructive",
+                  onPress: async () => {
+                    await clearDraft();
+                    setStep(0);
+                  },
+                },
+              ])
+            }
+          >
+            <Caption style={{ textAlign: "center" }}>Descartar y empezar de cero</Caption>
+          </Pressable>
+        )}
+
+        <Body style={{ height: spacing.xl }} />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -80,4 +498,18 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   price: { fontSize: 18, fontWeight: "700", color: colors.primary },
+  photos: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  photo: { width: 84, height: 84, borderRadius: radius.md, backgroundColor: colors.secondary },
+  photoRemove: {
+    position: "absolute",
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: radius.full,
+    backgroundColor: colors.destructive,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  photoRemoveText: { color: "#fff", fontSize: 16, lineHeight: 18, fontWeight: "700" },
 });
