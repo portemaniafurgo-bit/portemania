@@ -15,9 +15,16 @@ reglas de negocio.
 el conductor recibe ofertas, las acepta, avanza estados y **emite posición con
 el móvil bloqueado**.
 
-Pendiente: pago con tarjeta desde la app (T2.6), ganancias del conductor (T4.7),
-subida de documentos con cámara (T4.8), firma de entrega (T4.9), Sentry y la
-publicación en Play Store (Etapa 6).
+El pago con tarjeta y Google Pay funciona con PaymentSheet contra las mismas
+Edge Functions que la web (claves de prueba).
+
+Pendiente: ganancias del conductor (T4.7, necesita una vista en BD para que
+cuadre con Finanzas del admin), subida de documentos con cámara (T4.8), firma de
+entrega (T4.9), Sentry y la publicación en Play Store (Etapa 6).
+
+⚠️ **Añadir un módulo nativo obliga a regenerar la development build**: el APK
+que ya esté instalado no lo incluye y la app casca al usarlo. Los cambios de
+JavaScript, en cambio, se recargan solos.
 
 ⚠️ **El push está inerte** hasta que se aplique la migración `0011` y se
 despliegue `send-push`. Sin la tabla `push_tokens` el registro falla en silencio

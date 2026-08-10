@@ -26,13 +26,14 @@
 | T2.3 fotos con compresión | Hecha |
 | T2.4 precio en vivo + servidor | Hecha |
 | T2.5 aviso de duplicado | Hecha |
-| T2.6 pago con tarjeta (PaymentSheet) | **Pendiente** — el pedido se crea y se paga desde la web |
+| T2.6 pago con tarjeta (PaymentSheet + Google Pay) | Hecha (claves de prueba, sin probar en dispositivo) |
 | T2.7 borrador local | Hecha |
 | T3.1 – T3.4 seguimiento, chat, historial | Hechas (chat sin fotos ni badge de no leídos) |
 | T4.1 – T4.6 ofertas, estados, GPS, chat | Hechas |
 | T4.7 ganancias | Pendiente: necesita la vista en BD |
 | T4.8 documentos con cámara | Pendiente |
-| T4.9 prueba de entrega (firma) | Pendiente |
+| T4.9 prueba de entrega (firma) | Pendiente — necesita `react-native-svg` + `react-native-view-shot`, y **añadir un módulo nativo obliga a regenerar la dev build** |
+| Opinión del conductor al finalizar | Hecha (paridad) |
 | T5.1 – T5.4 push | Hechas en la app; **inertes hasta aplicar la 0011 y desplegar `send-push`** |
 | Etapa 6 (QA, Play Store) | Pendiente |
 
