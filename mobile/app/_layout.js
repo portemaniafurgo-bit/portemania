@@ -3,6 +3,8 @@ import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { StripeProvider } from "@stripe/stripe-react-native";
+import { STRIPE_MERCHANT_ID, STRIPE_PUBLISHABLE_KEY } from "../lib/payments";
 import { AuthProvider, useAuth } from "../lib/auth";
 import { usePushNotifications } from "../lib/push";
 import { Loading } from "../components/ui";
@@ -58,10 +60,15 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <AuthProvider>
-          <StatusBar style="dark" />
-          <RootNavigation />
-        </AuthProvider>
+        <StripeProvider
+          publishableKey={STRIPE_PUBLISHABLE_KEY}
+          merchantIdentifier={STRIPE_MERCHANT_ID}
+        >
+          <AuthProvider>
+            <StatusBar style="dark" />
+            <RootNavigation />
+          </AuthProvider>
+        </StripeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

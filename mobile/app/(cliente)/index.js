@@ -445,9 +445,8 @@ export default function Pedir() {
               />
               {form.payment_method === "card" ? (
                 <Caption>
-                  El cobro con tarjeta desde la app llega en el siguiente paso del desarrollo. De
-                  momento el pedido se crea como pendiente de pago y puedes pagarlo desde
-                  clicyvoy.es.
+                  Al confirmar, el pedido se crea y podrás pagarlo desde su pantalla con tarjeta o
+                  Google Pay.
                 </Caption>
               ) : null}
             </Card>

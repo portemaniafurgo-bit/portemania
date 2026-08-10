@@ -9,6 +9,7 @@ import { serviceOf } from "../../../lib/services";
 import { Body, Button, Caption, Card, Field, Heading, Loading, Title } from "../../../components/ui";
 import TrackingMap from "../../../components/TrackingMap";
 import ReportIncident from "../../../components/ReportIncident";
+import PayButton from "../../../components/PayButton";
 import { colors, radius, spacing } from "../../../theme";
 
 /**
@@ -158,6 +159,12 @@ export default function OrderDetail() {
             <Text style={styles.price}>{order.estimated_price} €</Text>
           ) : null}
         </Card>
+
+        {/* Pago con tarjeta pendiente. En efectivo no aparece: se paga al
+            conductor al terminar. */}
+        {order.payment_method === "card" &&
+          order.payment_status !== "paid" &&
+          order.status !== "cancelled" && <PayButton order={order} />}
 
         {/* Valoración: solo tras la entrega y una sola vez */}
         {order.status === "delivered" && !order.client_rating && (
