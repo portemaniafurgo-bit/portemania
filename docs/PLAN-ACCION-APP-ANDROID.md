@@ -17,10 +17,24 @@
 |---|---|
 | T0.1 migración 0011 | Escrita en `supabase/migrations/`. **Sin aplicar en prod** (bloqueo 1) |
 | T0.2 `send-push` | Escrita en `supabase/functions/send-push/`. **Sin desplegar** (bloqueo 1) |
-| T0.3 / T0.4 frescura GPS | Hechas, en la rama `pendiente/gps-frescura`. **No mergear** hasta aplicar la 0011 |
+| T0.3 / T0.4 frescura GPS (web) | Hechas, en la rama `pendiente/gps-frescura`. **No mergear** hasta aplicar la 0011 |
 | T0.5 prioridad de incidencias | Hecha y desplegada |
-| T1.1 – T1.7 esqueleto Expo | Hechas (falta T1.7 Sentry: necesita DSN) |
-| Etapas 2-6 | Pendientes |
+| T1.1 – T1.6 esqueleto Expo | Hechas. Proyecto EAS `@clicyvoys-team/clicyvoy` creado |
+| T1.7 Sentry | Pendiente: necesita DSN |
+| T2.1 asistente con los 4 servicios | Hecha |
+| T2.2 direcciones con autocompletado | Hecha (falta el pin arrastrable en el mapa) |
+| T2.3 fotos con compresión | Hecha |
+| T2.4 precio en vivo + servidor | Hecha |
+| T2.5 aviso de duplicado | Hecha |
+| T2.6 pago con tarjeta (PaymentSheet) | **Pendiente** — el pedido se crea y se paga desde la web |
+| T2.7 borrador local | Hecha |
+| T3.1 – T3.4 seguimiento, chat, historial | Hechas (chat sin fotos ni badge de no leídos) |
+| T4.1 – T4.6 ofertas, estados, GPS, chat | Hechas |
+| T4.7 ganancias | Pendiente: necesita la vista en BD |
+| T4.8 documentos con cámara | Pendiente |
+| T4.9 prueba de entrega (firma) | Pendiente |
+| T5.1 – T5.4 push | Hechas en la app; **inertes hasta aplicar la 0011 y desplegar `send-push`** |
+| Etapa 6 (QA, Play Store) | Pendiente |
 
 **Bloqueo 1 — sólo lo puede desbloquear el usuario.** Escribir en el Supabase de
 producción requiere que el usuario **nombre explícitamente el proyecto
@@ -352,7 +366,7 @@ Pídelos **al empezar la etapa que los necesita**, no antes:
 
 | Cuándo | Qué | Para qué |
 |---|---|---|
-| Etapa 1 | Cuenta **Expo/EAS** (gratuita) | Dev builds y builds firmados |
+| ~~Etapa 1~~ | ~~Cuenta **Expo/EAS**~~ — hecha: cuenta `clicyvoys-team`, proyecto `clicyvoy` | Dev builds y builds firmados |
 | Etapa 5 | Proyecto **Firebase** (gratuito) + `google-services.json` + service account subido con `eas credentials` | FCM (transporte del push en Android) |
 | Etapa 1 | DSN de **Sentry** (plan gratuito) | Crash reporting |
 | Etapa 2 | Publishable key **test** de Stripe (ya existe en la web) | PaymentSheet |

@@ -10,10 +10,20 @@ reglas de negocio.
 
 ## Estado
 
-**Etapa 1 (esqueleto) terminada.** Hay sesión persistente, enrutado por rol y
-pantallas que ya leen datos reales de producción. El asistente de pedido, el
-seguimiento en vivo, el chat, el GPS en segundo plano y el push llegan en las
-etapas 2-5.
+**Etapas 1 a 5 construidas.** Funciona el ciclo completo: el cliente pide
+(4 servicios, fotos, precio en vivo), sigue al conductor en el mapa y chatea;
+el conductor recibe ofertas, las acepta, avanza estados y **emite posición con
+el móvil bloqueado**.
+
+Pendiente: pago con tarjeta desde la app (T2.6), ganancias del conductor (T4.7),
+subida de documentos con cámara (T4.8), firma de entrega (T4.9), Sentry y la
+publicación en Play Store (Etapa 6).
+
+⚠️ **El push está inerte** hasta que se aplique la migración `0011` y se
+despliegue `send-push`. Sin la tabla `push_tokens` el registro falla en silencio
+y la app sigue avisando solo por email. Y sin la columna `location_updated_at`,
+la escritura de posición del conductor falla: **eso apaga el seguimiento en
+vivo**, así que es el primer paso pendiente.
 
 ## Arrancar
 
@@ -41,11 +51,21 @@ app/                 rutas (expo-router, navegación por ficheros)
   _layout.js         guardia de sesión: decide grupo según el rol
   (auth)/            login, registro, recuperar contraseña
   (cliente)/         pestañas Pedir · Mis pedidos · Perfil
+    index.js         asistente de pedido (5 pasos)
+    order/[id].js    seguimiento en vivo, chat, valoración e incidencias
   (conductor)/       pestañas Ofertas · Ganancias · Perfil
-components/ui.js     piezas de UI compartidas (Card, Button, Field…)
+    index.js         ofertas y aceptación anti-carrera
+    job/[id].js      trabajo activo: estados, navegación, chat
+components/          ui.js, wizard.js, AddressField, TrackingMap, ReportIncident
 lib/
   supabase.js        cliente con sesión en SecureStore (partida en trozos)
   auth.js            contexto de sesión y rol
+  useRequestForm.js  estado, validación y envío del pedido
+  orders.js          pedido, posición y chat EN TIEMPO REAL
+  tracking.js        GPS en segundo plano del conductor
+  push.js            registro del token y apertura por notificación
+  photos.js          cámara/galería con compresión antes de subir
+  addresses.js       autocompletado y "usar mi ubicación"
   driverProfile.js   lookup del perfil de conductor POR EMAIL (ver aviso abajo)
   services.js        catálogo de servicios      ─┐
   pricing.js         motor de precios            ├─ copiados de src/lib de la web:
@@ -66,7 +86,12 @@ theme.js             colores y tipografías de la web, en hex
   que piden una versión de react distinta a la del SDK. Sin eso, `npm install`
   falla.
 - **Mapas gratis**: MapLibre con tiles de OpenStreetMap, sin API keys, igual que
-  la web. No introducir Google Maps (de pago).
+  la web. No introducir Google Maps (de pago). Ojo: **MapLibre v11 cambió la API
+  entera** — es `Map`/`Marker`/`GeoJSONSource`, no `MapView`/`PointAnnotation`.
+- **Orden de las coordenadas**: `eta.js` las devuelve como `[lat, lng]` porque la
+  web usa Leaflet; GeoJSON y MapLibre las quieren como `[lng, lat]`.
+- **Nada de sondeos.** El estado, la posición y el chat van por Realtime. Si
+  añades una pantalla viva, suscríbete; no pongas un `setInterval`.
 
 ## Comprobar que sigue compilando
 
