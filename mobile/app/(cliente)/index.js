@@ -9,6 +9,7 @@ import { servicePriceFrom } from "../../lib/tariffs";
 import { pickPhotos, takePhoto } from "../../lib/photos";
 import { Body, Button, Caption, Card, ErrorText, Field, Heading, Title } from "../../components/ui";
 import { Counter, Option, PriceSummary, Steps, Toggle } from "../../components/wizard";
+import AddressField from "../../components/AddressField";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -175,12 +176,18 @@ export default function Pedir() {
                 keyboardType="phone-pad"
                 inputMode="tel"
               />
-              <Field
+              <AddressField
                 label="Dirección de recogida"
                 value={form.origin_address}
-                onChangeText={v => update("origin_address", v)}
-                placeholder="Calle, número y código postal"
+                zone="albacete"
                 error={form.origin_address ? addressErrors.origin : ""}
+                onChange={(text, picked) => {
+                  update("origin_address", text);
+                  // Coordenadas del geocodificador: evitan una segunda búsqueda
+                  // al enviar y son más fiables que re-geocodificar el texto.
+                  update("origin_lat", picked?.lat ?? null);
+                  update("origin_lng", picked?.lng ?? null);
+                }}
               />
 
               {service.hasZones && (
@@ -201,18 +208,18 @@ export default function Pedir() {
                 </View>
               )}
 
-              <Field
+              <AddressField
                 label="Dirección de entrega"
                 value={form.destination_address}
-                onChangeText={v => update("destination_address", v)}
-                placeholder="Calle, número y código postal"
+                zone={destinationZoneKey}
                 error={form.destination_address ? addressErrors.destination : ""}
+                onChange={(text, picked) => {
+                  update("destination_address", text);
+                  update("destination_lat", picked?.lat ?? null);
+                  update("destination_lng", picked?.lng ?? null);
+                }}
               />
             </Card>
-            <Caption>
-              De momento la dirección se escribe a mano, igual que en la web. El autocompletado y el
-              punto en el mapa llegan enseguida.
-            </Caption>
           </>
         )}
 

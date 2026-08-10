@@ -191,9 +191,14 @@ export function useRequestForm({ user } = {}) {
   const computeRoute = useCallback(async () => {
     if (!form.origin_address || !form.destination_address) return null;
     try {
+      // Si la dirección se eligió del autocompletado ya tenemos sus coordenadas
+      // exactas; volver a geocodificar el texto solo añadiría una petición y la
+      // posibilidad de acertar peor.
       const [from, to] = await Promise.all([
-        geocodeAlbacete(form.origin_address),
-        geocodeAlbacete(form.destination_address),
+        form.origin_lat ? { lat: form.origin_lat, lng: form.origin_lng } : geocodeAlbacete(form.origin_address),
+        form.destination_lat
+          ? { lat: form.destination_lat, lng: form.destination_lng }
+          : geocodeAlbacete(form.destination_address),
       ]);
       if (!from || !to) return null;
       const route = await fetchRouteEta(from, to);
@@ -209,7 +214,14 @@ export function useRequestForm({ user } = {}) {
     } catch {
       return null;
     }
-  }, [form.origin_address, form.destination_address]);
+  }, [
+    form.origin_address,
+    form.destination_address,
+    form.origin_lat,
+    form.origin_lng,
+    form.destination_lat,
+    form.destination_lng,
+  ]);
 
   // --- Validación por paso -------------------------------------------------
   /** @returns {{ok: boolean, reason: string}} motivo visible para el cliente. */
@@ -292,7 +304,11 @@ export function useRequestForm({ user } = {}) {
    * trigger); `quote` solo es lo que se le enseñó al cliente.
    */
   const submit = useCallback(async () => {
-    const route = form.origin_lat ? null : await computeRoute();
+    // Hace falta la ruta si falta cualquiera de las dos puntas o la distancia:
+    // con el autocompletado es normal tener una dirección con coordenadas y la
+    // otra escrita a mano, y sin las dos el pedido llegaría sin destino al mapa.
+    const needsRoute = !form.origin_lat || !form.destination_lat || !form.distance_km;
+    const route = needsRoute ? await computeRoute() : null;
     const payload = {
       client_name: form.client_name || user?.user_metadata?.full_name || user?.email || "Cliente",
       client_phone: form.client_phone,
