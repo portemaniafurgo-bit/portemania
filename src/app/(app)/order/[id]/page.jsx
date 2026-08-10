@@ -34,6 +34,22 @@ import DriverTrackingMap from "@/components/common/DriverTrackingMap";
 import { fetchRouteEta, geocodeAlbacete, distanceKm } from "@/lib/eta";
 import { serviceOf } from "@/lib/services";
 
+// Una posición se considera "en vivo" si se escribió hace menos de un minuto.
+// El conductor la publica cada 15 s desde la web (y cada ~10 s desde la app),
+// así que un hueco mayor significa que dejó de emitir: móvil bloqueado,
+// pestaña cerrada o sin cobertura. Presentarla como actual engaña al cliente.
+const FRESH_LOCATION_MS = 60_000;
+
+function locationFreshness(updatedAt) {
+  if (!updatedAt) return { fresh: false, label: "antigüedad desconocida" };
+  const ageMinutes = Math.floor((Date.now() - new Date(updatedAt).getTime()) / 60_000);
+  if (Date.now() - new Date(updatedAt).getTime() < FRESH_LOCATION_MS) {
+    return { fresh: true, label: "en vivo" };
+  }
+  if (ageMinutes < 60) return { fresh: false, label: `hace ${ageMinutes} min` };
+  return { fresh: false, label: `hace ${Math.floor(ageMinutes / 60)} h` };
+}
+
 export default function OrderDetail() {
   const { id } = useParams();
   const { user } = useAuth();
@@ -80,7 +96,11 @@ export default function OrderDetail() {
               const prof = p?.[0] || null;
               setDriverProfile(prof);
               if (prof?.current_lat && prof?.current_lng) {
-                setDriverLocation({ lat: prof.current_lat, lng: prof.current_lng });
+                setDriverLocation({
+                  lat: prof.current_lat,
+                  lng: prof.current_lng,
+                  updatedAt: prof.location_updated_at,
+                });
               }
             });
           }
@@ -107,7 +127,11 @@ export default function OrderDetail() {
       const profiles = await base44.entities.DriverProfile.filter({ created_by_id: order.driver_id }, "created_date", 1);
       const prof = profiles?.[0];
       if (prof?.current_lat && prof?.current_lng) {
-        setDriverLocation({ lat: prof.current_lat, lng: prof.current_lng });
+        setDriverLocation({
+          lat: prof.current_lat,
+          lng: prof.current_lng,
+          updatedAt: prof.location_updated_at,
+        });
       }
     };
     poll();
@@ -332,8 +356,13 @@ export default function OrderDetail() {
 
       {/* ETA en tiempo real / llegada inminente */}
       {["accepted", "in_transit", "picked_up"].includes(order.status) && (() => {
+        const freshness = driverLocation ? locationFreshness(driverLocation.updatedAt) : null;
+        // "Está llegando" solo si la posición es reciente: con una congelada a
+        // 80 m el cliente saldría a la calle a esperar a un conductor que ya no
+        // está ahí.
         const arriving =
-          driverLocation && targetCoords && distanceKm(driverLocation, targetCoords) < 0.12;
+          driverLocation && targetCoords && freshness?.fresh &&
+          distanceKm(driverLocation, targetCoords) < 0.12;
         if (arriving) {
           return (
             <div className="bg-emerald-50 rounded-2xl border-2 border-emerald-300 p-4 flex items-center gap-3">
@@ -356,7 +385,12 @@ export default function OrderDetail() {
                   Llega a {eta.label} en ~{eta.minutes} min
                   <span className="text-primary"> · {format(addMinutes(new Date(), eta.minutes), "HH:mm")}</span>
                 </p>
-                <p className="text-xs text-muted-foreground">{eta.km} km por carretera · se actualiza en vivo</p>
+                <p className="text-xs text-muted-foreground">
+                  {eta.km} km por carretera ·{" "}
+                  {freshness?.fresh
+                    ? "posición en vivo"
+                    : `posición de ${freshness?.label ?? "antigüedad desconocida"}`}
+                </p>
               </div>
             </div>
           );
@@ -366,14 +400,33 @@ export default function OrderDetail() {
 
       {/* Map con la ruta del conductor */}
       {order.status !== "cancelled" && (
-        <DriverTrackingMap
-          driverLocation={driverLocation}
-          originLat={order.origin_lat ?? targetCoords?.lat}
-          originLng={order.origin_lng ?? targetCoords?.lng}
-          destLat={order.destination_lat}
-          destLng={order.destination_lng}
-          route={eta?.coords}
-        />
+        <div className="space-y-2">
+          <DriverTrackingMap
+            driverLocation={driverLocation}
+            originLat={order.origin_lat ?? targetCoords?.lat}
+            originLng={order.origin_lng ?? targetCoords?.lng}
+            destLat={order.destination_lat}
+            destLng={order.destination_lng}
+            route={eta?.coords}
+          />
+          {driverLocation && (() => {
+            const freshness = locationFreshness(driverLocation.updatedAt);
+            return (
+              <p className="text-xs flex items-center gap-1.5 px-1">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    freshness.fresh ? "bg-emerald-500 animate-pulse" : "bg-amber-500"
+                  }`}
+                />
+                <span className={freshness.fresh ? "text-emerald-700" : "text-amber-700"}>
+                  {freshness.fresh
+                    ? "Posición del conductor en vivo"
+                    : `Última posición del conductor ${freshness.label}`}
+                </span>
+              </p>
+            );
+          })()}
+        </div>
       )}
 
       {/* Live Tracking */}

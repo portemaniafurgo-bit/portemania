@@ -80,6 +80,9 @@ export default function ActiveJob() {
             await base44.entities.DriverProfile.update(profile.id, {
               current_lat: pos.coords.latitude,
               current_lng: pos.coords.longitude,
+              // Sin esta marca el cliente no puede distinguir una posición de
+              // hace 3 segundos de una congelada al cerrar la pestaña.
+              location_updated_at: new Date().toISOString(),
             });
           }
         } catch {
