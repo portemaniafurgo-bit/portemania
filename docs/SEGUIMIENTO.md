@@ -420,6 +420,22 @@ Revisión punto por punto contra `FUNCIONALIDADES-PROPUESTA.md` §1 y remate de 
 - Nuevo documento **[PLAN-ACCION-APP-ANDROID.md](PLAN-ACCION-APP-ANDROID.md)**: convierte la especificación de producto (2026-07-15) en 7 etapas con tareas ordenadas, archivos concretos y criterios de "hecho", pensado para que lo ejecute un agente de IA. Decisiones cerradas: Expo + expo-router en JS, carpeta `mobile/` en este repo, MapLibre + tiles OSM (sin API keys), Expo Push Service, Stripe PaymentSheet con Google Pay, sesión en SecureStore.
 - Correcciones de alcance respecto al doc de julio detectadas en la revisión del código: el catálogo de servicios creció (mini mudanza 99 €, tiendas 30 €, paquete Villarrobledo 19,99 €) y la **firma de entrega ya existe en la web** (`deliveryProof.js`) → ambas cosas son paridad de Fase 1, no Fase 2.
 
+### 2026-08-10 — App Android: Etapa 0 (parcial) y Etapa 1 (esqueleto) construidas
+
+Ejecutando [PLAN-ACCION-APP-ANDROID.md](PLAN-ACCION-APP-ANDROID.md).
+
+**Etapa 0 — backend y fixes web** (commit 527759c, desplegado):
+- `supabase/migrations/0011_app_android_base.sql`: `driver_profiles.location_updated_at` + tabla `push_tokens` con RLS de dueño. **ESCRITA PERO NO APLICADA** (ver bloqueos abajo).
+- `supabase/functions/send-push/index.ts`: espejo de `send-email` para Expo Push. El llamante solo manda `mode` + `order_id`; el servidor resuelve destinatarios y texto y comprueba que el estado real del pedido justifique el aviso, así que aunque se llame sin sesión (como `send-email`, por el flujo de invitado) solo puede reenviar una notificación que ya era cierta. Modos: `new_request`, `driver_assigned`, `driver_arriving`, `status_changed`, `chat_message`, `driver_cancelled`. **ESCRITA PERO NO DESPLEGADA.**
+- T0.5 hecho: el reporte de incidencias ya deja elegir urgencia (normal/alta/urgente). Antes TODAS entraban como `normal` por defecto de columna y el admin no podía distinguir un retraso de un daño grave.
+
+**Etapa 1 — esqueleto de la app** (commit e7e44c5, en GitHub): carpeta `mobile/`, Expo SDK 57 + expo-router en JavaScript. Sesión persistente en SecureStore (partida en trozos: el límite de ~2 KB por entrada no admite una sesión entera) con refresco atado al `AppState`; guardia de navegación por rol (una sola app, cara de cliente y de conductor); pantallas leyendo producción de verdad: catálogo con tarifas vivas de `app_settings`, pedidos del cliente vía RLS, ofertas del conductor con el filtro de tamaño de furgoneta y toggle de disponibilidad. `lib/` copia services/pricing/tariffs/zones/eta de la web y porta `driverProfile` con el lookup por email. Verificado con `expo config`, `expo-doctor` (19/20; el que falla es de red) y `expo export --platform android` (1705 módulos, bundle 3,8 MB, sin errores).
+
+**BLOQUEADO — requiere acción del usuario:**
+1. **Aplicar la migración 0011 y desplegar `send-push`** en el Supabase de producción: el clasificador de seguridad exige que el usuario nombre explícitamente el proyecto `dnehzwrqphqpkcdjwqfi` para autorizar escrituras en prod (mismo caso que en julio de 2026).
+2. Por eso T0.3/T0.4 (frescura del GPS: el conductor escribe `location_updated_at`, el cliente ve «en vivo» / «hace X min», y el aviso «está llegando» exige posición reciente) están en la rama **`pendiente/gps-frescura`**, SIN mergear: si ese código llega a producción antes que la columna, el update del GPS falla y el catch silencioso deja al cliente sin seguimiento. Mergear en cuanto la 0011 esté aplicada.
+3. Para seguir con las etapas 2-6 hará falta cuenta **Expo/EAS**, proyecto **Firebase** (push), DSN de **Sentry** y cuenta de **Google Play Console** — ver §6 del plan de acción.
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

@@ -11,6 +11,41 @@
 
 ---
 
+## Estado de ejecución (2026-08-10)
+
+| Tarea | Estado |
+|---|---|
+| T0.1 migración 0011 | Escrita en `supabase/migrations/`. **Sin aplicar en prod** (bloqueo 1) |
+| T0.2 `send-push` | Escrita en `supabase/functions/send-push/`. **Sin desplegar** (bloqueo 1) |
+| T0.3 / T0.4 frescura GPS | Hechas, en la rama `pendiente/gps-frescura`. **No mergear** hasta aplicar la 0011 |
+| T0.5 prioridad de incidencias | Hecha y desplegada |
+| T1.1 – T1.7 esqueleto Expo | Hechas (falta T1.7 Sentry: necesita DSN) |
+| Etapas 2-6 | Pendientes |
+
+**Bloqueo 1 — sólo lo puede desbloquear el usuario.** Escribir en el Supabase de
+producción requiere que el usuario **nombre explícitamente el proyecto
+`dnehzwrqphqpkcdjwqfi`** al autorizarlo; el clasificador de seguridad rechaza la
+operación si no. Hasta entonces, ni la migración ni la Edge Function pueden
+subir, y la frescura del GPS no puede llegar a producción (sin la columna, el
+update del conductor falla y el seguimiento en vivo se apaga en silencio).
+
+Aplicar la migración, una vez autorizado:
+
+```bash
+# desde la raíz del repo, con el PAT del negocio
+node scripts/apply-sql.mjs supabase/migrations/0011_app_android_base.sql
+```
+
+Desplegar `send-push`: usar SIEMPRE el endpoint **multipart**
+`POST /v1/projects/{ref}/functions/deploy?slug=send-push` (metadata JSON +
+fichero). El `PATCH .../functions/{slug}` sube código crudo sin ESZIP y provoca
+BOOT_ERROR aunque el panel diga ACTIVE — gotcha documentado en SEGUIMIENTO
+2026-07-07. Verificar el arranque llamando a la función después.
+
+Y después: `git merge pendiente/gps-frescura`.
+
+---
+
 ## 0. Instrucciones para el agente ejecutor
 
 1. **Ejecuta las etapas en orden** (0 → 6) y, dentro de cada etapa, las tareas
