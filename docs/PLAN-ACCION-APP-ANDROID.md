@@ -30,10 +30,11 @@
 | T2.7 borrador local | Hecha |
 | T3.1 – T3.4 seguimiento, chat, historial | Hechas (chat sin fotos ni badge de no leídos) |
 | T4.1 – T4.6 ofertas, estados, GPS, chat | Hechas |
-| T4.7 ganancias | Pendiente: necesita la vista en BD |
-| T4.8 documentos con cámara | Pendiente |
-| T4.9 prueba de entrega (firma) | Pendiente — necesita `react-native-svg` + `react-native-view-shot`, y **añadir un módulo nativo obliga a regenerar la dev build** |
+| T4.7 ganancias | Hecha (paridad con la fórmula de la web; la vista en BD queda como mejora) |
+| T4.8 documentos con cámara | Hecha (10 documentos, privados/públicos según la regla de la web) |
+| T4.9 prueba de entrega (foto + firma) | Hecha (bucket privado; obligatoria en paquete/tienda) |
 | Opinión del conductor al finalizar | Hecha (paridad) |
+| Marca (iconos, splash, logo) + pin en mapa + badges + Google login | Hechas (2026-08-11; cotejo completo en [PROPUESTA-VS-ESTADO.md](PROPUESTA-VS-ESTADO.md)) |
 | T5.1 – T5.4 push | Hechas y **operativas**: falta probarlas con dos móviles reales |
 | Etapa 6 (QA, Play Store) | Pendiente |
 
