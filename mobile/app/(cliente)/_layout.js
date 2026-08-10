@@ -38,6 +38,9 @@ export default function ClienteLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
         }}
       />
+      {/* El detalle del pedido vive dentro de las pestañas para conservarlas al
+          abrirlo, pero no es una pestaña: se entra desde "Mis pedidos". */}
+      <Tabs.Screen name="order/[id]" options={{ href: null }} />
     </Tabs>
   );
 }

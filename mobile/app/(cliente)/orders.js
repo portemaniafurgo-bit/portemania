@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import { serviceOf } from "../../lib/services";
@@ -22,6 +23,7 @@ const STATUS = {
 
 export default function MisPedidos() {
   const { user } = useAuth();
+  const router = useRouter();
   const [orders, setOrders] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -67,7 +69,8 @@ export default function MisPedidos() {
             };
             const service = serviceOf(order);
             return (
-              <Card key={order.id}>
+              <Pressable key={order.id} onPress={() => router.push(`/(cliente)/order/${order.id}`)}>
+              <Card>
                 <View style={styles.header}>
                   <Title>
                     {service?.emoji} {service?.label || "Servicio"}
@@ -82,6 +85,7 @@ export default function MisPedidos() {
                   <Text style={styles.price}>{order.estimated_price} €</Text>
                 )}
               </Card>
+              </Pressable>
             );
           })
         )}
