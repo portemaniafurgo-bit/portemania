@@ -415,6 +415,11 @@ Revisión punto por punto contra `FUNCIONALIDADES-PROPUESTA.md` §1 y remate de 
 - ⚠️ El token de Vercel del negocio (2026-07-04) **no tiene scope del team** — el deploy por CLI/API falla con «Not authorized … portemaniafurgo-7893s-projects». No bloquea (el deploy va por git push), pero para operar Vercel por API hay que regenerar el token con acceso al team.
 - **Reseñas de Google visibles sin la Places API** (commit `8224331`, verificado en prod): la home muestra el volcado estático de las reseñas REALES de la ficha «Clicyvoy» (5,0 · 4 valoraciones) — las dos con texto, sin la respuesta del dueño ni valoraciones sin texto. Descubierto por el camino: el enlace corto guardado (maps.app.goo.gl/CEs2fNnTqzqcBkb4A) apuntaba a la DIRECCIÓN C. Gerona 15, no a la ficha de empresa; corregido al perfil real (`/g/11zgsd09_c`). Si llegan reseñas nuevas, actualizar a mano `src/lib/reviews.js`; al configurar `GOOGLE_PLACES_API_KEY`+`GOOGLE_PLACE_ID` pasan a leerse en vivo y el volcado deja de usarse.
 
+### 2026-08-10 — Plan de acción ejecutable para la app Android
+
+- Nuevo documento **[PLAN-ACCION-APP-ANDROID.md](PLAN-ACCION-APP-ANDROID.md)**: convierte la especificación de producto (2026-07-15) en 7 etapas con tareas ordenadas, archivos concretos y criterios de "hecho", pensado para que lo ejecute un agente de IA. Decisiones cerradas: Expo + expo-router en JS, carpeta `mobile/` en este repo, MapLibre + tiles OSM (sin API keys), Expo Push Service, Stripe PaymentSheet con Google Pay, sesión en SecureStore.
+- Correcciones de alcance respecto al doc de julio detectadas en la revisión del código: el catálogo de servicios creció (mini mudanza 99 €, tiendas 30 €, paquete Villarrobledo 19,99 €) y la **firma de entrega ya existe en la web** (`deliveryProof.js`) → ambas cosas son paridad de Fase 1, no Fase 2.
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

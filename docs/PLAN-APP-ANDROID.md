@@ -4,6 +4,8 @@
 > Objetivo: tras validar el negocio con la web, construir la app móvil.
 > **Especificación de producto completa (2026-07-15):** [FUNCIONALIDADES-APP-ANDROID.md](FUNCIONALIDADES-APP-ANDROID.md)
 > — incluye la revisión funcional del código, el servicio de envío de paquetes y los cambios de backend necesarios.
+> **Plan de acción ejecutable (2026-08-10):** [PLAN-ACCION-APP-ANDROID.md](PLAN-ACCION-APP-ANDROID.md)
+> — etapas y tareas en orden con archivos concretos y criterios de "hecho"; es el documento que sigue el agente que programa.
 
 ## Tecnología elegida
 

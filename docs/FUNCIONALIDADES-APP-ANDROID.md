@@ -7,6 +7,8 @@
 >
 > **Este documento es la especificación de producto**: qué debe hacer la app,
 > qué mejora respecto a la web y qué hay que tocar en el backend para lograrlo.
+> El **plan de acción ejecutable** (etapas, tareas y criterios de "hecho") está
+> en [PLAN-ACCION-APP-ANDROID.md](PLAN-ACCION-APP-ANDROID.md) (2026-08-10).
 
 Leyenda usada en todo el documento:
 - ✅ **Paridad** — ya existe en la web; en la app se rehace con UI nativa.
