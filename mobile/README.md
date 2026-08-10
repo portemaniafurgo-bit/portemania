@@ -26,11 +26,8 @@ entrega (T4.9), Sentry y la publicación en Play Store (Etapa 6).
 que ya esté instalado no lo incluye y la app casca al usarlo. Los cambios de
 JavaScript, en cambio, se recargan solos.
 
-⚠️ **El push está inerte** hasta que se aplique la migración `0011` y se
-despliegue `send-push`. Sin la tabla `push_tokens` el registro falla en silencio
-y la app sigue avisando solo por email. Y sin la columna `location_updated_at`,
-la escritura de posición del conductor falla: **eso apaga el seguimiento en
-vivo**, así que es el primer paso pendiente.
+El backend ya está listo: migración `0011` aplicada y `send-push` desplegada y
+verificada en producción, así que el push y la frescura del GPS funcionan.
 
 ## Arrancar
 

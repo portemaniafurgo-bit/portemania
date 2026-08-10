@@ -440,10 +440,13 @@ Ejecutando [PLAN-ACCION-APP-ANDROID.md](PLAN-ACCION-APP-ANDROID.md).
 
 Gotchas de Expo SDK 57 que costaron tiempo y conviene recordar: `@expo/vector-icons` ya no viene incluido con `expo`; el plugin de Stripe exige `merchantIdentifier` en app.json o `expo config` falla; hace falta `.npmrc` con `legacy-peer-deps` porque expo-router arrastra dependencias web que piden otra versión de react; y **MapLibre v11 cambió la API entera** (`Map`/`Marker`/`GeoJSONSource`, no `MapView`/`PointAnnotation`). Además `eta.js` devuelve las coordenadas en orden `[lat, lng]` porque la web usa Leaflet, mientras que GeoJSON las quiere al revés.
 
-**BLOQUEADO — requiere acción del usuario:**
-1. **Aplicar la migración 0011 y desplegar `send-push`** en el Supabase de producción: el clasificador de seguridad exige que el usuario nombre explícitamente el proyecto `dnehzwrqphqpkcdjwqfi` para autorizar escrituras en prod (mismo caso que en julio de 2026).
-2. Por eso T0.3/T0.4 (frescura del GPS: el conductor escribe `location_updated_at`, el cliente ve «en vivo» / «hace X min», y el aviso «está llegando» exige posición reciente) están en la rama **`pendiente/gps-frescura`**, SIN mergear: si ese código llega a producción antes que la columna, el update del GPS falla y el catch silencioso deja al cliente sin seguimiento. Mergear en cuanto la 0011 esté aplicada.
-3. Para seguir con las etapas 2-6 hará falta cuenta **Expo/EAS**, proyecto **Firebase** (push), DSN de **Sentry** y cuenta de **Google Play Console** — ver §6 del plan de acción.
+**Etapa 0 CERRADA el 2026-08-11** (commits 808d1a9 y 7b154ae), tras autorizarlo el usuario nombrando el proyecto:
+- Migración **0011 aplicada** en `dnehzwrqphqpkcdjwqfi`: columna `location_updated_at`, tabla `push_tokens` y 4 políticas RLS, verificadas por consulta al esquema.
+- **`send-push` desplegada** con `verify_jwt=true` (todos sus llamantes tienen sesión; `send-email` sigue pública porque la solicitud de invitado en la web no tiene JWT). Verificada EN PRODUCCIÓN: arranca de verdad (devuelve un 404 real, no BOOT_ERROR), el guardia de estado salta un `new_request` sobre un pedido cancelado, y sin JWT responde 401.
+- **Frescura del GPS mergeada y desplegada** en la web: el conductor escribe `location_updated_at` y el cliente ve «en vivo» o «hace X min»; el aviso «está llegando» ya exige posición reciente. Build 42/42 rutas.
+- Nuevo helper `scripts/deploy-function.mjs` (endpoint multipart, el único que genera ESZIP).
+
+**Pendiente de aportar por el negocio** para terminar: proyecto **Firebase** (transporte del push en Android), DSN de **Sentry** y cuenta de **Google Play Console** — ver §6 del plan de acción.
 
 ## 5. Pendientes / roadmap
 

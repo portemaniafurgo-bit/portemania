@@ -15,9 +15,9 @@
 
 | Tarea | Estado |
 |---|---|
-| T0.1 migración 0011 | Escrita en `supabase/migrations/`. **Sin aplicar en prod** (bloqueo 1) |
-| T0.2 `send-push` | Escrita en `supabase/functions/send-push/`. **Sin desplegar** (bloqueo 1) |
-| T0.3 / T0.4 frescura GPS (web) | Hechas, en la rama `pendiente/gps-frescura`. **No mergear** hasta aplicar la 0011 |
+| T0.1 migración 0011 | **APLICADA** en `dnehzwrqphqpkcdjwqfi` (columna + tabla + 4 políticas RLS verificadas) |
+| T0.2 `send-push` | **DESPLEGADA** con `verify_jwt=true`. Arranque verificado en producción |
+| T0.3 / T0.4 frescura GPS (web) | **Mergeadas y desplegadas** |
 | T0.5 prioridad de incidencias | Hecha y desplegada |
 | T1.1 – T1.6 esqueleto Expo | Hechas. Proyecto EAS `@clicyvoys-team/clicyvoy` creado |
 | T1.7 Sentry | Pendiente: necesita DSN |
@@ -34,30 +34,24 @@
 | T4.8 documentos con cámara | Pendiente |
 | T4.9 prueba de entrega (firma) | Pendiente — necesita `react-native-svg` + `react-native-view-shot`, y **añadir un módulo nativo obliga a regenerar la dev build** |
 | Opinión del conductor al finalizar | Hecha (paridad) |
-| T5.1 – T5.4 push | Hechas en la app; **inertes hasta aplicar la 0011 y desplegar `send-push`** |
+| T5.1 – T5.4 push | Hechas y **operativas**: falta probarlas con dos móviles reales |
 | Etapa 6 (QA, Play Store) | Pendiente |
 
-**Bloqueo 1 — sólo lo puede desbloquear el usuario.** Escribir en el Supabase de
-producción requiere que el usuario **nombre explícitamente el proyecto
-`dnehzwrqphqpkcdjwqfi`** al autorizarlo; el clasificador de seguridad rechaza la
-operación si no. Hasta entonces, ni la migración ni la Edge Function pueden
-subir, y la frescura del GPS no puede llegar a producción (sin la columna, el
-update del conductor falla y el seguimiento en vivo se apaga en silencio).
+**Etapa 0 cerrada el 2026-08-11.** La migración está aplicada, `send-push`
+desplegada y verificada, y la frescura del GPS mergeada en la web.
 
-Aplicar la migración, una vez autorizado:
+Para operar el backend de producción desde aquí (hace falta el PAT del negocio,
+y el clasificador exige que el **usuario** nombre el proyecto al autorizarlo):
 
 ```bash
-# desde la raíz del repo, con el PAT del negocio
-node scripts/apply-sql.mjs supabase/migrations/0011_app_android_base.sql
+SUPABASE_PAT=sbp_xxx node scripts/apply-sql.mjs supabase/migrations/00XX_....sql
+SUPABASE_PAT=sbp_xxx node scripts/deploy-function.mjs <slug>   # --public si debe responder sin sesión
 ```
 
-Desplegar `send-push`: usar SIEMPRE el endpoint **multipart**
-`POST /v1/projects/{ref}/functions/deploy?slug=send-push` (metadata JSON +
-fichero). El `PATCH .../functions/{slug}` sube código crudo sin ESZIP y provoca
-BOOT_ERROR aunque el panel diga ACTIVE — gotcha documentado en SEGUIMIENTO
-2026-07-07. Verificar el arranque llamando a la función después.
-
-Y después: `git merge pendiente/gps-frescura`.
+`deploy-function.mjs` usa el endpoint **multipart** a propósito: el
+`PATCH .../functions/{slug}` sube código crudo sin ESZIP y provoca BOOT_ERROR
+aunque el panel diga ACTIVE. **Verifica siempre el arranque llamando a la
+función después de desplegarla** — que el panel diga ACTIVE no basta.
 
 ---
 
