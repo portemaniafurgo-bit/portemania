@@ -364,9 +364,17 @@ export const supabase = createClient(
 
 ### A.2 GPS en segundo plano (conductor, solo con trabajo activo)
 
+> ⚠️ **`driver_profiles` NO tiene columna `user_id`.** El enganche real es
+> `created_by_id` + `email`, y `created_by_id` no es de fiar (los perfiles que
+> creó el admin llevaron el id del admin — bug histórico, ver SEGUIMIENTO
+> 2026-07-07). Resuelve el perfil **por email de login**, igual que hace
+> `src/lib/driverProfile.js` en la web, y guarda su `id` al empezar el trabajo
+> en vez de buscarlo en cada tick.
+
 ```js
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "./supabase";
 
 const TASK = "clicyvoy-driver-location";
@@ -374,6 +382,10 @@ const TASK = "clicyvoy-driver-location";
 TaskManager.defineTask(TASK, async ({ data, error }) => {
   if (error || !data?.locations?.length) return;
   const { latitude, longitude } = data.locations.at(-1).coords;
+  // El id del perfil se guardó al arrancar el seguimiento: la tarea de segundo
+  // plano se ejecuta fuera de React y no puede rehacer el lookup por email.
+  const profileId = await AsyncStorage.getItem("driver_profile_id");
+  if (!profileId) return;
   await supabase
     .from("driver_profiles")
     .update({
@@ -381,10 +393,11 @@ TaskManager.defineTask(TASK, async ({ data, error }) => {
       current_lng: longitude,
       location_updated_at: new Date().toISOString(),
     })
-    .eq("user_id", (await supabase.auth.getUser()).data.user.id);
+    .eq("id", profileId);
 });
 
-export async function startTracking() {
+export async function startTracking(profileId) {
+  await AsyncStorage.setItem("driver_profile_id", profileId);
   await Location.startLocationUpdatesAsync(TASK, {
     accuracy: Location.Accuracy.Balanced,
     timeInterval: 10000,
@@ -403,26 +416,22 @@ export async function stopTracking() {
 }
 ```
 
-### A.3 Esqueleto de la Edge Function `send-push`
+### A.3 Edge Function `send-push`
 
-```ts
-// supabase/functions/send-push/index.ts — espejo de send-email
-// 1) valida mode + destinatarios (lista blanca, como send-email)
-// 2) lee push_tokens de esos user_ids con service role
-// 3) envía en lotes de 100:
-const messages = tokens.map((t) => ({
-  to: t.token,
-  title,
-  body,
-  data, // p. ej. { order_id } para el deep link
-  channelId: mode === "new_request" ? "ofertas" : "estado",
-}));
-await fetch("https://exp.host/--/api/v2/push/send", {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify(messages),
+**Ya está escrita** en `supabase/functions/send-push/index.ts` (T0.2 hecha).
+Contrato: `POST { mode, order_id, message_id? }`. Modos disponibles:
+`new_request`, `driver_assigned`, `driver_arriving`, `status_changed`,
+`chat_message`, `driver_cancelled`.
+
+El llamante **no elige destinatarios ni texto** (misma protección que
+`send-email`, que es pública porque el flujo de invitado no tiene JWT): el
+servidor los deriva del pedido y comprueba que su estado real justifique el
+aviso. Desde la app se invoca igual que `send-email`:
+
+```js
+await supabase.functions.invoke("send-push", {
+  body: { mode: "status_changed", order_id: order.id },
 });
-// 4) si la respuesta trae DeviceNotRegistered → delete de ese token
 ```
 
 ### A.4 Mapa MapLibre con tiles OSM (sin API key)

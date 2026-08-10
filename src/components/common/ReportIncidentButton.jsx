@@ -17,6 +17,16 @@ const TYPES = [
   { value: "other", label: "Otro" },
 ];
 
+// La BD acepta cualquier texto y por defecto pone 'normal'; el panel de admin
+// destaca en rojo 'urgent' y en naranja 'high'. Sin selector, TODA incidencia
+// entraba como normal y el admin no podía distinguir un retraso de un daño
+// grave.
+const PRIORITIES = [
+  { value: "normal", label: "Normal — puede esperar" },
+  { value: "high", label: "Alta — necesito respuesta hoy" },
+  { value: "urgent", label: "Urgente — está pasando ahora" },
+];
+
 /**
  * Reporte de incidencias sobre un pedido, para cliente y conductor. El panel
  * /admin/incidents existía pero NINGUNA página creaba incidencias: la
@@ -25,6 +35,7 @@ const TYPES = [
 export default function ReportIncidentButton({ order, user }) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState("other");
+  const [priority, setPriority] = useState("normal");
   const [description, setDescription] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
@@ -43,6 +54,7 @@ export default function ReportIncidentButton({ order, user }) {
         reporter_id: user?.id,
         reporter_name: user?.full_name || user?.email || "Usuario",
         type,
+        priority,
         description: description.trim(),
       });
       setSent(true);
@@ -88,6 +100,19 @@ export default function ReportIncidentButton({ order, user }) {
           <SelectContent>
             {TYPES.map(t => (
               <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="space-y-2">
+        <label className="text-sm text-muted-foreground">¿Cómo de urgente es?</label>
+        <Select value={priority} onValueChange={setPriority}>
+          <SelectTrigger className="rounded-xl">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PRIORITIES.map(p => (
+              <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
