@@ -38,6 +38,9 @@ export default function ConductorLayout() {
           tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
         }}
       />
+      {/* El trabajo activo no es una pestaña: se entra al aceptar una oferta o
+          desde el aviso de "servicio en curso". */}
+      <Tabs.Screen name="job/[id]" options={{ href: null }} />
     </Tabs>
   );
 }

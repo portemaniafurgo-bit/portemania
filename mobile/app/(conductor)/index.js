@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import { fetchMyDriverProfile, isDriverProfileIncomplete } from "../../lib/driverProfile";
 import { serviceOf } from "../../lib/services";
-import { Body, Caption, Card, Heading, Loading, Title } from "../../components/ui";
+import { stopTracking } from "../../lib/tracking";
+import { Body, Button, Caption, Card, ErrorText, Heading, Loading, Title } from "../../components/ui";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -22,10 +24,14 @@ import { colors, radius, spacing } from "../../theme";
  */
 export default function Ofertas() {
   const { user } = useAuth();
+  const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState(null);
+  const [activeJob, setActiveJob] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [accepting, setAccepting] = useState(null);
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
     const prof = await fetchMyDriverProfile(user);
@@ -33,8 +39,20 @@ export default function Ofertas() {
 
     if (!prof || prof.status !== "verified") {
       setOrders([]);
+      setActiveJob(null);
       return;
     }
+
+    // Un trabajo en curso manda sobre todo lo demás: es lo primero que el
+    // conductor necesita ver al abrir la app.
+    const { data: mine } = await supabase
+      .from("transport_requests")
+      .select("id, status, service_type, origin_address, destination_address, estimated_price")
+      .eq("driver_id", user.id)
+      .in("status", ["accepted", "in_transit", "picked_up"])
+      .order("created_date", { ascending: false })
+      .limit(1);
+    setActiveJob(mine?.[0] || null);
 
     let query = supabase
       .from("transport_requests")
@@ -56,12 +74,60 @@ export default function Ofertas() {
   const toggleAvailable = async (value) => {
     if (!profile) return;
     setSaving(true);
-    const { error } = await supabase
+    const { error: err } = await supabase
       .from("driver_profiles")
       .update({ is_available: value })
       .eq("id", profile.id);
-    if (!error) setProfile(prev => ({ ...prev, is_available: value }));
+    if (!err) {
+      setProfile(prev => ({ ...prev, is_available: value }));
+      // Al desconectarse deja de compartir posición: seguir emitiendo cuando ya
+      // no se trabaja es gastar batería y publicar dónde está sin motivo.
+      if (!value) await stopTracking();
+    }
     setSaving(false);
+  };
+
+  /**
+   * Aceptar con update CONDICIONADO a que siga pendiente: si otro conductor se
+   * adelantó, el update no afecta a ninguna fila y se avisa en vez de robarle
+   * el servicio. Es la misma protección anti-carrera que la web.
+   */
+  const accept = async (order) => {
+    setAccepting(order.id);
+    setError("");
+    try {
+      const { data: updated, error: err } = await supabase
+        .from("transport_requests")
+        .update({
+          status: "accepted",
+          driver_id: user.id,
+          // El nombre del PERFIL primero: en cuentas invitadas por email
+          // profiles.full_name está vacío y el cliente veía el correo del
+          // conductor como nombre.
+          driver_name: profile?.full_name || user?.user_metadata?.full_name || "Conductor",
+          accepted_at: new Date().toISOString(),
+        })
+        .eq("id", order.id)
+        .eq("status", "pending")
+        .select();
+      if (err) throw err;
+
+      if (!updated || updated.length === 0) {
+        setError("Otro conductor ha aceptado este servicio antes que tú.");
+        await load();
+        return;
+      }
+
+      supabase.functions
+        .invoke("send-push", { body: { mode: "driver_assigned", order_id: order.id } })
+        .catch(() => {});
+
+      router.push(`/(conductor)/job/${order.id}`);
+    } catch (err) {
+      setError("No se pudo aceptar: " + (err.message || "error de conexión"));
+    } finally {
+      setAccepting(null);
+    }
   };
 
   const onRefresh = async () => {
@@ -81,6 +147,19 @@ export default function Ofertas() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <Heading>Pedidos disponibles</Heading>
+
+        {activeJob && (
+          <Card style={{ borderColor: colors.primary, borderWidth: 2 }}>
+            <Title>Tienes un servicio en curso</Title>
+            <Caption>{activeJob.origin_address} → {activeJob.destination_address}</Caption>
+            <Button
+              title="Continuar servicio"
+              onPress={() => router.push(`/(conductor)/job/${activeJob.id}`)}
+            />
+          </Card>
+        )}
+
+        <ErrorText>{error}</ErrorText>
 
         {profile && (
           <Card>
@@ -153,6 +232,15 @@ export default function Ofertas() {
                     </View>
                   ) : null}
                 </View>
+                <Button
+                  title="Aceptar servicio"
+                  loading={accepting === order.id}
+                  disabled={!!activeJob || incomplete || !profile?.is_available}
+                  onPress={() => accept(order)}
+                />
+                {activeJob ? (
+                  <Caption>Termina el servicio en curso antes de aceptar otro.</Caption>
+                ) : null}
               </Card>
             );
           })
