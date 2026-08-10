@@ -1,0 +1,15 @@
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Builds nativos: los genera `expo prebuild`, no se versionan (flujo de
+# proyecto gestionado; la configuración vive en app.json).
+android/
+ios/
+
+*.log
+.DS_Store
+.env
+.env.local

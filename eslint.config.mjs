@@ -14,6 +14,9 @@ const eslintConfig = defineConfig([
     "base44/**",
     // Edge Functions (Deno, no Node)
     "supabase/functions/**",
+    // App Android (React Native): otro entorno y otras reglas; se lintéa desde
+    // mobile/ con la configuración de Expo, no con la de Next.
+    "mobile/**",
   ]),
 ]);
 
