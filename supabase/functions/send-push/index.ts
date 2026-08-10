@@ -4,14 +4,18 @@
 // FCM por debajo en Android). Alimenta la app móvil; el email se conserva como
 // respaldo.
 //
-// PRINCIPIO DE SEGURIDAD (igual que send-email, y por el mismo motivo):
-// el llamante NO elige destinatarios ni texto. Solo manda un `mode` y el id del
-// pedido; el servidor resuelve a quién avisar y qué decirle. Además, cada modo
-// comprueba que el estado real del pedido justifique el aviso — así, aunque
-// alguien llame a la función sin sesión (el flujo de invitado no tiene JWT,
-// igual que en send-email), lo único que puede provocar es reenviar una
+// PRINCIPIO DE SEGURIDAD: el llamante NO elige destinatarios ni texto. Solo
+// manda un `mode` y el id del pedido; el servidor resuelve a quién avisar y qué
+// decirle. Además, cada modo comprueba que el estado real del pedido justifique
+// el aviso, así que lo máximo que se puede provocar es reenviar una
 // notificación que ya era cierta. No hay forma de empujar texto arbitrario a un
 // móvil ajeno.
+//
+// A diferencia de `send-email`, esta función se despliega con verify_jwt=TRUE:
+// todos sus llamantes son usuarios con sesión desde la app. `send-email` tiene
+// que ser pública porque la solicitud de invitado en la web no tiene JWT; aquí
+// no hace falta abrir esa puerta. Si algún día el flujo de invitado necesita
+// push, habrá que replantearlo, no simplemente desactivar la verificación.
 //
 // Ver docs/PLAN-ACCION-APP-ANDROID.md (T0.2) y la matriz de notificaciones en
 // docs/FUNCIONALIDADES-APP-ANDROID.md §6.
