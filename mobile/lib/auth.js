@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { AppState } from "react-native";
 import { supabase } from "./supabase";
+import { unregisterPushToken } from "./push";
+import { stopTracking } from "./tracking";
 
 /**
  * Sesión y rol del usuario. Equivalente móvil de `src/lib/AuthContext.jsx` +
@@ -63,6 +65,10 @@ export function AuthProvider({ children }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Antes de cerrar sesión: si no, este móvil seguiría recibiendo los avisos
+    // del usuario que se acaba de ir.
+    await unregisterPushToken();
+    await stopTracking();
     await supabase.auth.signOut();
     setSession(null);
     setRole(null);

@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../lib/auth";
+import { usePushNotifications } from "../lib/push";
 import { Loading } from "../components/ui";
 import { colors } from "../theme";
 
@@ -17,6 +18,8 @@ function RootNavigation() {
   const { session, role, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  usePushNotifications({ userId: session?.user?.id, role });
 
   useEffect(() => {
     if (loading) return;
