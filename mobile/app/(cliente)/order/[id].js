@@ -5,6 +5,7 @@ import { Stack, useLocalSearchParams } from "expo-router";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../lib/auth";
 import { STATUS_FLOW, STATUS_LABELS, useChat, useDriverLocation, useOrder } from "../../../lib/orders";
+import { markChatRead } from "../../../lib/unread";
 import { serviceOf } from "../../../lib/services";
 import { Body, Button, Caption, Card, Field, Heading, Loading, Title } from "../../../components/ui";
 import TrackingMap from "../../../components/TrackingMap";
@@ -59,9 +60,11 @@ export default function OrderDetail() {
 
   useEffect(() => {
     // Al llegar un mensaje nuevo, bajar del todo: si no, el usuario ve la
-    // conversación congelada y cree que no ha entrado nada.
+    // conversación congelada y cree que no ha entrado nada. Y de paso queda
+    // leído: el badge de "Mis pedidos" se apaga.
     scrollRef.current?.scrollToEnd({ animated: true });
-  }, [messages.length]);
+    if (id) markChatRead(id);
+  }, [messages.length, id]);
 
   if (loading) return <Loading label="Cargando el pedido…" />;
   if (!order) {

@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Image, View } from "react-native";
 import { Link } from "expo-router";
 import { supabase } from "../../lib/supabase";
-import { Body, Button, Caption, Card, ErrorText, Field, Heading, Screen } from "../../components/ui";
+import { signInWithGoogle } from "../../lib/googleAuth";
+import { Body, Button, Caption, Card, ErrorText, Field, Screen } from "../../components/ui";
 import { colors, spacing } from "../../theme";
 
 /**
@@ -43,10 +44,15 @@ export default function Login() {
 
   return (
     <Screen>
-      <View style={{ gap: spacing.xs, marginTop: spacing.xxl }}>
-        <Heading style={{ fontSize: 28 }}>
-          Clic<Body style={{ fontSize: 28, fontWeight: "700", color: colors.primary }}>yVoy</Body>
-        </Heading>
+      <View style={{ gap: spacing.md, marginTop: spacing.xxl }}>
+        {/* El MISMO logotipo que la web (generado desde Logo.jsx con
+            scripts/generate-app-assets.mjs) — la marca es una sola. */}
+        <Image
+          source={require("../../assets/logo.png")}
+          style={{ width: 220, height: 54 }}
+          resizeMode="contain"
+          accessibilityLabel="ClicyVoy"
+        />
         <Caption>Portes y mudanzas en Albacete, cuando los necesitas.</Caption>
       </View>
 
@@ -71,6 +77,14 @@ export default function Login() {
         />
         <ErrorText>{error}</ErrorText>
         <Button title="Entrar" onPress={submit} loading={loading} />
+        <Button
+          title="Continuar con Google"
+          variant="plain"
+          onPress={async () => {
+            const result = await signInWithGoogle();
+            if (!result.ok && result.reason) setError(result.reason);
+          }}
+        />
         <Link href="/(auth)/forgot-password" asChild>
           <Caption style={{ textAlign: "center", color: colors.primary }}>
             He olvidado mi contraseña

@@ -8,6 +8,10 @@ import { fetchMyDriverProfile } from "../../../lib/driverProfile";
 import { STATUS_LABELS, useChat, useOrder } from "../../../lib/orders";
 import { serviceOf } from "../../../lib/services";
 import { startTracking, stopTracking } from "../../../lib/tracking";
+import { uploadProofPhoto, uploadSignature } from "../../../lib/deliveryProof";
+import { markChatRead } from "../../../lib/unread";
+import { takePhoto } from "../../../lib/photos";
+import SignaturePad from "../../../components/SignaturePad";
 import { Body, Button, Caption, Card, ErrorText, Field, Heading, Loading, Title } from "../../../components/ui";
 import { colors, radius, spacing } from "../../../theme";
 
@@ -47,6 +51,9 @@ export default function TrabajoActivo() {
   const [saving, setSaving] = useState(false);
   const [feedbackTags, setFeedbackTags] = useState([]);
   const [feedbackText, setFeedbackText] = useState("");
+  const [showProof, setShowProof] = useState(false);
+  const [proofPhotoUri, setProofPhotoUri] = useState(null);
+  const [recipientName, setRecipientName] = useState("");
   const trackingStarted = useRef(false);
 
   const sendFeedback = async () => {
@@ -69,6 +76,10 @@ export default function TrabajoActivo() {
   useEffect(() => {
     fetchMyDriverProfile(user).then(setProfile);
   }, [user]);
+
+  useEffect(() => {
+    if (id) markChatRead(id);
+  }, [messages.length, id]);
 
   // El seguimiento vive mientras el trabajo esté vivo. Al salir de la pantalla
   // NO se para: el conductor va a estar en Google Maps, que es justo cuando más
@@ -106,12 +117,18 @@ export default function TrabajoActivo() {
 
   const advance = async () => {
     if (!step) return;
+    // Finalizar pasa SIEMPRE por la prueba de entrega (foto + firma). En los
+    // servicios sin firma obligatoria se puede omitir, pero se ofrece: es lo
+    // que protege al conductor y a la empresa ante una disputa.
+    if (step.to === "delivered") {
+      setShowProof(true);
+      return;
+    }
     setSaving(true);
     setError("");
     try {
       const extra = {};
       if (step.to === "picked_up") extra.pickup_time = new Date().toISOString();
-      if (step.to === "delivered") extra.delivery_time = new Date().toISOString();
 
       const { error: err } = await supabase
         .from("transport_requests")
@@ -119,13 +136,46 @@ export default function TrabajoActivo() {
         .eq("id", id);
       if (err) throw err;
 
-      if (step.to === "delivered") await stopTracking();
-
       supabase.functions
         .invoke("send-push", { body: { mode: "status_changed", order_id: id } })
         .catch(() => {});
     } catch (err) {
       setError("No se pudo actualizar el estado: " + (err.message || "error de conexión"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /**
+   * Entrega con prueba. La firma (y la foto) se suben ANTES de marcar
+   * entregado, para que no quede un pedido cerrado sin su justificante — mismo
+   * orden que decidió la web.
+   */
+  const finishDelivery = async ({ signatureBase64 = null } = {}) => {
+    setSaving(true);
+    setError("");
+    try {
+      const patch = { status: "delivered", delivery_time: new Date().toISOString() };
+
+      if (proofPhotoUri) {
+        patch.proof_photo_url = await uploadProofPhoto(id, proofPhotoUri);
+      }
+      if (signatureBase64) {
+        patch.proof_signature_url = await uploadSignature(id, signatureBase64);
+        patch.delivered_signature_at = new Date().toISOString();
+        if (recipientName.trim()) patch.recipient_name = recipientName.trim();
+      }
+
+      const { error: err } = await supabase.from("transport_requests").update(patch).eq("id", id);
+      if (err) throw err;
+
+      await stopTracking();
+      setShowProof(false);
+      supabase.functions
+        .invoke("send-push", { body: { mode: "status_changed", order_id: id } })
+        .catch(() => {});
+    } catch (err) {
+      setError("No se pudo registrar la entrega: " + (err.message || "error de conexión"));
     } finally {
       setSaving(false);
     }
@@ -232,8 +282,52 @@ export default function TrabajoActivo() {
 
         <ErrorText>{error}</ErrorText>
 
-        {step && (
+        {step && !showProof && (
           <Button title={step.label} onPress={advance} loading={saving} />
+        )}
+
+        {/* Prueba de entrega: foto de lo entregado + firma del receptor.
+            Obligatoria en paquetes y compras en tienda; opcional en el resto. */}
+        {showProof && !finished && (
+          <Card>
+            <Title>Prueba de entrega</Title>
+            <Caption>
+              {service?.signatureRequired
+                ? "En este servicio la firma del receptor es obligatoria."
+                : "Opcional, pero te protege si hay una disputa."}
+            </Caption>
+
+            <Button
+              title={proofPhotoUri ? "Foto hecha ✓ (repetir)" : "Foto de lo entregado"}
+              variant="plain"
+              onPress={async () => {
+                const uris = await takePhoto();
+                if (uris[0]) setProofPhotoUri(uris[0]);
+              }}
+            />
+
+            <Field
+              label="¿Quién recibe?"
+              value={recipientName}
+              onChangeText={setRecipientName}
+              placeholder="Nombre de la persona que firma"
+            />
+
+            <SignaturePad
+              capturing={saving}
+              onCapture={base64 => finishDelivery({ signatureBase64: base64 })}
+            />
+
+            {!service?.signatureRequired && (
+              <Button
+                title="Finalizar sin firma"
+                variant="plain"
+                loading={saving}
+                onPress={() => finishDelivery()}
+              />
+            )}
+            <Button title="Volver" variant="plain" onPress={() => setShowProof(false)} disabled={saving} />
+          </Card>
         )}
 
         {finished && (

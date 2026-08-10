@@ -9,11 +9,6 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#3B82F6"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.clicyvoy.app"
@@ -73,7 +68,16 @@
           "merchantIdentifier": "merchant.com.clicyvoy.app"
         }
       ],
-      "@maplibre/maplibre-react-native"
+      "@maplibre/maplibre-react-native",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 260,
+          "backgroundColor": "#FFFFFF"
+        }
+      ],
+      "expo-web-browser"
     ],
     "extra": {
       "router": {},

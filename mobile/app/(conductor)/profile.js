@@ -1,28 +1,67 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Alert, StyleSheet, Text, View } from "react-native";
+import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
-import { fetchMyDriverProfile, isDriverProfileIncomplete } from "../../lib/driverProfile";
-import { Body, Button, Caption, Card, Heading, Loading, Screen, Title } from "../../components/ui";
-import { colors } from "../../theme";
+import {
+  DOC_FIELDS,
+  fetchMyDriverProfile,
+  isDriverProfileIncomplete,
+  uploadPrivateDriverDocFromUri,
+} from "../../lib/driverProfile";
+import { pickPhotos, takePhoto, uploadPhoto } from "../../lib/photos";
+import { Body, Button, Caption, Card, ErrorText, Heading, Loading, Screen, Title } from "../../components/ui";
+import { colors, radius, spacing } from "../../theme";
 
 /**
- * Perfil del conductor. En la Etapa 4 (T4.8) se añade aquí la re-subida de
- * documentos con cámara y compresión; de momento muestra el estado real para
- * verificar que el lookup por email encuentra el perfil correcto (el bug de
- * julio hacía que un admin-conductor viese el perfil de otra persona).
+ * Perfil del conductor con su documentación (T4.8).
+ *
+ * Cada documento se puede (re)subir con la cámara o la galería, comprimido en
+ * el móvil. Los sensibles van al bucket PRIVADO driver-docs como referencia
+ * "driver-docs://"; el selfie y las fotos de la furgoneta siguen públicos
+ * porque el cliente los ve en su pedido — mismas reglas que la web.
  */
 export default function PerfilConductor() {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState(undefined);
+  const [uploading, setUploading] = useState(null);
+  const [error, setError] = useState("");
+
+  const load = useCallback(() => fetchMyDriverProfile(user).then(setProfile), [user]);
 
   useEffect(() => {
-    let active = true;
-    fetchMyDriverProfile(user).then(p => {
-      if (active) setProfile(p);
-    });
-    return () => {
-      active = false;
-    };
-  }, [user]);
+    load();
+  }, [load]);
+
+  const uploadDoc = async (doc, source) => {
+    setError("");
+    const uris = source === "camera" ? await takePhoto() : await pickPhotos(1);
+    if (!uris[0]) return;
+
+    setUploading(doc.field);
+    try {
+      const url = doc.private
+        ? await uploadPrivateDriverDocFromUri(uris[0])
+        : await uploadPhoto(uris[0]);
+      const { error: err } = await supabase
+        .from("driver_profiles")
+        .update({ [doc.field]: url })
+        .eq("id", profile.id);
+      if (err) throw err;
+      setProfile(prev => ({ ...prev, [doc.field]: url }));
+    } catch (err) {
+      setError(`No se pudo subir «${doc.label}»: ` + (err.message || "error de conexión"));
+    } finally {
+      setUploading(null);
+    }
+  };
+
+  const chooseSource = doc => {
+    Alert.alert(doc.label, "¿De dónde sale la imagen?", [
+      { text: "Cámara", onPress: () => uploadDoc(doc, "camera") },
+      { text: "Galería", onPress: () => uploadDoc(doc, "gallery") },
+      { text: "Cancelar", style: "cancel" },
+    ]);
+  };
 
   if (profile === undefined) return <Loading label="Cargando tu perfil…" />;
 
@@ -50,9 +89,36 @@ export default function PerfilConductor() {
       {profile && isDriverProfileIncomplete(profile) && (
         <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
           <Body>Documentación incompleta</Body>
+          <Caption>Sin todos los documentos no puedes recibir servicios.</Caption>
+        </Card>
+      )}
+
+      {profile && (
+        <Card>
+          <Title>Mi documentación</Title>
           <Caption>
-            Súbela desde clicyvoy.es hasta que la Etapa 4 traiga la subida con cámara a la app.
+            Toca un documento para subirlo o sustituirlo (por ejemplo, al renovar el seguro). Los
+            documentos personales se guardan en privado.
           </Caption>
+          <ErrorText>{error}</ErrorText>
+          {DOC_FIELDS.map(doc => {
+            const present = !!profile[doc.field];
+            return (
+              <View key={doc.field} style={styles.docRow}>
+                <View style={[styles.docDot, { backgroundColor: present ? colors.success : colors.destructive }]} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.docLabel}>{doc.label}</Text>
+                  <Caption>{present ? "Subido" : "Falta"}</Caption>
+                </View>
+                <Button
+                  title={present ? "Sustituir" : "Subir"}
+                  variant="plain"
+                  loading={uploading === doc.field}
+                  onPress={() => chooseSource(doc)}
+                />
+              </View>
+            );
+          })}
         </Card>
       )}
 
@@ -60,3 +126,16 @@ export default function PerfilConductor() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  docRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    paddingVertical: spacing.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  docDot: { width: 10, height: 10, borderRadius: radius.full },
+  docLabel: { fontSize: 14, fontWeight: "600", color: colors.foreground },
+});

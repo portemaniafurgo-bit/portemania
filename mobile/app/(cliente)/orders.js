@@ -6,6 +6,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import { serviceOf } from "../../lib/services";
+import { countUnread } from "../../lib/unread";
 import { Button, Caption, Card, Heading, Loading, Title } from "../../components/ui";
 import { colors, radius, spacing } from "../../theme";
 
@@ -36,6 +37,7 @@ export default function MisPedidos() {
   const [orders, setOrders] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState("active");
+  const [unread, setUnread] = useState({});
 
   const load = useCallback(async () => {
     // `select("*")` a propósito: "repetir pedido" necesita todos los campos del
@@ -46,7 +48,8 @@ export default function MisPedidos() {
       .order("created_date", { ascending: false })
       .limit(50);
     setOrders(data || []);
-  }, []);
+    setUnread(await countUnread((data || []).map(o => o.id), user?.id));
+  }, [user?.id]);
 
   /**
    * Repetir un pedido: deja el borrador que lee el asistente y lleva a él. No
@@ -141,6 +144,9 @@ export default function MisPedidos() {
                 <View style={styles.header}>
                   <Title>
                     {service?.emoji} {service?.label || "Servicio"}
+                    {unread[order.id] ? (
+                      <Text style={styles.unread}>  💬 {unread[order.id]}</Text>
+                    ) : null}
                   </Title>
                   <View style={[styles.badge, { backgroundColor: status.bg }]}>
                     <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
@@ -180,4 +186,5 @@ const styles = StyleSheet.create({
   },
   filterActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   filterText: { fontSize: 13, fontWeight: "600", color: colors.mutedForeground },
+  unread: { fontSize: 13, fontWeight: "700", color: colors.primary },
 });

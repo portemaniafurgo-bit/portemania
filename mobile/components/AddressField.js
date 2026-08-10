@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { currentAddress, suggestAddresses } from "../lib/addresses";
+import MapPicker from "./MapPicker";
 import { Caption, Field } from "./ui";
 import { colors, radius, spacing } from "../theme";
 
@@ -21,6 +22,9 @@ export default function AddressField({ label, value, onChange, zone = "albacete"
   const [searching, setSearching] = useState(false);
   const [locating, setLocating] = useState(false);
   const [hint, setHint] = useState("");
+  const [showMap, setShowMap] = useState(false);
+  // Última coordenada elegida: el mapa abre ahí en vez de en el centro de la ciudad.
+  const lastPicked = useRef(null);
   // Al elegir una sugerencia cambia `value`, lo que dispararía otra búsqueda y
   // volvería a abrir la lista justo después de cerrarla.
   const skipNextSearch = useRef(false);
@@ -57,6 +61,7 @@ export default function AddressField({ label, value, onChange, zone = "albacete"
     skipNextSearch.current = true;
     setSuggestions([]);
     setHint(item.served ? "" : "Esa dirección está fuera de nuestra zona de servicio.");
+    lastPicked.current = item;
     onChange(item.label, item);
   };
 
@@ -92,13 +97,29 @@ export default function AddressField({ label, value, onChange, zone = "albacete"
         autoCorrect={false}
       />
 
-      <Pressable onPress={useMyLocation} disabled={locating} style={styles.locate}>
-        {locating ? (
-          <ActivityIndicator size="small" color={colors.primary} />
-        ) : (
-          <Text style={styles.locateText}>📍 Usar mi ubicación actual</Text>
-        )}
-      </Pressable>
+      <View style={{ flexDirection: "row", gap: spacing.lg }}>
+        <Pressable onPress={useMyLocation} disabled={locating} style={styles.locate}>
+          {locating ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Text style={styles.locateText}>📍 Mi ubicación</Text>
+          )}
+        </Pressable>
+        <Pressable onPress={() => setShowMap(true)} style={styles.locate}>
+          <Text style={styles.locateText}>🗺️ Ajustar en el mapa</Text>
+        </Pressable>
+      </View>
+
+      <MapPicker
+        visible={showMap}
+        initial={lastPicked.current}
+        zone={zone}
+        onConfirm={item => {
+          setShowMap(false);
+          choose(item);
+        }}
+        onClose={() => setShowMap(false)}
+      />
 
       {searching ? <Caption>Buscando direcciones…</Caption> : null}
       {hint ? <Caption style={{ color: colors.warning }}>{hint}</Caption> : null}

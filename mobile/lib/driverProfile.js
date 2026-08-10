@@ -1,3 +1,5 @@
+import { decode } from "base64-arraybuffer";
+import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { supabase } from "./supabase";
 
 /**
@@ -21,6 +23,41 @@ export const PRIVATE_DOC_FIELDS = new Set([
   "autonomo_receipt_url",
   "censal_document_url",
 ]);
+
+/**
+ * Sube un documento sensible al bucket PRIVADO driver-docs desde una uri local
+ * de cámara/galería, comprimido. Devuelve la referencia "driver-docs://<path>"
+ * que se guarda en la columna del perfil (mismo esquema que la web).
+ */
+export async function uploadPrivateDriverDocFromUri(uri) {
+  const context = ImageManipulator.manipulate(uri);
+  context.resize({ width: 1600 });
+  const rendered = await context.renderAsync();
+  const image = await rendered.saveAsync({ compress: 0.75, format: SaveFormat.JPEG, base64: true });
+  if (!image?.base64) throw new Error("No se pudo procesar el documento");
+
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+  const { error } = await supabase.storage
+    .from("driver-docs")
+    .upload(path, decode(image.base64), { contentType: "image/jpeg", cacheControl: "3600" });
+  if (error) throw error;
+  return PRIVATE_PREFIX + path;
+}
+
+/** Campos de documentación del perfil, con su etiqueta y si son privados.
+ *  Misma lista que exige `isDriverProfileIncomplete`. */
+export const DOC_FIELDS = [
+  { field: "photo_url", label: "Foto de cara (selfie)", private: false },
+  { field: "license_photo_url", label: "Carnet de conducir", private: true },
+  { field: "id_document_url", label: "DNI / NIE", private: true },
+  { field: "insurance_url", label: "Seguro del vehículo", private: true },
+  { field: "autonomo_receipt_url", label: "Recibo de autónomo", private: true },
+  { field: "censal_document_url", label: "Situación censal (Hacienda)", private: true },
+  { field: "vehicle_photo_front_url", label: "Furgoneta — frontal", private: false },
+  { field: "vehicle_photo_rear_url", label: "Furgoneta — trasera", private: false },
+  { field: "vehicle_photo_left_url", label: "Furgoneta — lateral izquierdo", private: false },
+  { field: "vehicle_photo_right_url", label: "Furgoneta — lateral derecho", private: false },
+];
 
 export async function resolveDriverDocUrl(value) {
   if (!value) return null;

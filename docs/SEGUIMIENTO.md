@@ -448,6 +448,19 @@ Gotchas de Expo SDK 57 que costaron tiempo y conviene recordar: `@expo/vector-ic
 
 **Pendiente de aportar por el negocio** para terminar: proyecto **Firebase** (transporte del push en Android), DSN de **Sentry** y cuenta de **Google Play Console** — ver §6 del plan de acción.
 
+### 2026-08-11 (noche) — Marca real + cierre de huecos contra la propuesta comercial
+
+El usuario aportó la **propuesta comercial aceptada por el cliente** (Rediseño web 300 € + App Cliente 700 € + App Conductor 700 €); pasa a ser el contrato de referencia. Cotejo completo punto por punto en **[PROPUESTA-VS-ESTADO.md](PROPUESTA-VS-ESTADO.md)**. Construido en esta tanda:
+
+- **Marca de verdad**: iconos, adaptive icon, monocromo, splash y logo del login generados desde el MISMO SVG de la web (`scripts/generate-app-assets.mjs` con sharp; un solo origen de marca). La app dejó de llevar los assets de la plantilla de Expo. Splash con `expo-splash-screen` (en SDK 57 el campo `splash` de app.json ya no hace nada solo).
+- **Prueba de entrega completa** (T4.9): lienzo de firma (react-native-svg + view-shot → PNG) + foto de lo entregado, subidas ANTES de marcar entregado al bucket privado `delivery-proofs` — las columnas ya existían de la web, sin migración. Obligatoria en paquete/tienda, opcional en portes.
+- **Documentación del conductor** (T4.8): los 10 documentos con cámara/galería + compresión; sensibles → `driver-docs://` privado, selfie/furgoneta → público (mismas reglas que la web).
+- **Ganancias** (T4.7): misma fórmula que la web (`(final_price||estimated_price) × (100−commission_pct)%`), hoy/semana/mes + gráfico de 7 días en SVG puro (recharts no existe en RN y para 7 barras no hace falta librería).
+- **Pin en mapa** (patrón Uber: pin fijo, se arrastra el mapa) y **badges de no leídos** por pedido (last-read en AsyncStorage; el badge es UI, no estado de negocio).
+- **Login con Google** (expo-web-browser + setSession con los tokens del fragmento). ⚠️ La consent screen del negocio sigue en Testing: solo test users hasta publicarla.
+
+Módulos nativos añadidos (obligan a APK nuevo): expo-splash-screen, react-native-svg, react-native-view-shot, expo-web-browser. Pendiente contra la propuesta (ver cotejo): OTP SMS (Twilio 🔑), chat con fotos, programados, propina, PDF, tarjetas guardadas, caducidades (todos necesitan una migración o una credencial externa).
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**
