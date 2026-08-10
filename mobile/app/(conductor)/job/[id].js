@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "../../../lib/supabase";
@@ -24,6 +24,9 @@ const STEPS = [
   { from: "picked_up", to: "delivered", label: "Trabajo finalizado" },
 ];
 
+// Mismas etiquetas que la web: el admin ya las tiene tabuladas.
+const FEEDBACK_TAGS = ["Precio justo", "Precio injusto", "Mucho tiempo de espera"];
+
 const CANCEL_REASONS = [
   "Avería o problema con la furgoneta",
   "No puedo llegar a tiempo",
@@ -42,7 +45,26 @@ export default function TrabajoActivo() {
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [feedbackTags, setFeedbackTags] = useState([]);
+  const [feedbackText, setFeedbackText] = useState("");
   const trackingStarted = useRef(false);
+
+  const sendFeedback = async () => {
+    setSaving(true);
+    try {
+      await supabase
+        .from("transport_requests")
+        .update({
+          driver_feedback_tags: feedbackTags,
+          driver_feedback_text: feedbackText.trim() || null,
+        })
+        .eq("id", id);
+    } catch (err) {
+      setError("No se pudo enviar la opinión: " + (err.message || "error de conexión"));
+    } finally {
+      setSaving(false);
+    }
+  };
 
   useEffect(() => {
     fetchMyDriverProfile(user).then(setProfile);
@@ -220,6 +242,44 @@ export default function TrabajoActivo() {
           </Card>
         )}
 
+        {/* Opinión del conductor: la lee la empresa en el panel de admin. */}
+        {order.status === "delivered" && !order.driver_feedback_tags && !order.driver_feedback_text && (
+          <Card>
+            <Title>¿Cómo fue el servicio?</Title>
+            <Caption>Opcional. Lo lee la empresa, no el cliente.</Caption>
+            <View style={styles.chips}>
+              {FEEDBACK_TAGS.map(tag => {
+                const on = feedbackTags.includes(tag);
+                return (
+                  <Pressable
+                    key={tag}
+                    onPress={() =>
+                      setFeedbackTags(prev =>
+                        prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag],
+                      )
+                    }
+                    style={[styles.chip, on && styles.chipOn]}
+                  >
+                    <Text style={[styles.chipText, on && { color: colors.primary }]}>{tag}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Field
+              value={feedbackText}
+              onChangeText={setFeedbackText}
+              placeholder="Lo que quieras contarle a la empresa sobre este servicio…"
+              multiline
+            />
+            <Button
+              title="Enviar opinión"
+              disabled={feedbackTags.length === 0 && !feedbackText.trim()}
+              loading={saving}
+              onPress={sendFeedback}
+            />
+          </Card>
+        )}
+
         {canCancel && (
           <Card>
             <Title>¿No puedes hacerlo?</Title>
@@ -277,4 +337,14 @@ const styles = StyleSheet.create({
   bubbleMine: { alignSelf: "flex-end", backgroundColor: colors.primary },
   bubbleTheirs: { alignSelf: "flex-start", backgroundColor: colors.secondary },
   bubbleText: { fontSize: 15, color: colors.foreground },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  chip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  chipOn: { borderColor: colors.primary, backgroundColor: "#EFF6FF" },
+  chipText: { fontSize: 13, color: colors.mutedForeground },
 });
