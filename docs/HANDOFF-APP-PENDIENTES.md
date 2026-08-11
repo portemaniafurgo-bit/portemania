@@ -90,6 +90,12 @@ botones rounded-full), iconos/splash generados desde el SVG real con
 
 ## 5. TAREAS PENDIENTES, en orden recomendado
 
+### T0 — Mejoras UX del conductor "estilo Uber" (feedback directo del cliente)
+Especificadas COMPLETAS en **[MEJORAS-UX-CONDUCTOR.md](MEJORAS-UX-CONDUCTOR.md)**:
+mapa embebido en el trabajo activo (UX-1), mapa de contexto en la oferta
+(UX-2) y pulido visual con la paleta (UX-3). Todo JavaScript → se entrega por
+OTA sin APK. **Empezar por aquí**: es lo que el cliente pidió al probar.
+
 ### T1 — Push de verdad (bloqueado por Firebase) 🔑
 **Qué falta**: solo la credencial. Todo el código existe y `send-push` está
 desplegada y verificada.
