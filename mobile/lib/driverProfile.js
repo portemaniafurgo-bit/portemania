@@ -44,20 +44,33 @@ export async function uploadPrivateDriverDocFromUri(uri) {
   return PRIVATE_PREFIX + path;
 }
 
-/** Campos de documentación del perfil, con su etiqueta y si son privados.
+/** Campos de documentación del perfil, con su etiqueta, si son privados y en
+ *  qué columna guardan su fecha de caducidad (los que caducan).
  *  Misma lista que exige `isDriverProfileIncomplete`. */
 export const DOC_FIELDS = [
   { field: "photo_url", label: "Foto de cara (selfie)", private: false },
-  { field: "license_photo_url", label: "Carnet de conducir", private: true },
-  { field: "id_document_url", label: "DNI / NIE", private: true },
-  { field: "insurance_url", label: "Seguro del vehículo", private: true },
-  { field: "autonomo_receipt_url", label: "Recibo de autónomo", private: true },
-  { field: "censal_document_url", label: "Situación censal (Hacienda)", private: true },
+  { field: "license_photo_url", label: "Carnet de conducir", private: true, expiresField: "license_expires_at" },
+  { field: "id_document_url", label: "DNI / NIE", private: true, expiresField: "id_document_expires_at" },
+  { field: "insurance_url", label: "Seguro del vehículo", private: true, expiresField: "insurance_expires_at" },
+  { field: "autonomo_receipt_url", label: "Recibo de autónomo", private: true, expiresField: "autonomo_receipt_expires_at" },
+  { field: "censal_document_url", label: "Situación censal (Hacienda)", private: true, expiresField: "censal_document_expires_at" },
   { field: "vehicle_photo_front_url", label: "Furgoneta — frontal", private: false },
   { field: "vehicle_photo_rear_url", label: "Furgoneta — trasera", private: false },
   { field: "vehicle_photo_left_url", label: "Furgoneta — lateral izquierdo", private: false },
   { field: "vehicle_photo_right_url", label: "Furgoneta — lateral derecho", private: false },
 ];
+
+/** Estado de caducidad de un documento: null (no caduca / sin fecha),
+ *  'expired', 'soon' (≤15 días, el margen del aviso de la propuesta) u 'ok'. */
+export function expiryStatus(profile, doc) {
+  if (!doc.expiresField) return null;
+  const value = profile?.[doc.expiresField];
+  if (!value) return null;
+  const days = Math.floor((new Date(value) - Date.now()) / (24 * 3600 * 1000));
+  if (days < 0) return "expired";
+  if (days <= 15) return "soon";
+  return "ok";
+}
 
 export async function resolveDriverDocUrl(value) {
   if (!value) return null;

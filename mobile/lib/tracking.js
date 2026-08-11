@@ -77,7 +77,7 @@ export async function startTracking(profileId) {
     foregroundService: {
       notificationTitle: "ClicyVoy · servicio en curso",
       notificationBody: "Compartiendo tu posición con el cliente",
-      notificationColor: "#3B82F6",
+      notificationColor: "#7145d6",
     },
   });
 

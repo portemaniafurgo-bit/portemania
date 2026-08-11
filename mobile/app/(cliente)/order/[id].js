@@ -8,9 +8,12 @@ import { STATUS_FLOW, STATUS_LABELS, useChat, useDriverLocation, useOrder } from
 import { markChatRead } from "../../../lib/unread";
 import { serviceOf } from "../../../lib/services";
 import { Body, Button, Caption, Card, Field, Heading, Loading, Title } from "../../../components/ui";
+import { pickPhotos } from "../../../lib/photos";
 import TrackingMap from "../../../components/TrackingMap";
 import ReportIncident from "../../../components/ReportIncident";
 import PayButton from "../../../components/PayButton";
+import TipCard from "../../../components/TipCard";
+import { downloadReceipt } from "../../../lib/receipt";
 import { colors, radius, spacing } from "../../../theme";
 
 /**
@@ -29,7 +32,30 @@ export default function OrderDetail() {
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
   const [savingReview, setSavingReview] = useState(false);
+  const [chatError, setChatError] = useState("");
   const scrollRef = useRef(null);
+
+  const sendText = async () => {
+    setChatError("");
+    try {
+      await send(draft);
+      setDraft("");
+    } catch {
+      setChatError("No se pudo enviar el mensaje. Comprueba tu conexión.");
+    }
+  };
+
+  const sendPhoto = async () => {
+    setChatError("");
+    try {
+      const uris = await pickPhotos(1);
+      if (!uris[0]) return;
+      await send(draft, { imageUri: uris[0] });
+      setDraft("");
+    } catch {
+      setChatError("No se pudo enviar la foto. Comprueba tu conexión.");
+    }
+  };
 
   const submitReview = async () => {
     setSavingReview(true);
@@ -203,8 +229,26 @@ export default function OrderDetail() {
           </Card>
         ) : null}
 
-        {/* Cancelar: la regla actual solo lo permite mientras nadie lo ha aceptado */}
-        {order.status === "pending" && (
+        {/* Propina: tras la entrega, cargo Stripe aparte, 100% para el conductor */}
+        {order.status === "delivered" && <TipCard order={order} driverName={driver?.full_name} />}
+
+        {/* Recibo en PDF, generado en el propio móvil */}
+        {order.status === "delivered" && (
+          <Button
+            title="Descargar recibo (PDF)"
+            variant="plain"
+            onPress={async () => {
+              try {
+                await downloadReceipt(order, service);
+              } catch {
+                setChatError("No se pudo generar el recibo. Inténtalo de nuevo.");
+              }
+            }}
+          />
+        )}
+
+        {/* Cancelar: mientras nadie lo ha aceptado (o aún no se ha publicado) */}
+        {["pending", "scheduled"].includes(order.status) && (
           <Button title="Cancelar el pedido" variant="plain" onPress={cancelOrder} />
         )}
 
@@ -225,7 +269,12 @@ export default function OrderDetail() {
                     style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
                   >
                     {!mine ? <Caption>{m.sender_name}</Caption> : null}
-                    <Text style={[styles.bubbleText, mine && { color: "#fff" }]}>{m.message}</Text>
+                    {m.image_url ? (
+                      <Image source={{ uri: m.image_url }} style={styles.chatImage} />
+                    ) : null}
+                    {m.message && m.message !== "📷 Foto" ? (
+                      <Text style={[styles.bubbleText, mine && { color: "#fff" }]}>{m.message}</Text>
+                    ) : null}
                   </View>
                 );
               })
@@ -241,15 +290,23 @@ export default function OrderDetail() {
                   placeholder="Escribe un mensaje…"
                   multiline
                 />
-                <Button
-                  title="Enviar"
-                  loading={sending}
-                  disabled={!draft.trim()}
-                  onPress={async () => {
-                    await send(draft);
-                    setDraft("");
-                  }}
-                />
+                {chatError ? <Caption style={{ color: colors.destructive }}>{chatError}</Caption> : null}
+                <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                  <Button
+                    title="📷"
+                    variant="plain"
+                    loading={sending}
+                    onPress={() => sendPhoto()}
+                    style={{ minWidth: 56 }}
+                  />
+                  <Button
+                    title="Enviar"
+                    loading={sending}
+                    disabled={!draft.trim()}
+                    onPress={() => sendText()}
+                    style={{ flex: 1 }}
+                  />
+                </View>
               </View>
             )}
           </Card>
@@ -273,5 +330,6 @@ const styles = StyleSheet.create({
   bubbleTheirs: { alignSelf: "flex-start", backgroundColor: colors.secondary },
   bubbleText: { fontSize: 15, color: colors.foreground },
   stars: { flexDirection: "row", gap: spacing.sm },
-  star: { fontSize: 32, color: colors.warning },
+  star: { fontSize: 32, color: colors.accent },
+  chatImage: { width: 200, height: 150, borderRadius: radius.md, backgroundColor: colors.secondary },
 });

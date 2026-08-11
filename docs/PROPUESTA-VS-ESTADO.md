@@ -27,17 +27,17 @@ alcance de este documento.
 | Seguimiento en vivo (Realtime + ETA OSRM + frescura) | ✅ | Sin sondeos; indicador "en vivo" / "hace X min" |
 | Push FCM en todos los cambios de estado | 🔑 | Todo construido y la Edge Function `send-push` desplegada y verificada. **Falta el proyecto Firebase** (gratuito): sin `google-services.json` Android no entrega notificaciones |
 | Chat: mensajería | ✅ | Realtime en ambos lados |
-| Chat: fotos comprimidas | ⏳ | Necesita columna `image_url` en `chat_messages` (migración) y pintar imágenes también en la web |
+| Chat: fotos comprimidas | ✅ | En app (cámara/galería + compresión) y pintadas también en la web. Columna `image_url` aplicada (migración 0012) |
 | Chat: badges de no leídos | ✅ | Contador por pedido en «Mis pedidos» |
 | Chat: sonido/vibración | ✅ | Canales Android (las ofertas con sonido propio) — efectivo cuando haya FCM |
 | Pagos: Stripe nativo con Google Pay | ✅ | PaymentSheet contra las MISMAS Edge Functions (el servidor recalcula el importe y verifica el cargo). Claves test |
-| Pagos: tarjetas guardadas | ⏳ | PaymentSheet lo soporta, pero exige crear el *customer* de Stripe en `create-payment-intent` (cambio pequeño de backend) |
+| Pagos: tarjetas guardadas | ⏳ | PaymentSheet lo soporta, pero exige crear el *customer* de Stripe en `create-payment-intent`. Se hará con pruebas dedicadas: es la función que cobra |
 | Valoración con estrellas | ✅ | La media la recalcula el trigger de la BD |
-| Propina al conductor | ⏳ | Necesita columna `tip_amount` + cargo Stripe aparte. Fase 3 en la especificación técnica |
-| Recibo/factura PDF | ⏳ | Necesita una Edge Function de generación de PDF |
+| Propina al conductor | ✅ | Cargo Stripe aparte (funciones `create-tip-intent`/`confirm-tip` desplegadas y verificadas); 0,50–20 €, un intento por pedido, 100% para el conductor |
+| Recibo/factura PDF | 🔶 | PDF generado EN el móvil (expo-print) y compartible/guardable, con marca. El envío automático por email queda pendiente |
 | Historial con filtros | ✅ | Activos / Entregados / Cancelados |
 | Repetir pedido con un toque | ✅ | Rellena el asistente; el precio lo fija el servidor de nuevo |
-| Pedidos programados | ⏳ | Necesita columna `scheduled_at` + job pg_cron que los publique a su hora |
+| Pedidos programados | ✅ | Día/hora en el asistente; nacen como 'scheduled' (política RLS ampliada solo a fecha futura) y un job pg_cron los publica cada minuto |
 
 ## 2.3 App Android Conductor
 
@@ -45,7 +45,7 @@ alcance de este documento.
 |---|---|---|
 | Verificación documental (selfie, carnet, DNI, seguro, autónomo, vehículo) | ✅ | Los 10 documentos con cámara/galería y compresión; sensibles al bucket privado con signed URLs |
 | Escaneo de bordes del documento | 🔶 | Se sube la foto comprimida sin recorte automático de bordes (necesitaría vision-camera; ver «Desviaciones») |
-| Caducidad inteligente (vencimientos + push 15 días + bloqueo pg_cron) | ⏳ | Necesita columnas de vencimiento + job pg_cron (migración) |
+| Caducidad inteligente | 🔶 | Fechas por documento en la app, avisos visuales (≤15 días) y job pg_cron diario que bloquea el reparto al vencer. El push de aviso llegará con Firebase |
 | Toggle Disponible/No disponible | ✅ | Además apaga el GPS y condiciona el push de ofertas |
 | Ofertas por push con sonido distintivo | 🔑 | Construido (canal "Ofertas" propio); efectivo cuando haya Firebase |
 | GPS background con foreground service, solo en trabajo activo | ✅ | expo-location + TaskManager; escribe `location_updated_at`; se apaga al terminar/cancelar/desconectarse |
@@ -85,14 +85,20 @@ funcionalidad visible; se documentan para que el negocio las conozca:
 | Cuenta **Google Play Console** | Publicar la app | 25 $ una vez |
 | DSN de **Sentry** | Crash reporting en producción | 0 € (plan free) |
 
-## Trabajo restante estimado (sin contar bloqueos externos)
+## Trabajo restante (sin contar bloqueos externos)
 
-1. Migración de backend (una sola): `scheduled_at` + `chat_messages.image_url`
-   + columnas de caducidad de documentos + `tip_amount` (+ pg_cron para
-   programados y caducidades).
-2. Chat con fotos (app + pintado en web).
-3. Pedidos programados (asistente + recordatorio).
-4. Propina post-servicio y recibo PDF.
-5. Tarjetas guardadas (customer de Stripe).
-6. QA en dispositivos reales y checklist de Play Store (Data Safety + vídeo de
+La migración 0012 está **aplicada** y las funciones de propina **desplegadas y
+verificadas** (2026-08-11). Queda:
+
+1. Tarjetas guardadas (customer de Stripe en `create-payment-intent`) — con
+   pruebas dedicadas: es la función que cobra.
+2. Envío del recibo por email (el PDF en el móvil ya funciona).
+3. Escaneo de bordes de documentos (si el negocio lo quiere: vision-camera).
+4. QA en dispositivos reales y checklist de Play Store (Data Safety + vídeo de
    ubicación en segundo plano).
+5. Cuando haya Firebase: probar la matriz de push completa con dos móviles.
+
+**Nota de diseño (2026-08-11):** la app usa la línea gráfica de la landing
+actual — morado `#7145d6` (pressed `#5a35b0`), amarillo de marca `#F5B400`,
+negro `#1a1b20`, botones redondeados. Todo sale de `mobile/theme.js`: ninguna
+pantalla lleva colores en duro.

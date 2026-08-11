@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import {
   DOC_FIELDS,
+  expiryStatus,
   fetchMyDriverProfile,
   isDriverProfileIncomplete,
   uploadPrivateDriverDocFromUri,
@@ -20,6 +21,27 @@ import { colors, radius, spacing } from "../../theme";
  * "driver-docs://"; el selfie y las fotos de la furgoneta siguen públicos
  * porque el cliente los ve en su pedido — mismas reglas que la web.
  */
+/** Campo pequeño de fecha de caducidad: se guarda al perder el foco. */
+function ExpiryField({ initial, onSave }) {
+  // "2027-03-01" → "01/03/2027" para editar en el formato que usa la gente.
+  const toDisplay = iso => {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || "");
+    return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+  };
+  const [text, setText] = useState(toDisplay(initial));
+
+  return (
+    <TextInput
+      value={text}
+      onChangeText={setText}
+      onBlur={() => text.trim() && text !== toDisplay(initial) && onSave(text)}
+      placeholder="Caducidad: DD/MM/AAAA"
+      placeholderTextColor={colors.mutedForeground}
+      style={styles.expiryInput}
+    />
+  );
+}
+
 export default function PerfilConductor() {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState(undefined);
@@ -53,6 +75,27 @@ export default function PerfilConductor() {
     } finally {
       setUploading(null);
     }
+  };
+
+  /** Fecha de caducidad de un documento (DD/MM/AAAA). El job diario del
+   *  servidor bloquea el reparto cuando algo vence. */
+  const saveExpiry = async (doc, text) => {
+    const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(text.trim());
+    if (!match) {
+      setError(`Fecha de «${doc.label}» no válida: usa DD/MM/AAAA.`);
+      return;
+    }
+    setError("");
+    const iso = `${match[3]}-${match[2].padStart(2, "0")}-${match[1].padStart(2, "0")}`;
+    const { error: err } = await supabase
+      .from("driver_profiles")
+      .update({ [doc.expiresField]: iso })
+      .eq("id", profile.id);
+    if (err) {
+      setError("No se pudo guardar la fecha: " + err.message);
+      return;
+    }
+    setProfile(prev => ({ ...prev, [doc.expiresField]: iso }));
   };
 
   const chooseSource = doc => {
@@ -103,12 +146,34 @@ export default function PerfilConductor() {
           <ErrorText>{error}</ErrorText>
           {DOC_FIELDS.map(doc => {
             const present = !!profile[doc.field];
+            const expiry = expiryStatus(profile, doc);
+            const dotColor =
+              expiry === "expired" ? colors.destructive
+              : expiry === "soon" ? colors.warning
+              : present ? colors.success
+              : colors.destructive;
             return (
               <View key={doc.field} style={styles.docRow}>
-                <View style={[styles.docDot, { backgroundColor: present ? colors.success : colors.destructive }]} />
+                <View style={[styles.docDot, { backgroundColor: dotColor }]} />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.docLabel}>{doc.label}</Text>
-                  <Caption>{present ? "Subido" : "Falta"}</Caption>
+                  <Caption>
+                    {!present
+                      ? "Falta"
+                      : expiry === "expired"
+                        ? "CADUCADO — súbelo renovado"
+                        : expiry === "soon"
+                          ? `Caduca pronto (${profile[doc.expiresField]})`
+                          : expiry === "ok"
+                            ? `Vence ${profile[doc.expiresField]}`
+                            : "Subido"}
+                  </Caption>
+                  {present && doc.expiresField ? (
+                    <ExpiryField
+                      initial={profile[doc.expiresField]}
+                      onSave={text => saveExpiry(doc, text)}
+                    />
+                  ) : null}
                 </View>
                 <Button
                   title={present ? "Sustituir" : "Subir"}
@@ -138,4 +203,14 @@ const styles = StyleSheet.create({
   },
   docDot: { width: 10, height: 10, borderRadius: radius.full },
   docLabel: { fontSize: 14, fontWeight: "600", color: colors.foreground },
+  expiryInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    fontSize: 13,
+    color: colors.foreground,
+    marginTop: spacing.xs,
+  },
 });

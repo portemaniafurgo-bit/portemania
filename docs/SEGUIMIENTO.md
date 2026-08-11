@@ -461,6 +461,20 @@ El usuario aportó la **propuesta comercial aceptada por el cliente** (Rediseño
 
 Módulos nativos añadidos (obligan a APK nuevo): expo-splash-screen, react-native-svg, react-native-view-shot, expo-web-browser. Pendiente contra la propuesta (ver cotejo): OTP SMS (Twilio 🔑), chat con fotos, programados, propina, PDF, tarjetas guardadas, caducidades (todos necesitan una migración o una credencial externa).
 
+### 2026-08-11 (madrugada) — Re-tema morado + fase 2 completa de la propuesta
+
+El usuario señaló que la app llevaba botones azules del diseño viejo: la línea gráfica de referencia es la de la **landing actual** (morado `#7145d6`/`#5a35b0`, amarillo de marca `#F5B400`, negro `#1a1b20`, botones redondeados). Re-tematizado TODO vía `mobile/theme.js` — ninguna pantalla lleva colores en duro (los `#EFF6FF`/`#3B82F6` que quedaban pasaron a tokens). A petición suya, **NO se lanza build hasta su OK** (la que estaba en cola se canceló).
+
+**Migración 0012 APLICADA** en `dnehzwrqphqpkcdjwqfi` (verificada por consulta al esquema: columnas + política + 2 jobs pg_cron) y con ella construido:
+- **Chat con fotos**: cámara/galería comprimidas, pintadas en app Y en la web (`chat_messages.image_url`).
+- **Pedidos programados**: día/hora en el asistente; nacen `scheduled` (política de INSERT ampliada SOLO a fecha futura del propio usuario), job pg_cron los publica cada minuto y entonces disparan los avisos normales. Visibles y cancelables en la app.
+- **Propina**: Edge Functions `create-tip-intent` + `confirm-tip` desplegadas con verify_jwt y verificadas (espejo del patrón de pago: el servidor valida el rango 0,50-20 €, un intento por pedido, y solo se anota tras verificar el cargo real en Stripe). UI con PaymentSheet tras la entrega.
+- **Caducidades**: 5 columnas `*_expires_at` + `docs_expired`; el conductor pone la fecha al documento en su perfil, avisos visuales a ≤15 días, y job pg_cron diario que bloquea el reparto al vencer (el push de aviso llegará con Firebase).
+- **Recibo PDF**: generado EN el móvil (expo-print) con la marca, compartible; sin Edge Function y funciona offline.
+- **Auth**: `clicyvoy://` añadido a la allowlist de redirecciones de Supabase (sin esto el login con Google de la app no podía volver).
+
+Verificación: bundle Android limpio (5,9 MB), build web 42/42 (el chat de las dos páginas web pinta fotos). El cotejo [PROPUESTA-VS-ESTADO.md](PROPUESTA-VS-ESTADO.md) queda: TODO ✅ salvo OTP SMS (🔑 Twilio), push efectivo (🔑 Firebase), Google login público (🔑 consent screen), tarjetas guardadas, email del recibo y escaneo de bordes.
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

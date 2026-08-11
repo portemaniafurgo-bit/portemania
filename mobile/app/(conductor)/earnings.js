@@ -143,7 +143,7 @@ export default function Ganancias() {
           </View>
         </Card>
 
-        <Card style={{ backgroundColor: "#EFF6FF", borderColor: colors.primary }}>
+        <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary }}>
           <Caption>
             💡 Recibes el <Caption style={{ fontWeight: "700", color: colors.foreground }}>{100 - commissionPct}%</Caption> de
             cada servicio. La comisión de plataforma es del {commissionPct}%.

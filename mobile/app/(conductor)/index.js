@@ -203,6 +203,16 @@ export default function Ofertas() {
           </Card>
         )}
 
+        {profile?.docs_expired && (
+          <Card style={{ backgroundColor: "#FEF2F2", borderColor: colors.destructive }}>
+            <Body>Tienes documentación caducada.</Body>
+            <Caption>
+              Sube el documento renovado con su nueva fecha en tu perfil y vuelve a ponerte
+              disponible.
+            </Caption>
+          </Card>
+        )}
+
         {orders.length === 0 ? (
           <Card>
             <Caption>Ahora mismo no hay pedidos disponibles para tu furgoneta.</Caption>
@@ -235,7 +245,7 @@ export default function Ofertas() {
                 <Button
                   title="Aceptar servicio"
                   loading={accepting === order.id}
-                  disabled={!!activeJob || incomplete || !profile?.is_available}
+                  disabled={!!activeJob || incomplete || profile?.docs_expired || !profile?.is_available}
                   onPress={() => accept(order)}
                 />
                 {activeJob ? (

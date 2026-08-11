@@ -14,7 +14,7 @@ import { colors, radius, spacing } from "../../theme";
  * Mis pedidos. La RLS ya limita lo que el cliente puede ver, así que basta un
  * select sin filtro de propietario: el servidor no devolverá pedidos ajenos.
  */
-const ACTIVE_STATUSES = ["pending", "accepted", "in_transit", "picked_up"];
+const ACTIVE_STATUSES = ["scheduled", "pending", "accepted", "in_transit", "picked_up"];
 
 const FILTERS = [
   { key: "active", label: "Activos" },
@@ -23,10 +23,11 @@ const FILTERS = [
 ];
 
 const STATUS = {
+  scheduled: { label: "Programado", color: colors.primary, bg: colors.primarySoft },
   pending: { label: "Buscando conductor", color: colors.warning, bg: colors.warningBg },
-  accepted: { label: "Conductor asignado", color: colors.primary, bg: "#EFF6FF" },
-  in_transit: { label: "En camino", color: colors.primary, bg: "#EFF6FF" },
-  picked_up: { label: "Carga recogida", color: colors.primary, bg: "#EFF6FF" },
+  accepted: { label: "Conductor asignado", color: colors.primary, bg: colors.primarySoft },
+  in_transit: { label: "En camino", color: colors.primary, bg: colors.primarySoft },
+  picked_up: { label: "Carga recogida", color: colors.primary, bg: colors.primarySoft },
   delivered: { label: "Entregado", color: colors.success, bg: colors.successBg },
   cancelled: { label: "Cancelado", color: colors.destructive, bg: "#FEF2F2" },
 };

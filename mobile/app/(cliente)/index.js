@@ -3,7 +3,7 @@ import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "rea
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useAuth } from "../../lib/auth";
-import { useRequestForm } from "../../lib/useRequestForm";
+import { parseScheduledAt, useRequestForm } from "../../lib/useRequestForm";
 import { SERVICE_KEYS, SERVICES } from "../../lib/services";
 import { servicePriceFrom } from "../../lib/tariffs";
 import { pickPhotos, takePhoto } from "../../lib/photos";
@@ -72,6 +72,12 @@ export default function Pedir() {
 
   const create = async () => {
     setError("");
+    // Programado a medias: mejor frenar aquí que crear un pedido "para ahora"
+    // cuando el cliente creía haberlo dejado para el sábado.
+    if (form.scheduled_date && !parseScheduledAt(form.scheduled_date, form.scheduled_time)) {
+      setError("Revisa el día y la hora del pedido programado (ej.: 25/08 y 09:30, en el futuro).");
+      return;
+    }
     setSending(true);
     try {
       const duplicate = await findRecentDuplicate();
@@ -427,6 +433,47 @@ export default function Pedir() {
 
             <Card>
               <PriceSummary quote={quote} />
+            </Card>
+
+            <Card>
+              <Caption>¿Cuándo lo necesitas?</Caption>
+              <Option
+                label="Lo antes posible"
+                description="Se publica ahora a los conductores"
+                selected={!form.scheduled_date}
+                onPress={() => {
+                  update("scheduled_date", "");
+                  update("scheduled_time", "");
+                }}
+              />
+              <Option
+                label="Programarlo"
+                description="Elige día y hora; se publicará automáticamente"
+                selected={!!form.scheduled_date}
+                onPress={() => update("scheduled_date", form.scheduled_date || "  /  ")}
+              />
+              {form.scheduled_date ? (
+                <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                  <View style={{ flex: 1 }}>
+                    <Field
+                      label="Día (DD/MM)"
+                      value={form.scheduled_date.trim() === "/" ? "" : form.scheduled_date}
+                      onChangeText={v => update("scheduled_date", v)}
+                      placeholder="25/08"
+                      keyboardType="numbers-and-punctuation"
+                    />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Field
+                      label="Hora (HH:MM)"
+                      value={form.scheduled_time}
+                      onChangeText={v => update("scheduled_time", v)}
+                      placeholder="09:30"
+                      keyboardType="numbers-and-punctuation"
+                    />
+                  </View>
+                </View>
+              ) : null}
             </Card>
 
             <Card>

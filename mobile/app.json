@@ -16,7 +16,7 @@
     "android": {
       "package": "com.clicyvoy.app",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FFFFFF",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -58,7 +58,7 @@
       [
         "expo-notifications",
         {
-          "color": "#3B82F6"
+          "color": "#7145d6"
         }
       ],
       [
@@ -77,7 +77,8 @@
           "backgroundColor": "#FFFFFF"
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-sharing"
     ],
     "extra": {
       "router": {},

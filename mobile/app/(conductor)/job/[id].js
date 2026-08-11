@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "../../../lib/supabase";
@@ -54,6 +54,7 @@ export default function TrabajoActivo() {
   const [showProof, setShowProof] = useState(false);
   const [proofPhotoUri, setProofPhotoUri] = useState(null);
   const [recipientName, setRecipientName] = useState("");
+  const [chatError, setChatError] = useState("");
   const trackingStarted = useRef(false);
 
   const sendFeedback = async () => {
@@ -398,7 +399,10 @@ export default function TrabajoActivo() {
               return (
                 <View key={m.id} style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
                   {!mine ? <Caption>{m.sender_name}</Caption> : null}
-                  <Text style={[styles.bubbleText, mine && { color: "#fff" }]}>{m.message}</Text>
+                  {m.image_url ? <Image source={{ uri: m.image_url }} style={styles.chatImage} /> : null}
+                  {m.message && m.message !== "📷 Foto" ? (
+                    <Text style={[styles.bubbleText, mine && { color: "#fff" }]}>{m.message}</Text>
+                  ) : null}
                 </View>
               );
             })
@@ -408,15 +412,41 @@ export default function TrabajoActivo() {
           ) : (
             <View style={{ gap: spacing.sm }}>
               <Field value={draft} onChangeText={setDraft} placeholder="Escribe un mensaje…" multiline />
-              <Button
-                title="Enviar"
-                loading={sending}
-                disabled={!draft.trim()}
-                onPress={async () => {
-                  await send(draft);
-                  setDraft("");
-                }}
-              />
+              {chatError ? <Caption style={{ color: colors.destructive }}>{chatError}</Caption> : null}
+              <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                <Button
+                  title="📷"
+                  variant="plain"
+                  loading={sending}
+                  style={{ minWidth: 56 }}
+                  onPress={async () => {
+                    setChatError("");
+                    try {
+                      const uris = await takePhoto();
+                      if (!uris[0]) return;
+                      await send(draft, { imageUri: uris[0] });
+                      setDraft("");
+                    } catch {
+                      setChatError("No se pudo enviar la foto.");
+                    }
+                  }}
+                />
+                <Button
+                  title="Enviar"
+                  loading={sending}
+                  disabled={!draft.trim()}
+                  style={{ flex: 1 }}
+                  onPress={async () => {
+                    setChatError("");
+                    try {
+                      await send(draft);
+                      setDraft("");
+                    } catch {
+                      setChatError("No se pudo enviar el mensaje.");
+                    }
+                  }}
+                />
+              </View>
             </View>
           )}
         </Card>
@@ -439,6 +469,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
   },
-  chipOn: { borderColor: colors.primary, backgroundColor: "#EFF6FF" },
+  chipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   chipText: { fontSize: 13, color: colors.mutedForeground },
+  chatImage: { width: 200, height: 150, borderRadius: radius.md, backgroundColor: colors.secondary },
 });

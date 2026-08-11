@@ -564,7 +564,14 @@ export default function ActiveJob() {
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-foreground"
               }`}>
-                {msg.message}
+                {/* Fotos enviadas desde la app (chat_messages.image_url) */}
+                {msg.image_url && (
+                  <a href={msg.image_url} target="_blank" rel="noreferrer">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={msg.image_url} alt="Foto del chat" className="rounded-xl max-h-40 mb-1" />
+                  </a>
+                )}
+                {msg.message !== "📷 Foto" && msg.message}
               </div>
             </div>
           ))}

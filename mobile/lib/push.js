@@ -34,12 +34,12 @@ async function ensureChannels() {
     name: "Pedidos disponibles",
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 250, 250, 250],
-    lightColor: "#3B82F6",
+    lightColor: "#7145d6",
   });
   await Notifications.setNotificationChannelAsync("estado", {
     name: "Estado del pedido y chat",
     importance: Notifications.AndroidImportance.HIGH,
-    lightColor: "#3B82F6",
+    lightColor: "#7145d6",
   });
 }
 

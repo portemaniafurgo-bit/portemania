@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.card,
   },
-  optionSelected: { borderColor: colors.primary, backgroundColor: "#EFF6FF" },
+  optionSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   optionLabel: { fontSize: 15, fontWeight: "600", color: colors.foreground },
   radio: {
     width: 22,

@@ -48,7 +48,31 @@ const emptyForm = (draft = {}) => ({
   payment_method: draft.payment_method || "cash",
   notes: draft.notes || "",
   distance_km: 0,
+  // Programado: "DD/MM HH:MM" en texto; null = ahora mismo.
+  scheduled_date: draft.scheduled_date || "",
+  scheduled_time: draft.scheduled_time || "",
 });
+
+/**
+ * "25/12 09:30" → Date, o null si no es válida o ya pasó. Año actual (o el
+ * siguiente si la fecha ya quedó atrás, p. ej. programar el 2 de enero en
+ * diciembre).
+ */
+export function parseScheduledAt(dateStr, timeStr) {
+  const dm = /^(\d{1,2})\/(\d{1,2})$/.exec((dateStr || "").trim());
+  const hm = /^(\d{1,2}):(\d{2})$/.exec((timeStr || "").trim());
+  if (!dm || !hm) return null;
+  const [, day, month] = dm.map(Number);
+  const [, hours, minutes] = hm.map(Number);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hours > 23 || minutes > 59) return null;
+
+  const now = new Date();
+  let when = new Date(now.getFullYear(), month - 1, day, hours, minutes);
+  if (when <= now) when = new Date(now.getFullYear() + 1, month - 1, day, hours, minutes);
+  // Más de 60 días vista huele a error de tecleo, no a una mudanza planificada.
+  if (when - now > 60 * 24 * 3600 * 1000) return null;
+  return when;
+}
 
 export function useRequestForm({ user } = {}) {
   const [tariffs, setTariffs] = useState(DEFAULT_TARIFFS);
@@ -309,6 +333,14 @@ export function useRequestForm({ user } = {}) {
     // otra escrita a mano, y sin las dos el pedido llegaría sin destino al mapa.
     const needsRoute = !form.origin_lat || !form.destination_lat || !form.distance_km;
     const route = needsRoute ? await computeRoute() : null;
+
+    // Programado: si el cliente rellenó fecha y hora válidas, el pedido nace
+    // como 'scheduled' y el job del servidor lo publica a su hora. La política
+    // de INSERT solo lo acepta con fecha futura.
+    const scheduledAt =
+      form.scheduled_date && form.scheduled_time
+        ? parseScheduledAt(form.scheduled_date, form.scheduled_time)
+        : null;
     const payload = {
       client_name: form.client_name || user?.user_metadata?.full_name || user?.email || "Cliente",
       client_phone: form.client_phone,
@@ -334,7 +366,8 @@ export function useRequestForm({ user } = {}) {
       payment_method: form.payment_method,
       notes: form.notes || null,
       helpers_count: 0,
-      status: "pending",
+      status: scheduledAt ? "scheduled" : "pending",
+      ...(scheduledAt ? { scheduled_at: scheduledAt.toISOString() } : {}),
       payment_status: "pending",
       distance_km: (route?.distance_km ?? form.distance_km) || null,
       ...(route || {}),
@@ -349,12 +382,16 @@ export function useRequestForm({ user } = {}) {
 
     // Avisos a admins y conductores compatibles. No deben bloquear el flujo:
     // si fallan, el pedido ya está creado y se ve en el panel igualmente.
-    supabase.functions
-      .invoke("send-email", { body: { mode: "new_request", order_id: data.id } })
-      .catch(() => {});
-    supabase.functions
-      .invoke("send-push", { body: { mode: "new_request", order_id: data.id } })
-      .catch(() => {});
+    // Un programado NO avisa ahora: los conductores se enteran cuando el job lo
+    // publique a su hora (send-push ya ignora pedidos que no estén pendientes).
+    if (!scheduledAt) {
+      supabase.functions
+        .invoke("send-email", { body: { mode: "new_request", order_id: data.id } })
+        .catch(() => {});
+      supabase.functions
+        .invoke("send-push", { body: { mode: "new_request", order_id: data.id } })
+        .catch(() => {});
+    }
 
     await clearDraft();
     return data;

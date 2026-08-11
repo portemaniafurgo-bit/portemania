@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "./supabase";
+import { uploadPhoto } from "./photos";
 
 /**
  * Datos vivos de un pedido: estado, conductor, posición y chat.
@@ -25,6 +26,7 @@ export function locationFreshness(updatedAt) {
 export const STATUS_FLOW = ["pending", "accepted", "in_transit", "picked_up", "delivered"];
 
 export const STATUS_LABELS = {
+  scheduled: "Programado — se publicará a su hora",
   pending: "Buscando conductor",
   accepted: "Conductor asignado",
   in_transit: "En camino a la recogida",
@@ -174,11 +176,16 @@ export function useChat(orderId, { user, role }) {
   }, [orderId]);
 
   const send = useCallback(
-    async text => {
+    async (text, { imageUri = null } = {}) => {
       const message = (text || "").trim();
-      if (!message) return;
+      if (!message && !imageUri) return;
       setSending(true);
       try {
+        // La foto se comprime y sube ANTES de crear el mensaje: un mensaje que
+        // referencia una imagen que no llegó a subir es un bocadillo roto para
+        // siempre en los dos lados del chat.
+        const image_url = imageUri ? await uploadPhoto(imageUri) : null;
+
         const { data, error } = await supabase
           .from("chat_messages")
           .insert({
@@ -186,7 +193,8 @@ export function useChat(orderId, { user, role }) {
             sender_id: user?.id,
             sender_name: user?.user_metadata?.full_name || user?.email || "Usuario",
             sender_role: role === "driver" ? "driver" : "client",
-            message,
+            message: message || "📷 Foto",
+            ...(image_url ? { image_url } : {}),
           })
           .select()
           .single();
