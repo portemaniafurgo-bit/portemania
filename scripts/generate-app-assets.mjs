@@ -66,8 +66,16 @@ await render(markOnly("#FFFFFF").replaceAll("#F5B400", "#FFFFFF"), {
   .png()
   .toFile(`${OUT}/android-icon-monochrome.png`);
 
-// Splash: logo completo sobre blanco. expo-splash-screen lo centra.
-await render(fullLogo, { width: 1200, height: 344, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+// Splash APILADO: isotipo grande arriba y wordmark centrado debajo (petición
+// del cliente 2026-08-11 — el logo horizontal quedaba pequeño y cortado en la
+// pantalla de arranque).
+const stackedLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 430">
+  <g transform="translate(180 5)">${MARK()}</g>
+  <text x="280" y="382" text-anchor="middle" font-family="'Poppins','Montserrat','Arial',sans-serif" font-weight="700" font-size="92">
+    <tspan fill="#111111">Clicy</tspan><tspan fill="#F5B400">Voy</tspan>
+  </text>
+</svg>`;
+await render(stackedLogo, { width: 840, height: 645, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
   .png()
   .toFile(`${OUT}/splash-icon.png`);
 
