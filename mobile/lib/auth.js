@@ -30,8 +30,17 @@ AppState.addEventListener("change", (state) => {
 
 async function fetchRole(userId) {
   if (!userId) return null;
-  const { data } = await supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
-  return data?.role || "client";
+  try {
+    // Con red inestable esta consulta puede no responder nunca (fetch sin
+    // timeout). Antes que dejar al usuario mirando "Abriendo ClicyVoy…", a los
+    // 8 segundos se asume cliente: el guardia re-evalúa cuando haya red.
+    const query = supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
+    const timeout = new Promise(resolve => setTimeout(() => resolve({ data: null }), 8000));
+    const { data } = await Promise.race([query, timeout]);
+    return data?.role || "client";
+  } catch {
+    return "client";
+  }
 }
 
 export function AuthProvider({ children }) {
@@ -43,13 +52,25 @@ export function AuthProvider({ children }) {
     let active = true;
 
     // getSession lee del almacenamiento local (no hace red): así el arranque no
-    // se queda colgado si el móvil está sin cobertura.
-    supabase.auth.getSession().then(async ({ data }) => {
+    // se queda colgado si el móvil está sin cobertura. Y AUNQUE algo reviente,
+    // loading termina: una pantalla de carga eterna es el peor fallo posible,
+    // porque no deja ni reintentar.
+    (async () => {
+      let session = null;
+      try {
+        const { data } = await supabase.auth.getSession();
+        session = data.session;
+      } catch {
+        session = null; // sesión ilegible = empezar deslogueado
+      }
       if (!active) return;
-      setSession(data.session);
-      setRole(await fetchRole(data.session?.user?.id));
-      setLoading(false);
-    });
+      setSession(session);
+      try {
+        setRole(await fetchRole(session?.user?.id));
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
 
     const { data: sub } = supabase.auth.onAuthStateChange(async (_event, next) => {
       if (!active) return;
@@ -66,10 +87,17 @@ export function AuthProvider({ children }) {
 
   const signOut = useCallback(async () => {
     // Antes de cerrar sesión: si no, este móvil seguiría recibiendo los avisos
-    // del usuario que se acaba de ir.
-    await unregisterPushToken();
-    await stopTracking();
-    await supabase.auth.signOut();
+    // del usuario que se acaba de ir. Pero ninguna de estas limpiezas puede
+    // IMPEDIR salir: cerrar sesión tiene que funcionar hasta sin red.
+    try {
+      await unregisterPushToken();
+    } catch {}
+    try {
+      await stopTracking();
+    } catch {}
+    try {
+      await supabase.auth.signOut();
+    } catch {}
     setSession(null);
     setRole(null);
   }, []);
