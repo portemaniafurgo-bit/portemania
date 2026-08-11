@@ -475,6 +475,16 @@ El usuario señaló que la app llevaba botones azules del diseño viejo: la lín
 
 Verificación: bundle Android limpio (5,9 MB), build web 42/42 (el chat de las dos páginas web pinta fotos). El cotejo [PROPUESTA-VS-ESTADO.md](PROPUESTA-VS-ESTADO.md) queda: TODO ✅ salvo OTP SMS (🔑 Twilio), push efectivo (🔑 Firebase), Google login público (🔑 consent screen), tarjetas guardadas, email del recibo y escaneo de bordes.
 
+### 2026-08-11 (tarde) — v0.1.1→0.1.3 probadas EN el móvil del usuario + handoff
+
+Ciclo real de prueba con el usuario (Xiaomi, adb + capturas de pantalla + logcat en directo). Tres versiones en un día:
+- **0.1.1**: cuelgue real en "Abriendo ClicyVoy…" → dos causas tapadas (SecureStore que revienta tras reinstalar sin catch; consulta de rol sin timeout). El adaptador de sesión ya no puede lanzar jamás.
+- **0.1.2**: "Unmatched Route" al entrar (tres `index` disputándose `/` → grupos con pantallas CON NOMBRE `pedir`/`ofertas` + guardia que redirige siempre), isotipo recortado al rasterizar (caja holgada), G oficial de Google.
+- **0.1.3**: el deep link de vuelta de Google (`clicyvoy://auth`) no tenía ruta → `app/auth.js` + `+not-found.js` como red de seguridad; splash APILADO (isotipo arriba, wordmark debajo); **expo-updates + EAS Update (canal preview)**: desde esta versión los cambios de JS llegan por OTA sin APK. VERIFICADO en el móvil: icono de marca en el launcher, splash nuevo, login con Google entrando hasta "Pedir", asistente morado funcionando (capturas en el historial del chat).
+- MIUI ya acepta `adb install` (el usuario activó Instalar vía USB): la 0.1.3 se instaló sola desde el PC.
+- **Conductor de prueba recreado y verificado** (login OK, driver verificado, furgón grande, docs completos): `conductor.test@portemania.es` / `Conductor2026!` — borrarlo tras las campañas.
+- **[HANDOFF-APP-PENDIENTES.md](HANDOFF-APP-PENDIENTES.md)**: plan completo y documentado para que otro agente continúe (T1-T10 con pasos, credenciales, flujo OTA vs APK, reglas y trampas).
+
 ### 2026-08-12 — Pasada de calidad (revisión gráfica + funcional pre-entrega)
 
 Revisión completa con ojos de cliente. **Gráfico**: tipografía Poppins en títulos (la de la landing; expo-font ya venía con vector-icons, cero módulos nuevos, y si la fuente falla la app arranca con la del sistema); botones `rounded-full` que oscurecen al morado de hover al pulsar, como los CTA de la landing. **Cinco fallos funcionales encontrados y corregidos**:
