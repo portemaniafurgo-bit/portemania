@@ -54,6 +54,10 @@ export default function Pedir() {
   const [step, setStep] = useState(0);
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
+  // El cliente eligió "Programarlo" (aunque aún no haya escrito el día): un
+  // borrador recuperado con fecha también lo activa.
+  const [wantSchedule, setWantSchedule] = useState(false);
+  const scheduling = wantSchedule || !!form.scheduled_date;
 
   const next = () => {
     const { ok, reason } = validateStep(step);
@@ -74,7 +78,7 @@ export default function Pedir() {
     setError("");
     // Programado a medias: mejor frenar aquí que crear un pedido "para ahora"
     // cuando el cliente creía haberlo dejado para el sábado.
-    if (form.scheduled_date && !parseScheduledAt(form.scheduled_date, form.scheduled_time)) {
+    if (scheduling && !parseScheduledAt(form.scheduled_date, form.scheduled_time)) {
       setError("Revisa el día y la hora del pedido programado (ej.: 25/08 y 09:30, en el futuro).");
       return;
     }
@@ -440,8 +444,9 @@ export default function Pedir() {
               <Option
                 label="Lo antes posible"
                 description="Se publica ahora a los conductores"
-                selected={!form.scheduled_date}
+                selected={!scheduling}
                 onPress={() => {
+                  setWantSchedule(false);
                   update("scheduled_date", "");
                   update("scheduled_time", "");
                 }}
@@ -449,15 +454,15 @@ export default function Pedir() {
               <Option
                 label="Programarlo"
                 description="Elige día y hora; se publicará automáticamente"
-                selected={!!form.scheduled_date}
-                onPress={() => update("scheduled_date", form.scheduled_date || "  /  ")}
+                selected={scheduling}
+                onPress={() => setWantSchedule(true)}
               />
-              {form.scheduled_date ? (
+              {scheduling ? (
                 <View style={{ flexDirection: "row", gap: spacing.sm }}>
                   <View style={{ flex: 1 }}>
                     <Field
                       label="Día (DD/MM)"
-                      value={form.scheduled_date.trim() === "/" ? "" : form.scheduled_date}
+                      value={form.scheduled_date}
                       onChangeText={v => update("scheduled_date", v)}
                       placeholder="25/08"
                       keyboardType="numbers-and-punctuation"

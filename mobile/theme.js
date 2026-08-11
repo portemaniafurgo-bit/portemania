@@ -44,8 +44,9 @@ export const radius = {
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
 export const typography = {
-  heading: { fontSize: 20, fontWeight: "700", color: colors.foreground },
-  title: { fontSize: 16, fontWeight: "600", color: colors.foreground },
+  // Poppins: la tipografía con la que titula la landing (se carga en _layout).
+  heading: { fontSize: 20, fontFamily: "Poppins_700Bold", color: colors.foreground },
+  title: { fontSize: 16, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
   body: { fontSize: 15, color: colors.foreground },
   caption: { fontSize: 13, color: colors.mutedForeground },
 };

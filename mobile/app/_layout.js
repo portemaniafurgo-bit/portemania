@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import { StatusBar } from "expo-status-bar";
+import { useFonts, Poppins_600SemiBold, Poppins_700Bold } from "@expo-google-fonts/poppins";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StripeProvider } from "@stripe/stripe-react-native";
@@ -57,6 +58,12 @@ function RootNavigation() {
 }
 
 export default function RootLayout() {
+  // La tipografía de la marca (la landing titula con Poppins). Si tarda o
+  // falla, la app arranca igual con la del sistema: una fuente nunca puede
+  // dejar la pantalla en blanco.
+  const [fontsLoaded] = useFonts({ Poppins_600SemiBold, Poppins_700Bold });
+  if (!fontsLoaded) return <Loading label="Abriendo ClicyVoy…" />;
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

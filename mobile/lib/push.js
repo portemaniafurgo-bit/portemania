@@ -110,14 +110,30 @@ export function usePushNotifications({ userId, role }) {
     registerPushToken(userId);
   }, [userId]);
 
+  const coldStartHandled = useRef(false);
+
   useEffect(() => {
-    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      const orderId = response.notification.request.content.data?.order_id;
+    const open = orderId => {
       if (!orderId) return;
       router.push(
         role === "driver" ? `/(conductor)/job/${orderId}` : `/(cliente)/order/${orderId}`,
       );
+    };
+
+    const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+      open(response.notification.request.content.data?.order_id);
     });
+
+    // Arranque en frío: si la app se abrió TOCANDO una notificación, el
+    // listener de arriba ya no ve esa respuesta — hay que pedirla aparte.
+    // Solo una vez y con rol resuelto, para no llevar al grupo equivocado.
+    if (!coldStartHandled.current && role) {
+      coldStartHandled.current = true;
+      Notifications.getLastNotificationResponseAsync().then(response => {
+        if (response) open(response.notification.request.content.data?.order_id);
+      });
+    }
+
     return () => subscription.remove();
   }, [router, role]);
 }

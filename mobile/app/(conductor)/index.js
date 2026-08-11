@@ -71,6 +71,29 @@ export default function Ofertas() {
     if (user) load();
   }, [user, load]);
 
+  // Ofertas en vivo: cuando un pedido nuevo entra (o uno pendiente cambia de
+  // manos), la lista se recarga sola — sin el polling de 10 s de la web. El
+  // debounce agrupa ráfagas de eventos en una sola recarga.
+  useEffect(() => {
+    if (!user) return;
+    let timer = null;
+    const channel = supabase
+      .channel("ofertas-conductor")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "transport_requests" },
+        () => {
+          clearTimeout(timer);
+          timer = setTimeout(load, 400);
+        },
+      )
+      .subscribe();
+    return () => {
+      clearTimeout(timer);
+      supabase.removeChannel(channel);
+    };
+  }, [user, load]);
+
   const toggleAvailable = async (value) => {
     if (!profile) return;
     setSaving(true);

@@ -24,6 +24,12 @@ TaskManager.defineTask(TASK, async ({ data, error }) => {
   const profileId = await AsyncStorage.getItem(PROFILE_KEY);
   if (!profileId) return;
 
+  // Con la app en segundo plano el refresco automático del token está parado
+  // (lo detiene el listener de AppState para ahorrar batería). El access token
+  // dura 1 hora: en una mudanza larga caducaría y el GPS dejaría de escribir
+  // en silencio. getSession() refresca en perezoso si hace falta.
+  await supabase.auth.getSession();
+
   const { latitude, longitude } = data.locations[data.locations.length - 1].coords;
 
   await supabase

@@ -84,11 +84,15 @@ export default function OrderDetail() {
     ]);
   };
 
+  const seenCount = useRef(null);
   useEffect(() => {
-    // Al llegar un mensaje nuevo, bajar del todo: si no, el usuario ve la
-    // conversación congelada y cree que no ha entrado nada. Y de paso queda
-    // leído: el badge de "Mis pedidos" se apaga.
-    scrollRef.current?.scrollToEnd({ animated: true });
+    // Bajar al final SOLO cuando entra un mensaje nuevo estando ya en la
+    // pantalla. En la carga inicial no: saltar de golpe al fondo le escondía el
+    // mapa y el estado a quien abría el pedido. Leído se marca siempre.
+    if (seenCount.current !== null && messages.length > seenCount.current) {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }
+    seenCount.current = messages.length;
     if (id) markChatRead(id);
   }, [messages.length, id]);
 

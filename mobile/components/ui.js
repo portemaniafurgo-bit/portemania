@@ -62,7 +62,9 @@ export function Button({ title, onPress, loading, disabled, variant = "primary",
         styles.button,
         isPlain ? styles.buttonPlain : styles.buttonPrimary,
         blocked && styles.buttonDisabled,
-        pressed && !blocked && styles.buttonPressed,
+        // Al pulsar, el primario oscurece al morado de hover de la landing;
+        // el plano se atenúa.
+        pressed && !blocked && (isPlain ? styles.buttonPressed : styles.buttonPrimaryPressed),
         style,
       ]}
     >
@@ -115,7 +117,8 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   button: {
-    borderRadius: radius.md,
+    // rounded-full: la forma de botón de la landing.
+    borderRadius: radius.full,
     paddingVertical: 14,
     paddingHorizontal: spacing.lg,
     alignItems: "center",
@@ -123,6 +126,7 @@ const styles = StyleSheet.create({
     minHeight: 48, // objetivo táctil cómodo: se usa conduciendo o cargando
   },
   buttonPrimary: { backgroundColor: colors.primary },
+  buttonPrimaryPressed: { backgroundColor: colors.primaryPressed },
   buttonPlain: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border },
   buttonDisabled: { opacity: 0.5 },
   buttonPressed: { opacity: 0.85 },

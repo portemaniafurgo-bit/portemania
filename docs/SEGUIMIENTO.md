@@ -475,6 +475,15 @@ El usuario señaló que la app llevaba botones azules del diseño viejo: la lín
 
 Verificación: bundle Android limpio (5,9 MB), build web 42/42 (el chat de las dos páginas web pinta fotos). El cotejo [PROPUESTA-VS-ESTADO.md](PROPUESTA-VS-ESTADO.md) queda: TODO ✅ salvo OTP SMS (🔑 Twilio), push efectivo (🔑 Firebase), Google login público (🔑 consent screen), tarjetas guardadas, email del recibo y escaneo de bordes.
 
+### 2026-08-12 — Pasada de calidad (revisión gráfica + funcional pre-entrega)
+
+Revisión completa con ojos de cliente. **Gráfico**: tipografía Poppins en títulos (la de la landing; expo-font ya venía con vector-icons, cero módulos nuevos, y si la fuente falla la app arranca con la del sistema); botones `rounded-full` que oscurecen al morado de hover al pulsar, como los CTA de la landing. **Cinco fallos funcionales encontrados y corregidos**:
+1. El detalle del pedido saltaba solo hasta el fondo al abrirse (el auto-scroll del chat disparaba con la carga inicial y escondía el mapa). Ahora solo baja cuando entra un mensaje nuevo estando dentro.
+2. **GPS en trabajos largos**: el access token dura 1 h y el refresco automático se para en segundo plano → en una mudanza larga el GPS habría dejado de escribir EN SILENCIO. La tarea de fondo ahora fuerza `getSession()` (refresco perezoso) antes de cada escritura.
+3. Las ofertas del conductor no tenían la suscripción Realtime prometida (solo pull-to-refresh). Añadida, con debounce.
+4. El selector de pedido programado usaba un valor centinela feo ("  /  ") como estado; sustituido por estado propio.
+5. En envíos de paquete la foto de entrega no se exigía pese a ser obligatoria en la propuesta; ahora la firma no se confirma sin foto. Y el toque de una notificación con la app CERRADA se perdía (arranque en frío): se recupera con `getLastNotificationResponseAsync`.
+
 ## 5. Pendientes / roadmap
 
 **Para lanzar en real:**

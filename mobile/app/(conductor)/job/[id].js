@@ -316,7 +316,16 @@ export default function TrabajoActivo() {
 
             <SignaturePad
               capturing={saving}
-              onCapture={base64 => finishDelivery({ signatureBase64: base64 })}
+              onCapture={base64 => {
+                // En envíos de paquete la foto es obligatoria (propuesta §2.3):
+                // el remitente no suele estar en la entrega y la foto es la
+                // mitad de la prueba.
+                if (service?.key === "paquete" && !proofPhotoUri) {
+                  setError("En envíos de paquete la foto de la entrega es obligatoria.");
+                  return;
+                }
+                finishDelivery({ signatureBase64: base64 });
+              }}
             />
 
             {!service?.signatureRequired && (
