@@ -82,7 +82,7 @@ export default function MisPedidos() {
       payment_method: order.payment_method,
     };
     await AsyncStorage.setItem("request_draft_v1", JSON.stringify({ form: draft, photos: [] }));
-    router.push("/(cliente)");
+    router.push("/(cliente)/pedir");
   };
 
   useEffect(() => {

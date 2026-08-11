@@ -18,7 +18,7 @@ export default function ClienteLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="pedir"
         options={{
           title: "Pedir",
           tabBarIcon: ({ color, size }) => <Ionicons name="add-circle-outline" size={size} color={color} />,

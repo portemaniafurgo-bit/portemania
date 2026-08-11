@@ -3,6 +3,7 @@ import { Image, View } from "react-native";
 import { Link } from "expo-router";
 import { supabase } from "../../lib/supabase";
 import { signInWithGoogle } from "../../lib/googleAuth";
+import GoogleButton from "../../components/GoogleButton";
 import { Body, Button, Caption, Card, ErrorText, Field, Screen } from "../../components/ui";
 import { colors, spacing } from "../../theme";
 
@@ -49,7 +50,7 @@ export default function Login() {
             scripts/generate-app-assets.mjs) — la marca es una sola. */}
         <Image
           source={require("../../assets/logo.png")}
-          style={{ width: 220, height: 54 }}
+          style={{ width: 220, height: 62 }}
           resizeMode="contain"
           accessibilityLabel="ClicyVoy"
         />
@@ -77,9 +78,7 @@ export default function Login() {
         />
         <ErrorText>{error}</ErrorText>
         <Button title="Entrar" onPress={submit} loading={loading} />
-        <Button
-          title="Continuar con Google"
-          variant="plain"
+        <GoogleButton
           onPress={async () => {
             const result = await signInWithGoogle();
             if (!result.ok && result.reason) setError(result.reason);

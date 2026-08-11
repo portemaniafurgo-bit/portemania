@@ -27,10 +27,13 @@ const WORDMARK = `
     <tspan fill="#111111">Clicy</tspan><tspan fill="#F5B400">Voy</tspan>
   </text>`;
 
-const fullLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 220">${MARK()}${WORDMARK}</svg>`;
-// Solo el símbolo, encuadrado a su caja real (x 28-172, y -15..215 tras el translate).
+// ⚠️ Caja HOLGADA a propósito: la punta del pin baja hasta y≈233 y con el
+// viewBox 220 de la web el rasterizado la recortaba — en la app se veía el
+// isotipo cortado (reporte del usuario, 2026-08-11). El navegador disimula el
+// recorte; sharp no.
+const fullLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -6 900 252">${MARK()}${WORDMARK}</svg>`;
 const markOnly = (fill) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 180 230">${MARK(fill)}</svg>`;
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="6 -8 188 254">${MARK(fill)}</svg>`;
 
 const render = (svg, opts) => sharp(Buffer.from(svg), { density: 300 }).resize(opts);
 
@@ -64,12 +67,12 @@ await render(markOnly("#FFFFFF").replaceAll("#F5B400", "#FFFFFF"), {
   .toFile(`${OUT}/android-icon-monochrome.png`);
 
 // Splash: logo completo sobre blanco. expo-splash-screen lo centra.
-await render(fullLogo, { width: 1200, height: 294, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+await render(fullLogo, { width: 1200, height: 344, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
   .png()
   .toFile(`${OUT}/splash-icon.png`);
 
 // Logo del login (@3x aprox para nitidez en pantallas densas).
-await render(fullLogo, { width: 960, height: 235, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+await render(fullLogo, { width: 960, height: 269, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
   .png()
   .toFile(`${OUT}/logo.png`);
 

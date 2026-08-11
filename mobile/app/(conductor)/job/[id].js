@@ -211,7 +211,7 @@ export default function TrabajoActivo() {
             supabase.functions
               .invoke("send-push", { body: { mode: "driver_cancelled", order_id: id } })
               .catch(() => {});
-            router.replace("/(conductor)");
+            router.replace("/(conductor)/ofertas");
           } catch (err) {
             setError("No se pudo cancelar: " + (err.message || "error de conexión"));
           } finally {

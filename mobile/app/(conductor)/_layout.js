@@ -18,7 +18,7 @@ export default function ConductorLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="ofertas"
         options={{
           title: "Ofertas",
           tabBarIcon: ({ color, size }) => <Ionicons name="notifications-outline" size={size} color={color} />,

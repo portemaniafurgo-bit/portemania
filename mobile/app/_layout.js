@@ -28,10 +28,9 @@ function RootNavigation() {
     if (loading) return;
 
     const group = segments[0];
-    const inAuth = group === "(auth)";
 
     if (!session) {
-      if (!inAuth) router.replace("/(auth)/login");
+      if (group !== "(auth)") router.replace("/(auth)/login");
       return;
     }
 
@@ -39,9 +38,14 @@ function RootNavigation() {
     // grupo, y mandar a todo el mundo a cliente haría parpadear al conductor.
     if (!role) return;
 
+    // Redirigir SIEMPRE que no se esté ya en el grupo correcto — incluido el
+    // arranque en la raíz (group undefined): no redirigir ahí dejaba al usuario
+    // con sesión mirando "Abriendo ClicyVoy…" para siempre (bug real, 0.1.1).
+    // El destino es una pantalla CON NOMBRE, nunca el grupo a secas: tres
+    // rutas index disputándose "/" era lo que provocaba el "Unmatched Route".
     const target = role === "driver" ? "(conductor)" : "(cliente)";
-    if (inAuth || (group !== target && group !== undefined)) {
-      router.replace(role === "driver" ? "/(conductor)" : "/(cliente)");
+    if (group !== target) {
+      router.replace(role === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir");
     }
   }, [session, role, loading, segments, router]);
 

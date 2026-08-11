@@ -121,5 +121,5 @@ export const useAuth = () => useContext(AuthContext);
  *  entra en la app, se le trata como cliente (puede pedir servicios) y se le
  *  remite al panel web para administrar. */
 export function homeForRole(role) {
-  return role === "driver" ? "/(conductor)" : "/(cliente)";
+  return role === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir";
 }
