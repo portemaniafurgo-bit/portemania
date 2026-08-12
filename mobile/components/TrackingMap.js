@@ -27,7 +27,7 @@ const OSM_STYLE = {
   layers: [{ id: "osm", type: "raster", source: "osm" }],
 };
 
-export default function TrackingMap({ driverLocation, target, height = 260 }) {
+export default function TrackingMap({ driverLocation, target, height = 260, self = false }) {
   const [route, setRoute] = useState(null);
 
   useEffect(() => {
@@ -101,9 +101,14 @@ export default function TrackingMap({ driverLocation, target, height = 260 }) {
         <View style={styles.freshness}>
           <View style={[styles.dot, { backgroundColor: freshness.fresh ? colors.success : colors.warning }]} />
           <Caption style={{ color: freshness.fresh ? colors.success : colors.warning }}>
+            {/* `self`: quien mira es el propio conductor viendo SU posición. */}
             {freshness.fresh
-              ? "Posición del conductor en vivo"
-              : `Última posición del conductor ${freshness.label}`}
+              ? self
+                ? "Tu posición en vivo"
+                : "Posición del conductor en vivo"
+              : self
+                ? `Tu última posición ${freshness.label}`
+                : `Última posición del conductor ${freshness.label}`}
           </Caption>
         </View>
       ) : null}

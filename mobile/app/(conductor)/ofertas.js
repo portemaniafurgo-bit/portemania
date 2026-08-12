@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
+import * as Location from "expo-location";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import { fetchMyDriverProfile, isDriverProfileIncomplete } from "../../lib/driverProfile";
 import { serviceOf } from "../../lib/services";
+import { distanceKm } from "../../lib/eta";
 import { stopTracking } from "../../lib/tracking";
+import TrackingMap from "../../components/TrackingMap";
+import EmptyState from "../../components/EmptyState";
 import { Body, Button, Caption, Card, ErrorText, Heading, Loading, Title } from "../../components/ui";
 import { colors, radius, spacing } from "../../theme";
 
@@ -32,6 +36,25 @@ export default function Ofertas() {
   const [saving, setSaving] = useState(false);
   const [accepting, setAccepting] = useState(null);
   const [error, setError] = useState("");
+  // Oferta expandida (mapa + distancia, estilo Uber: ver DÓNDE está el trabajo
+  // antes de aceptarlo) y mi posición para calcular "a X km de ti".
+  const [expandedId, setExpandedId] = useState(null);
+  const [myPos, setMyPos] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const { granted } = await Location.getForegroundPermissionsAsync();
+        if (!granted) return; // no pedirlo aquí: se pide al aceptar un trabajo
+        const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+        if (active) setMyPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      } catch {}
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const load = useCallback(async () => {
     const prof = await fetchMyDriverProfile(user);
@@ -56,7 +79,7 @@ export default function Ofertas() {
 
     let query = supabase
       .from("transport_requests")
-      .select("id, status, service_type, vehicle_type, origin_address, destination_address, estimated_price, needs_help, created_date")
+      .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, estimated_price, needs_help, created_date")
       .eq("status", "pending")
       .order("created_date", { ascending: false })
       .limit(50);
@@ -185,10 +208,18 @@ export default function Ofertas() {
         <ErrorText>{error}</ErrorText>
 
         {profile && (
-          <Card>
+          <Card
+            style={
+              profile.is_available
+                ? { backgroundColor: colors.successBg, borderColor: colors.success }
+                : null
+            }
+          >
             <View style={styles.header}>
               <View style={{ flex: 1 }}>
-                <Title>{profile.is_available ? "Disponible" : "No disponible"}</Title>
+                <Title style={profile.is_available ? { color: colors.success } : null}>
+                  {profile.is_available ? "Disponible" : "No disponible"}
+                </Title>
                 <Caption>
                   {profile.is_available
                     ? "Recibes avisos de pedidos nuevos."
@@ -237,34 +268,62 @@ export default function Ofertas() {
         )}
 
         {orders.length === 0 ? (
-          <Card>
-            <Caption>Ahora mismo no hay pedidos disponibles para tu furgoneta.</Caption>
-          </Card>
+          <EmptyState
+            title="No hay pedidos ahora mismo"
+            hint="Te avisaremos en cuanto entre uno compatible con tu furgoneta. Mantente disponible."
+          />
         ) : (
           orders.map(order => {
             const service = serviceOf(order);
+            const expanded = expandedId === order.id;
+            const pickup =
+              order.origin_lat && order.origin_lng
+                ? { lat: order.origin_lat, lng: order.origin_lng }
+                : null;
+            const km = myPos && pickup ? distanceKm(myPos, pickup) : null;
             return (
-              <Card key={order.id}>
+              <Pressable key={order.id} onPress={() => setExpandedId(expanded ? null : order.id)}>
+              <Card style={expanded ? { borderColor: colors.primary, borderWidth: 2 } : null}>
                 <View style={styles.header}>
-                  <Title>
-                    {service?.emoji} {service?.label || "Servicio"}
-                  </Title>
+                  <View style={styles.serviceChip}>
+                    <Text style={styles.serviceChipText}>
+                      {service?.emoji} {service?.label || "Servicio"}
+                    </Text>
+                  </View>
                   <Text style={styles.price}>{order.estimated_price} €</Text>
                 </View>
                 <Caption>Recogida: {order.origin_address || "—"}</Caption>
                 <Caption>Entrega: {order.destination_address || "—"}</Caption>
                 <View style={styles.tags}>
+                  {km != null ? (
+                    <View style={[styles.tag, { backgroundColor: colors.primarySoft }]}>
+                      <Text style={[styles.tagText, { color: colors.primary, fontWeight: "600" }]}>
+                        📍 a {km.toFixed(1)} km de ti
+                      </Text>
+                    </View>
+                  ) : null}
                   <View style={styles.tag}>
                     <Text style={styles.tagText}>
                       {order.vehicle_type === "large" ? "Furgoneta grande" : "Furgoneta pequeña"}
                     </Text>
                   </View>
                   {order.needs_help ? (
-                    <View style={styles.tag}>
-                      <Text style={styles.tagText}>Con ayuda de carga</Text>
+                    <View style={[styles.tag, { backgroundColor: colors.warningBg }]}>
+                      <Text style={[styles.tagText, { color: colors.warning, fontWeight: "600" }]}>
+                        Con ayuda de carga
+                      </Text>
                     </View>
                   ) : null}
                 </View>
+
+                {/* Al tocar la tarjeta: DÓNDE está la recogida, antes de aceptar */}
+                {expanded && pickup ? (
+                  <TrackingMap driverLocation={null} target={pickup} height={170} />
+                ) : null}
+                {expanded && !pickup ? (
+                  <Caption>Este pedido no tiene coordenadas de recogida (dirección manual).</Caption>
+                ) : null}
+
                 <Button
                   title="Aceptar servicio"
                   loading={accepting === order.id}
@@ -275,6 +334,7 @@ export default function Ofertas() {
                   <Caption>Termina el servicio en curso antes de aceptar otro.</Caption>
                 ) : null}
               </Card>
+              </Pressable>
             );
           })
         )}
@@ -285,7 +345,9 @@ export default function Ofertas() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
-  price: { fontSize: 18, fontWeight: "700", color: colors.primary },
+  price: { fontSize: 22, fontFamily: "Poppins_700Bold", color: colors.primary },
+  serviceChip: { backgroundColor: colors.primarySoft, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },
+  serviceChipText: { fontSize: 14, fontFamily: "Poppins_600SemiBold", color: colors.primary },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   tag: { backgroundColor: colors.secondary, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },
   tagText: { fontSize: 12, color: colors.mutedForeground },

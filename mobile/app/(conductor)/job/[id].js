@@ -5,9 +5,12 @@ import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../lib/auth";
 import { fetchMyDriverProfile } from "../../../lib/driverProfile";
+import * as Location from "expo-location";
 import { STATUS_LABELS, useChat, useOrder } from "../../../lib/orders";
 import { serviceOf } from "../../../lib/services";
+import { geocodeAlbacete } from "../../../lib/eta";
 import { startTracking, stopTracking } from "../../../lib/tracking";
+import TrackingMap from "../../../components/TrackingMap";
 import { uploadProofPhoto, uploadSignature } from "../../../lib/deliveryProof";
 import { markChatRead } from "../../../lib/unread";
 import { takePhoto } from "../../../lib/photos";
@@ -55,7 +58,42 @@ export default function TrabajoActivo() {
   const [proofPhotoUri, setProofPhotoUri] = useState(null);
   const [recipientName, setRecipientName] = useState("");
   const [chatError, setChatError] = useState("");
+  // Mi posición para el mapa EMBEBIDO (estilo Uber): sale del GPS del propio
+  // móvil en primer plano, no de la BD — es más fresca y no gasta consultas.
+  const [myPos, setMyPos] = useState(null);
+  const [fallbackTarget, setFallbackTarget] = useState(null);
   const trackingStarted = useRef(false);
+
+  useEffect(() => {
+    let active = true;
+    let subscription = null;
+    (async () => {
+      try {
+        let { granted } = await Location.getForegroundPermissionsAsync();
+        if (!granted) granted = (await Location.requestForegroundPermissionsAsync()).granted;
+        if (!granted || !active) return;
+        subscription = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.Balanced, timeInterval: 5000, distanceInterval: 20 },
+          pos => {
+            if (active) {
+              setMyPos({
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          },
+        );
+      } catch {
+        // Sin permiso o sin GPS: el mapa se muestra sin mi posición, y los
+        // botones de Maps/Waze siguen funcionando.
+      }
+    })();
+    return () => {
+      active = false;
+      subscription?.remove();
+    };
+  }, []);
 
   const sendFeedback = async () => {
     setSaving(true);
@@ -81,6 +119,26 @@ export default function TrabajoActivo() {
   useEffect(() => {
     if (id) markChatRead(id);
   }, [messages.length, id]);
+
+  // Geocodificación de respaldo del destino del mapa (solo si el pedido no
+  // trae coordenadas). Va ANTES de los return tempranos: es un hook.
+  useEffect(() => {
+    if (!order) return;
+    const toPickup = ["accepted", "in_transit"].includes(order.status);
+    const lat = toPickup ? order.origin_lat : order.destination_lat;
+    const address = toPickup ? order.origin_address : order.destination_address;
+    if (lat || !address) {
+      setFallbackTarget(null);
+      return;
+    }
+    let active = true;
+    geocodeAlbacete(address).then(coords => {
+      if (active && coords) setFallbackTarget(coords);
+    });
+    return () => {
+      active = false;
+    };
+  }, [order?.status, order?.origin_address, order?.destination_address]);
 
   // El seguimiento vive mientras el trabajo esté vivo. Al salir de la pantalla
   // NO se para: el conductor va a estar en Google Maps, que es justo cuando más
@@ -112,9 +170,15 @@ export default function TrabajoActivo() {
   const finished = ["delivered", "cancelled"].includes(order.status);
   const canCancel = ["accepted", "in_transit"].includes(order.status);
   // Hasta recoger, el destino de la navegación es la recogida.
-  const navTarget = ["accepted", "in_transit"].includes(order.status)
-    ? order.origin_address
-    : order.destination_address;
+  const goingToPickup = ["accepted", "in_transit"].includes(order.status);
+  const navTarget = goingToPickup ? order.origin_address : order.destination_address;
+
+  // Destino del mapa embebido. Si el pedido no trae coordenadas (dirección
+  // tecleada a mano sin geocodificar), se geocodifica UNA vez y se cachea.
+  const targetLat = goingToPickup ? order.origin_lat : order.destination_lat;
+  const targetLng = goingToPickup ? order.origin_lng : order.destination_lng;
+  const mapTarget =
+    targetLat && targetLng ? { lat: targetLat, lng: targetLng } : fallbackTarget;
 
   const advance = async () => {
     if (!step) return;
@@ -240,12 +304,35 @@ export default function TrabajoActivo() {
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <Stack.Screen options={{ headerShown: true, title: "Servicio" }} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
-        <View style={{ gap: spacing.xs }}>
-          <Heading>
-            {service?.emoji} {service?.label}
-          </Heading>
-          <Caption>{STATUS_LABELS[order.status] || order.status}</Caption>
+        {/* Banda de estado estilo Uber: qué pasa ahora y qué toca después. */}
+        <View style={styles.statusBand}>
+          <Text style={styles.statusBandTitle}>
+            {service?.emoji} {STATUS_LABELS[order.status] || order.status}
+          </Text>
+          {step && !finished ? (
+            <Text style={styles.statusBandNext}>Siguiente: {step.label.toLowerCase()}</Text>
+          ) : null}
+          {/* Stepper de estados, como el timeline que ve el cliente */}
+          {!finished && order.status !== "cancelled" ? (
+            <View style={styles.stepper}>
+              {["accepted", "in_transit", "picked_up", "delivered"].map((s, i) => {
+                const currentIndex = ["accepted", "in_transit", "picked_up", "delivered"].indexOf(order.status);
+                return (
+                  <View
+                    key={s}
+                    style={[styles.stepperBar, { backgroundColor: i <= currentIndex ? colors.accent : "#FFFFFF55" }]}
+                  />
+                );
+              })}
+            </View>
+          ) : null}
         </View>
+
+        {/* Mapa DENTRO de la app (petición del cliente: como Uber). Los botones
+            de Maps/Waze quedan debajo como navegación paso a paso opcional. */}
+        {!finished && (
+          <TrackingMap driverLocation={myPos} target={mapTarget} height={230} self />
+        )}
 
         <Card>
           <Caption>Recogida</Caption>
@@ -270,7 +357,7 @@ export default function TrabajoActivo() {
 
         {!finished && (
           <Card>
-            <Title>Navegar hasta {navTarget ? "la dirección" : "el destino"}</Title>
+            <Title>Navegación paso a paso</Title>
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
               <Button title="Google Maps" variant="plain" onPress={() => navigate("gmaps")} style={{ flex: 1 }} />
               <Button title="Waze" variant="plain" onPress={() => navigate("waze")} style={{ flex: 1 }} />
@@ -481,4 +568,14 @@ const styles = StyleSheet.create({
   chipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   chipText: { fontSize: 13, color: colors.mutedForeground },
   chatImage: { width: 200, height: 150, borderRadius: radius.md, backgroundColor: colors.secondary },
+  statusBand: {
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  statusBandTitle: { fontSize: 18, fontFamily: "Poppins_700Bold", color: "#FFFFFF" },
+  statusBandNext: { fontSize: 13, color: "#FFFFFFCC" },
+  stepper: { flexDirection: "row", gap: spacing.xs, marginTop: spacing.xs },
+  stepperBar: { flex: 1, height: 4, borderRadius: radius.full },
 });

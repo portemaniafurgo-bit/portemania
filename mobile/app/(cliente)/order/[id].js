@@ -33,6 +33,8 @@ export default function OrderDetail() {
   const [review, setReview] = useState("");
   const [savingReview, setSavingReview] = useState(false);
   const [chatError, setChatError] = useState("");
+  const [sendingReceipt, setSendingReceipt] = useState(false);
+  const [receiptSent, setReceiptSent] = useState(false);
   const scrollRef = useRef(null);
 
   const sendText = async () => {
@@ -236,19 +238,43 @@ export default function OrderDetail() {
         {/* Propina: tras la entrega, cargo Stripe aparte, 100% para el conductor */}
         {order.status === "delivered" && <TipCard order={order} driverName={driver?.full_name} />}
 
-        {/* Recibo en PDF, generado en el propio móvil */}
+        {/* Recibo: PDF generado en el móvil + envío por email (Edge Function) */}
         {order.status === "delivered" && (
-          <Button
-            title="Descargar recibo (PDF)"
-            variant="plain"
-            onPress={async () => {
-              try {
-                await downloadReceipt(order, service);
-              } catch {
-                setChatError("No se pudo generar el recibo. Inténtalo de nuevo.");
-              }
-            }}
-          />
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <Button
+              title="Recibo PDF"
+              variant="plain"
+              style={{ flex: 1 }}
+              onPress={async () => {
+                try {
+                  await downloadReceipt(order, service);
+                } catch {
+                  setChatError("No se pudo generar el recibo. Inténtalo de nuevo.");
+                }
+              }}
+            />
+            <Button
+              title={receiptSent ? "Enviado ✓" : "Recibo por email"}
+              variant="plain"
+              style={{ flex: 1 }}
+              loading={sendingReceipt}
+              disabled={receiptSent}
+              onPress={async () => {
+                setSendingReceipt(true);
+                try {
+                  const { data } = await supabase.functions.invoke("send-receipt", {
+                    body: { order_id: order.id },
+                  });
+                  if (data?.sent) setReceiptSent(true);
+                  else setChatError(data?.error || "No se pudo enviar el recibo.");
+                } catch {
+                  setChatError("No se pudo enviar el recibo.");
+                } finally {
+                  setSendingReceipt(false);
+                }
+              }}
+            />
+          </View>
         )}
 
         {/* Cancelar: mientras nadie lo ha aceptado (o aún no se ha publicado) */}

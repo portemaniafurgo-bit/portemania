@@ -1,4 +1,5 @@
 import { useAuth } from "../../lib/auth";
+import DeleteAccount from "../../components/DeleteAccount";
 import { Body, Button, Caption, Card, Heading, Screen, Title } from "../../components/ui";
 
 /**
@@ -25,6 +26,8 @@ export default function Perfil() {
       </Card>
 
       <Button title="Cerrar sesión" variant="plain" onPress={signOut} />
+
+      <DeleteAccount />
     </Screen>
   );
 }

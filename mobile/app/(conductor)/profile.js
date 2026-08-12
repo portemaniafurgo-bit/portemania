@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, View } from "react-native";
+import { Alert, Image, StyleSheet, Text, TextInput, View } from "react-native";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import {
@@ -10,6 +10,7 @@ import {
   uploadPrivateDriverDocFromUri,
 } from "../../lib/driverProfile";
 import { pickPhotos, takePhoto, uploadPhoto } from "../../lib/photos";
+import DeleteAccount from "../../components/DeleteAccount";
 import { Body, Button, Caption, Card, ErrorText, Heading, Loading, Screen, Title } from "../../components/ui";
 import { colors, radius, spacing } from "../../theme";
 
@@ -113,17 +114,34 @@ export default function PerfilConductor() {
       <Heading>Mi perfil</Heading>
 
       <Card>
-        <Title>{profile?.full_name || user?.user_metadata?.full_name || "Sin nombre"}</Title>
-        <Caption>{user?.email}</Caption>
+        <View style={styles.headerRow}>
+          {profile?.photo_url ? (
+            <Image source={{ uri: profile.photo_url }} style={styles.avatar} />
+          ) : (
+            <View style={[styles.avatar, styles.avatarEmpty]}>
+              <Text style={styles.avatarInitial}>
+                {(profile?.full_name || user?.email || "C").slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <View style={{ flex: 1, gap: 2 }}>
+            <Title>{profile?.full_name || user?.user_metadata?.full_name || "Sin nombre"}</Title>
+            <Caption>{user?.email}</Caption>
+            {profile?.status === "verified" ? (
+              <View style={styles.verifiedChip}>
+                <Text style={styles.verifiedText}>✓ Verificado</Text>
+              </View>
+            ) : profile ? (
+              <Caption>Estado: {profile.status}</Caption>
+            ) : null}
+          </View>
+        </View>
         {profile ? (
-          <>
-            <Caption>
-              Furgoneta: {profile.vehicle_type === "large" ? "grande" : "pequeña"}
-              {profile.vehicle_brand ? ` · ${profile.vehicle_brand}` : ""}
-              {profile.vehicle_plate ? ` · ${profile.vehicle_plate}` : ""}
-            </Caption>
-            <Caption>Estado: {profile.status === "verified" ? "verificado" : profile.status}</Caption>
-          </>
+          <Caption>
+            Furgoneta: {profile.vehicle_type === "large" ? "grande" : "pequeña"}
+            {profile.vehicle_brand ? ` · ${profile.vehicle_brand}` : ""}
+            {profile.vehicle_plate ? ` · ${profile.vehicle_plate}` : ""}
+          </Caption>
         ) : (
           <Caption>Aún no tienes perfil de conductor asociado a este email.</Caption>
         )}
@@ -188,6 +206,8 @@ export default function PerfilConductor() {
       )}
 
       <Button title="Cerrar sesión" variant="plain" onPress={signOut} />
+
+      <DeleteAccount />
     </Screen>
   );
 }
@@ -202,6 +222,12 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   docDot: { width: 10, height: 10, borderRadius: radius.full },
+  headerRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  avatar: { width: 60, height: 60, borderRadius: radius.full, backgroundColor: colors.primarySoft },
+  avatarEmpty: { alignItems: "center", justifyContent: "center" },
+  avatarInitial: { fontSize: 24, fontFamily: "Poppins_700Bold", color: colors.primary },
+  verifiedChip: { alignSelf: "flex-start", backgroundColor: colors.successBg, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 2, marginTop: 2 },
+  verifiedText: { fontSize: 12, fontWeight: "700", color: colors.success },
   docLabel: { fontSize: 14, fontWeight: "600", color: colors.foreground },
   expiryInput: {
     borderWidth: 1,

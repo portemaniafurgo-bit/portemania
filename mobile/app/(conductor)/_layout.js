@@ -25,6 +25,13 @@ export default function ConductorLayout() {
         }}
       />
       <Tabs.Screen
+        name="history"
+        options={{
+          title: "Servicios",
+          tabBarIcon: ({ color, size }) => <Ionicons name="time-outline" size={size} color={color} />,
+        }}
+      />
+      <Tabs.Screen
         name="earnings"
         options={{
           title: "Ganancias",

@@ -91,9 +91,9 @@ export default function Ganancias() {
         <Heading>Mis ganancias</Heading>
 
         <View style={styles.grid}>
-          <Card style={styles.stat}>
-            <Caption>Total</Caption>
-            <Text style={styles.statValue}>{total.toFixed(0)} €</Text>
+          <Card style={[styles.stat, { backgroundColor: colors.primary, borderColor: colors.primary }]}>
+            <Caption style={{ color: "#FFFFFFCC" }}>Total ganado</Caption>
+            <Text style={[styles.statValue, { color: "#FFFFFF" }]}>{total.toFixed(0)} €</Text>
           </Card>
           <Card style={styles.stat}>
             <Caption>Este mes</Caption>
@@ -157,5 +157,5 @@ export default function Ganancias() {
 const styles = StyleSheet.create({
   grid: { flexDirection: "row", flexWrap: "wrap", gap: spacing.md },
   stat: { flexBasis: "47%", flexGrow: 1 },
-  statValue: { fontSize: 22, fontWeight: "700", color: colors.foreground },
+  statValue: { fontSize: 22, fontFamily: "Poppins_700Bold", color: colors.foreground },
 });

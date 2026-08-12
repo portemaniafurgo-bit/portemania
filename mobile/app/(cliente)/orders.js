@@ -8,6 +8,7 @@ import { useAuth } from "../../lib/auth";
 import { serviceOf } from "../../lib/services";
 import { countUnread } from "../../lib/unread";
 import { Button, Caption, Card, Heading, Loading, Title } from "../../components/ui";
+import EmptyState from "../../components/EmptyState";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -124,13 +125,10 @@ export default function MisPedidos() {
         </View>
 
         {visible.length === 0 ? (
-          <Card>
-            <Caption>
-              {orders.length === 0
-                ? "Todavía no has pedido nada. Cuando lo hagas, aparecerá aquí."
-                : "No hay pedidos en esta pestaña."}
-            </Caption>
-          </Card>
+          <EmptyState
+            title={orders.length === 0 ? "Todavía no has pedido nada" : "Nada en esta pestaña"}
+            hint={orders.length === 0 ? "Tu primer porte está a un minuto: pide desde la pestaña Pedir." : undefined}
+          />
         ) : (
           visible.map(order => {
             const status = STATUS[order.status] || {
