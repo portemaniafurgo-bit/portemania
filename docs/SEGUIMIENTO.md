@@ -485,6 +485,10 @@ Ciclo real de prueba con el usuario (Xiaomi, adb + capturas de pantalla + logcat
 - **Conductor de prueba recreado y verificado** (login OK, driver verificado, furgón grande, docs completos): `conductor.test@portemania.es` / `Conductor2026!` — borrarlo tras las campañas.
 - **[HANDOFF-APP-PENDIENTES.md](HANDOFF-APP-PENDIENTES.md)**: plan completo y documentado para que otro agente continúe (T1-T10 con pasos, credenciales, flujo OTA vs APK, reglas y trampas).
 
+### 2026-08-12 — T0+T5+T6+T7 desarrolladas y PRIMERA ENTREGA OTA
+
+Mapa embebido estilo Uber en el trabajo del conductor (posición propia en vivo por watchPositionAsync + banda de estado morada con stepper; Maps/Waze quedan como opción), oferta expandible con mapa y «a X km de ti», pulido visual completo con la paleta, pestaña Servicios (historial del conductor), borrado de cuenta (RPC 0013 aplicada; anonimiza pedidos, bloquea con servicio en curso) y recibo por email (send-receipt verificada). **Primera actualización OTA publicada** (runtime 0.1.3, canal preview, grupo c1ed011e): la app instalada la recibe al reabrirse dos veces, sin APK. Gotcha aprendido: eas update en no-interactivo exige --environment y, sin react-native-web instalado, hay que publicar con --platform android.
+
 ### 2026-08-12 — Pasada de calidad (revisión gráfica + funcional pre-entrega)
 
 Revisión completa con ojos de cliente. **Gráfico**: tipografía Poppins en títulos (la de la landing; expo-font ya venía con vector-icons, cero módulos nuevos, y si la fuente falla la app arranca con la del sistema); botones `rounded-full` que oscurecen al morado de hover al pulsar, como los CTA de la landing. **Cinco fallos funcionales encontrados y corregidos**:
