@@ -94,7 +94,7 @@ botones rounded-full), iconos/splash generados desde el SVG real con
 Especificadas COMPLETAS en **[MEJORAS-UX-CONDUCTOR.md](MEJORAS-UX-CONDUCTOR.md)**:
 mapa embebido en el trabajo activo (UX-1), mapa de contexto en la oferta
 (UX-2) y pulido visual con la paleta (UX-3). Todo JavaScript → se entrega por
-OTA sin APK. **Empezar por aquí**: es lo que el cliente pidió al probar.
+OTA sin APK. **HECHA el 2026-08-12** (mapa embebido con banda de estado y stepper, mapa+distancia en la oferta, pulido completo de la paleta). Entregada por OTA.
 
 ### T1 — Push de verdad (bloqueado por Firebase) 🔑
 **Qué falta**: solo la credencial. Todo el código existe y `send-push` está
@@ -125,18 +125,18 @@ Stripe (guardar `stripe_customer_id` en `profiles`, columna nueva) y devolver
 **Regla**: es LA función que cobra. Probar en test: pagar sin guardar, pagar
 guardando, reutilizar guardada, y que el flujo web actual sigue intacto.
 
-### T5 — Recibo por email
+### T5 — Recibo por email — **HECHA** (send-receipt desplegada y verificada)
 Edge Function nueva `send-receipt` (Resend, ya hay API key como secret):
 tras `delivered`, enviar al email del cliente un resumen con los mismos datos
 que `mobile/lib/receipt.js`. El PDF adjunto es opcional: un email HTML limpio
 con la referencia vale para v1.
 
-### T6 — Historial del conductor (paridad web pendiente)
+### T6 — Historial del conductor — **HECHA** (pestaña Servicios)
 La web tiene `driver/history`; la app no. Pantalla nueva en `(conductor)`:
 lista de sus servicios entregados/cancelados (RLS ya lo permite), con fecha,
 precio y acceso al detalle. Reusar patrones de `(cliente)/orders.js`.
 
-### T7 — Borrado de cuenta (requisito de Google Play)
+### T7 — Borrado de cuenta — **HECHA** (RPC 0013 aplicada + doble confirmación en ambos perfiles)
 RPC `delete_own_account` (migración 0013: borra/anonimiza pedidos propios,
 chat, tokens push, perfil y el usuario de auth) + botón con doble confirmación
 en Perfil (cliente y conductor).

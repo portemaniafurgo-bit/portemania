@@ -34,7 +34,7 @@ alcance de este documento.
 | Pagos: tarjetas guardadas | ⏳ | PaymentSheet lo soporta, pero exige crear el *customer* de Stripe en `create-payment-intent`. Se hará con pruebas dedicadas: es la función que cobra |
 | Valoración con estrellas | ✅ | La media la recalcula el trigger de la BD |
 | Propina al conductor | ✅ | Cargo Stripe aparte (funciones `create-tip-intent`/`confirm-tip` desplegadas y verificadas); 0,50–20 €, un intento por pedido, 100% para el conductor |
-| Recibo/factura PDF | 🔶 | PDF generado EN el móvil (expo-print) y compartible/guardable, con marca. El envío automático por email queda pendiente |
+| Recibo/factura PDF | ✅ | PDF en el móvil (expo-print) + envío por email (Edge Function send-receipt, verificada; solo al dueño del pedido entregado) |
 | Historial con filtros | ✅ | Activos / Entregados / Cancelados |
 | Repetir pedido con un toque | ✅ | Rellena el asistente; el precio lo fija el servidor de nuevo |
 | Pedidos programados | ✅ | Día/hora en el asistente; nacen como 'scheduled' (política RLS ampliada solo a fecha futura) y un job pg_cron los publica cada minuto |
