@@ -15,11 +15,16 @@ import { supabase } from "@/lib/entities";
 import { fetchMyDriverProfile, isDriverProfileIncomplete } from "@/lib/driverProfile";
 import { toast } from "@/components/ui/use-toast";
 import { serviceOf } from "@/lib/services";
+import { useState } from "react";
 
 export default function DriverRequests() {
   const { user } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  // Negociación (migración 0014): pedido con precio propuesto por el cliente.
+  const [counterFor, setCounterFor] = useState(null); // id del pedido con el form abierto
+  const [counterAmount, setCounterAmount] = useState("");
+  const [counterMessage, setCounterMessage] = useState("");
 
   const { data: allRequests = [], isLoading } = useQuery({
     queryKey: ["pending-requests"],
@@ -41,6 +46,72 @@ export default function DriverRequests() {
   // mudanza y null en los envíos de paquete, que caben en cualquier furgoneta.
   const requests = allRequests.filter(r => r.vehicle_type !== "large" || myVehicle === "large");
   const isUnavailable = profile?.is_available === false;
+
+  // Mis contraofertas vivas, para mostrar "enviada, esperando respuesta".
+  const { data: myOffers = [] } = useQuery({
+    queryKey: ["my-price-offers", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("price_offers")
+        .select("id, request_id, amount, status")
+        .eq("driver_id", user.id)
+        .eq("status", "pending");
+      return data || [];
+    },
+    enabled: !!user?.id,
+    refetchInterval: 10000,
+  });
+  const myOfferFor = (requestId) => myOffers.find(o => o.request_id === requestId);
+
+  // El conductor acepta el precio que propuso el cliente (RPC: fija el
+  // final_price pactado, cosa que un update directo no puede por el trigger).
+  const acceptAtClientPrice = useMutation({
+    mutationFn: async (requestId) => {
+      const { data, error } = await supabase.rpc("accept_at_client_price", {
+        p_request_id: requestId,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (req) => {
+      queryClient.invalidateQueries({ queryKey: ["pending-requests"] });
+      router.push(`/driver/job/${req.id}`);
+    },
+    onError: (err) => {
+      toast({ title: "No se pudo aceptar", description: err.message, variant: "destructive" });
+      queryClient.invalidateQueries({ queryKey: ["pending-requests"] });
+    },
+  });
+
+  const makeOffer = useMutation({
+    mutationFn: async ({ requestId, amount, message }) => {
+      const { data, error } = await supabase.rpc("make_price_offer", {
+        p_request_id: requestId,
+        p_amount: Number(amount),
+        p_message: message || null,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (offer) => {
+      toast({ title: "Contraoferta enviada", description: "El cliente la verá al momento." });
+      setCounterFor(null);
+      setCounterAmount("");
+      setCounterMessage("");
+      queryClient.invalidateQueries({ queryKey: ["my-price-offers"] });
+      // Push al cliente (no bloquea: sin Firebase aún, cae en silencio).
+      if (offer?.id) {
+        supabase.functions
+          .invoke("send-push", {
+            body: { mode: "price_offer", order_id: offer.request_id, offer_id: offer.id },
+          })
+          .catch(() => {});
+      }
+    },
+    onError: (err) => {
+      toast({ title: "No se pudo enviar", description: err.message, variant: "destructive" });
+    },
+  });
 
   const acceptMutation = useMutation({
     mutationFn: async (requestId) => {
@@ -179,7 +250,16 @@ export default function DriverRequests() {
                   <span className="text-2xl">{serviceOf(req).emoji}</span>
                   <span className="font-semibold text-foreground">{serviceSummary(req)}</span>
                 </div>
-                <span className="text-xl font-bold text-primary">{req.estimated_price?.toFixed(2)}€</span>
+                {req.proposed_price != null ? (
+                  <div className="text-right">
+                    <span className="text-xl font-bold text-primary">{Number(req.proposed_price).toFixed(2)}€</span>
+                    <p className="text-[11px] text-muted-foreground">
+                      ofrece el cliente · tarifa {req.estimated_price?.toFixed(2)}€
+                    </p>
+                  </div>
+                ) : (
+                  <span className="text-xl font-bold text-primary">{req.estimated_price?.toFixed(2)}€</span>
+                )}
               </div>
 
               <div className="space-y-2 mb-3">
@@ -228,15 +308,99 @@ export default function DriverRequests() {
                 </div>
               )}
 
-              <div className="flex gap-2">
-                <Button
-                  className="flex-1 rounded-xl gap-2"
-                  onClick={() => acceptMutation.mutate(req.id)}
-                  disabled={acceptMutation.isPending || isUnavailable}
-                >
-                  <Check className="w-4 h-4" /> Aceptar servicio
-                </Button>
-              </div>
+              {req.proposed_price == null ? (
+                /* Sin negociación: flujo clásico intacto */
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1 rounded-xl gap-2"
+                    onClick={() => acceptMutation.mutate(req.id)}
+                    disabled={acceptMutation.isPending || isUnavailable}
+                  >
+                    <Check className="w-4 h-4" /> Aceptar servicio
+                  </Button>
+                </div>
+              ) : myOfferFor(req.id) ? (
+                <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-sm">
+                  <p className="font-semibold text-foreground">
+                    Tu contraoferta: {Number(myOfferFor(req.id).amount).toFixed(2)}€
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    Esperando al cliente. Puedes cambiarla con «Contraofertar».
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="rounded-xl mt-2"
+                    onClick={() => {
+                      setCounterFor(req.id);
+                      setCounterAmount(String(myOfferFor(req.id).amount));
+                    }}
+                  >
+                    Cambiar contraoferta
+                  </Button>
+                </div>
+              ) : counterFor === req.id ? (
+                /* Formulario de contraoferta */
+                <div className="space-y-2 bg-muted/40 rounded-xl p-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="number"
+                      min="5"
+                      max="500"
+                      step="1"
+                      value={counterAmount}
+                      onChange={(e) => setCounterAmount(e.target.value)}
+                      placeholder={`p. ej. ${Math.round((req.estimated_price || 40))}`}
+                      className="w-28 rounded-xl border border-input bg-background px-3 py-2 text-sm font-semibold"
+                    />
+                    <span className="text-sm font-semibold">€</span>
+                    <input
+                      type="text"
+                      value={counterMessage}
+                      onChange={(e) => setCounterMessage(e.target.value)}
+                      placeholder="Motivo (opcional): distancia, plantas…"
+                      className="flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      className="flex-1 rounded-xl"
+                      disabled={!counterAmount || makeOffer.isPending}
+                      onClick={() =>
+                        makeOffer.mutate({ requestId: req.id, amount: counterAmount, message: counterMessage })
+                      }
+                    >
+                      {makeOffer.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enviar contraoferta"}
+                    </Button>
+                    <Button variant="outline" className="rounded-xl" onClick={() => setCounterFor(null)}>
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                /* Negociación: aceptar el precio del cliente o contraofertar */
+                <div className="flex gap-2">
+                  <Button
+                    className="flex-1 rounded-xl gap-2"
+                    onClick={() => acceptAtClientPrice.mutate(req.id)}
+                    disabled={acceptAtClientPrice.isPending || isUnavailable}
+                  >
+                    <Check className="w-4 h-4" /> Aceptar por {Number(req.proposed_price).toFixed(2)}€
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="rounded-xl"
+                    disabled={isUnavailable}
+                    onClick={() => {
+                      setCounterFor(req.id);
+                      setCounterAmount(String(Math.round(req.estimated_price || req.proposed_price)));
+                      setCounterMessage("");
+                    }}
+                  >
+                    Contraofertar
+                  </Button>
+                </div>
+              )}
             </motion.div>
           ))}
         </div>

@@ -647,6 +647,44 @@ export default function RequestWizard({ authenticated = false, user = null }) {
 
             <PriceSummary quote={quote} />
 
+            {/* Negociación (opcional, solo con cuenta): el cliente propone su
+                precio y los conductores aceptan o contraofertan. El suelo del
+                60% lo valida también el servidor (migración 0014). */}
+            {authenticated && quote.total > 0 && (
+              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold text-foreground">¿Quieres proponer tu precio?</p>
+                  <span className="text-[11px] text-muted-foreground">opcional</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Los conductores podrán aceptarlo o hacerte una contraoferta. Mínimo{" "}
+                  {Math.ceil(quote.total * 0.6)}€.
+                </p>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    min={Math.ceil(quote.total * 0.6)}
+                    max={500}
+                    step="1"
+                    placeholder={`${quote.total}`}
+                    value={form.proposed_price ?? ""}
+                    onChange={(e) => f.update("proposed_price", e.target.value)}
+                    className="w-32 rounded-xl font-semibold"
+                  />
+                  <span className="text-sm font-semibold text-foreground">€</span>
+                  {form.proposed_price ? (
+                    <button
+                      type="button"
+                      onClick={() => f.update("proposed_price", "")}
+                      className="text-xs text-muted-foreground underline"
+                    >
+                      quitar
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+            )}
+
             {authenticated ? (
               <div className="space-y-3">
                 <p className="text-sm font-medium text-foreground">Método de pago</p>

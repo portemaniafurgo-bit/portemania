@@ -41,6 +41,8 @@ const emptyForm = (draft = {}) => ({
   payment_method: draft.payment_method || "cash",
   notes: "",
   distance_km: 0,
+  // Negociación (solo con cuenta): precio propuesto por el cliente, opcional.
+  proposed_price: "",
 });
 
 export function useRequestForm({ draft = {}, requireName = true, guest = true } = {}) {
@@ -269,6 +271,9 @@ export function useRequestForm({ draft = {}, requireName = true, guest = true } 
         recipient_phone: service.needsRecipient ? form.recipient_phone : null,
         payment_method: form.payment_method,
         notes: form.notes || null,
+        // La RPC de invitado ignora las claves que no conoce; el insert
+        // autenticado la guarda y el servidor valida el suelo del 60%.
+        ...(form.proposed_price ? { proposed_price: Number(form.proposed_price) } : {}),
         helpers_count: 0,
         status: "pending",
         payment_status: "pending",

@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/entities";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,6 +65,69 @@ export default function OrderDetail() {
   const [order, setOrder] = useState(null);
   const [messages, setMessages] = useState([]);
   const [orderLoading, setOrderLoading] = useState(true);
+  // Negociación (migración 0014): contraofertas de conductores en vivo.
+  const [priceOffers, setPriceOffers] = useState([]);
+  const [negotiating, setNegotiating] = useState(false);
+
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+
+    const loadOffers = async () => {
+      const { data } = await supabase
+        .from("price_offers")
+        .select("id, driver_name, amount, message, status")
+        .eq("request_id", id)
+        .eq("status", "pending")
+        .order("created_date", { ascending: true });
+      if (active) setPriceOffers(data || []);
+    };
+    loadOffers();
+
+    const channel = supabase
+      .channel(`offers-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "price_offers", filter: `request_id=eq.${id}` },
+        loadOffers,
+      )
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
+
+  const acceptOffer = async (offerId) => {
+    setNegotiating(true);
+    try {
+      const { data, error } = await supabase.rpc("accept_price_offer", { p_offer_id: offerId });
+      if (error) throw error;
+      setOrder(prev => ({ ...prev, ...data }));
+      setPriceOffers([]);
+      // Avisar al conductor ganador ("¡Trato hecho!"). No bloquea el flujo.
+      supabase.functions
+        .invoke("send-push", { body: { mode: "offer_accepted", order_id: data.id } })
+        .catch(() => {});
+    } catch (err) {
+      toast({ title: "No se pudo aceptar", description: err.message, variant: "destructive" });
+    } finally {
+      setNegotiating(false);
+    }
+  };
+
+  const rejectOffer = async (offerId) => {
+    setNegotiating(true);
+    try {
+      const { error } = await supabase.rpc("reject_price_offer", { p_offer_id: offerId });
+      if (error) throw error;
+      setPriceOffers(prev => prev.filter(o => o.id !== offerId));
+    } catch (err) {
+      toast({ title: "No se pudo rechazar", description: err.message, variant: "destructive" });
+    } finally {
+      setNegotiating(false);
+    }
+  };
   const [driverProfile, setDriverProfile] = useState(null);
   const [driverLocation, setDriverLocation] = useState(null);
   const [eta, setEta] = useState(null);
@@ -357,6 +421,50 @@ export default function OrderDetail() {
                 <Send className="w-4 h-4" />
               </Button>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Negociación: respuestas de conductores mientras el pedido busca dueño */}
+      {order.status === "pending" && order.proposed_price != null && (
+        <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold text-sm text-foreground">Respuestas de conductores</h2>
+            <span className="text-xs bg-primary/10 text-primary font-semibold px-3 py-1 rounded-full">
+              Tu oferta: {Number(order.proposed_price).toFixed(2)}€
+            </span>
+          </div>
+          {priceOffers.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Aún no hay contraofertas. Un conductor puede aceptar tu precio directamente o
+              proponerte otro — lo verás aquí al momento.
+            </p>
+          ) : (
+            priceOffers.map(offer => (
+              <div key={offer.id} className="border border-border rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-sm text-foreground">{offer.driver_name || "Conductor"}</p>
+                  <span className="text-lg font-bold text-primary">{Number(offer.amount).toFixed(2)}€</span>
+                </div>
+                {offer.message && <p className="text-xs text-muted-foreground">«{offer.message}»</p>}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => acceptOffer(offer.id)}
+                    disabled={negotiating}
+                    className="flex-1 bg-primary text-primary-foreground text-sm font-semibold rounded-xl py-2 hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    Aceptar por {Number(offer.amount).toFixed(2)}€
+                  </button>
+                  <button
+                    onClick={() => rejectOffer(offer.id)}
+                    disabled={negotiating}
+                    className="border border-border text-sm text-muted-foreground rounded-xl px-4 hover:bg-muted disabled:opacity-50"
+                  >
+                    No, gracias
+                  </button>
+                </div>
+              </div>
+            ))
           )}
         </div>
       )}

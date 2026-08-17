@@ -485,6 +485,18 @@ Ciclo real de prueba con el usuario (Xiaomi, adb + capturas de pantalla + logcat
 - **Conductor de prueba recreado y verificado** (login OK, driver verificado, furgón grande, docs completos): `conductor.test@portemania.es` / `Conductor2026!` — borrarlo tras las campañas.
 - **[HANDOFF-APP-PENDIENTES.md](HANDOFF-APP-PENDIENTES.md)**: plan completo y documentado para que otro agente continúe (T1-T10 con pasos, credenciales, flujo OTA vs APK, reglas y trampas).
 
+### 2026-08-12 (2ª tanda) — NEGOCIACIÓN DE PRECIO operativa en backend y web
+
+El usuario aportó el rediseño de Claude Design (24 pantallas, negociación incluida; importado vía DesignSync) y aprobó: mapas se quedan en MapLibre gratis aproximando el estilo, y la negociación se implementa junto al rediseño. Hecho en esta tanda:
+
+- **Backend (migración 0014, APLICADA y verificada)**: `proposed_price` con suelo del 60 % del precio calculado (trigger `zz_validate_proposed_price`, corre tras `set_request_price` por orden alfabético), tabla `price_offers` (Realtime activado, RLS de solo lectura — escrituras SOLO vía RPCs) y 4 RPCs security definer con anti-carrera: `make_price_offer`, `accept_price_offer`, `accept_at_client_price`, `reject_price_offer`. El precio pactado va a `final_price` (el trigger de 0007 lo permite a postgres) y fluye solo a ganancias/recibo/finanzas.
+- **Pagos**: `create-payment-intent` v9 — cobra `final_price` (pactado/staff) si existe; si no, `compute_quote` como siempre. Y la Idempotency-Key ahora incluye el importe: si el importe cambió tras negociar, Stripe no rechaza la clave reutilizada con parámetros distintos. Verificada en prod.
+- **Web conductor** (`/driver/requests`): pedidos con precio propuesto muestran «ofrece el cliente · tarifa X€», botón «Aceptar por X€» (RPC), formulario de contraoferta (importe + motivo) y estado «tu contraoferta: esperando». Sin negociación, flujo clásico intacto.
+- **Web cliente** (`/order/[id]`): panel «Respuestas de conductores» EN VIVO (Realtime sobre price_offers) con aceptar/rechazar cada contraoferta; asistente con campo opcional «¿Quieres proponer tu precio?» (solo con cuenta; los invitados siguen a precio cerrado — la RPC de invitado ignora claves desconocidas).
+- **send-push v2**: modos `price_offer` (→ cliente, importe leído de la BD) y `offer_accepted` (→ conductor, «¡Trato hecho!»), verificados; los dispara la web al contraofertar/aceptar.
+
+Pendiente de esta funcionalidad: pantallas de la app (canvas 1e/1g/1i/1j) dentro del rediseño general, que es el siguiente bloque.
+
 ### 2026-08-12 — T0+T5+T6+T7 desarrolladas y PRIMERA ENTREGA OTA
 
 Mapa embebido estilo Uber en el trabajo del conductor (posición propia en vivo por watchPositionAsync + banda de estado morada con stepper; Maps/Waze quedan como opción), oferta expandible con mapa y «a X km de ti», pulido visual completo con la paleta, pestaña Servicios (historial del conductor), borrado de cuenta (RPC 0013 aplicada; anonimiza pedidos, bloquea con servicio en curso) y recibo por email (send-receipt verificada). **Primera actualización OTA publicada** (runtime 0.1.3, canal preview, grupo c1ed011e): la app instalada la recibe al reabrirse dos veces, sin APK. Gotcha aprendido: eas update en no-interactivo exige --environment y, sin react-native-web instalado, hay que publicar con --platform android.

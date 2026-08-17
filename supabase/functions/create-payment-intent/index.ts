@@ -52,16 +52,23 @@ Deno.serve(async (req: Request) => {
   if (order.payment_status === "paid") return json({ error: "Ya está pagado" }, 400);
   if (order.status === "cancelled") return json({ error: "El pedido está cancelado" }, 400);
 
-  // Importe recalculado por la MISMA función que fija el precio al crear el
-  // pedido (public.compute_quote, migración 0010). Antes esta fórmula estaba
-  // duplicada aquí y se desincronizaba con la del resto de la aplicación.
-  const { data: quote, error: quoteError } = await admin.rpc("compute_quote", { payload: order });
-  if (quoteError) {
-    console.error("compute_quote error:", quoteError.message);
-    return json({ error: "No se pudo calcular el importe" }, 500);
+  // Importe a cobrar, en este orden de autoridad:
+  //  1) final_price — el PRECIO PACTADO en la negociación (solo lo escriben
+  //     las RPCs security definer de la migración 0014 o el staff; el cliente
+  //     no puede fijarlo) o corregido por el staff.
+  //  2) compute_quote — la MISMA función que fija el precio al crear el pedido
+  //     (migración 0010).
+  let amount: number;
+  if (order.final_price != null && Number(order.final_price) > 0) {
+    amount = Math.round(Number(order.final_price) * 100);
+  } else {
+    const { data: quote, error: quoteError } = await admin.rpc("compute_quote", { payload: order });
+    if (quoteError) {
+      console.error("compute_quote error:", quoteError.message);
+      return json({ error: "No se pudo calcular el importe" }, 500);
+    }
+    amount = Math.round(Number(quote?.total) * 100);
   }
-
-  const amount = Math.round(Number(quote?.total) * 100);
   if (!Number.isFinite(amount) || amount < 50) return json({ error: "Importe no válido" }, 400);
 
   const params = new URLSearchParams({
@@ -78,8 +85,10 @@ Deno.serve(async (req: Request) => {
     headers: {
       Authorization: `Bearer ${stripeKey}`,
       "Content-Type": "application/x-www-form-urlencoded",
-      // Idempotencia por pedido: reintentos no crean cargos duplicados.
-      "Idempotency-Key": `order_${order.id}`,
+      // Idempotencia por pedido E importe: reintentos no duplican cargos, y si
+      // el importe cambió (negociación posterior a un intento previo) Stripe
+      // no rechaza la clave por parámetros distintos.
+      "Idempotency-Key": `order_${order.id}_${amount}`,
     },
     body: params,
   });

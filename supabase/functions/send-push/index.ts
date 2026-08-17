@@ -107,7 +107,7 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
 
-  let body: { mode?: string; order_id?: string; message_id?: string };
+  let body: { mode?: string; order_id?: string; message_id?: string; offer_id?: string };
   try {
     body = await req.json();
   } catch {
@@ -255,6 +255,52 @@ Deno.serve(async (req: Request) => {
           String(msg.message || "").slice(0, 140),
           { ...data, message_id: msg.id },
           CHANNEL_STATUS,
+        ),
+      );
+    }
+
+    // ---------- Negociación: contraoferta nueva → cliente ----------
+    case "price_offer": {
+      if (!body.offer_id) return json({ error: "offer_id requerido" }, 400);
+      // La contraoferta tiene que existir, ser de ESTE pedido y estar viva:
+      // así el importe que llega al móvil es el que hay en la BD.
+      const { data: offer } = await admin
+        .from("price_offers")
+        .select("id, request_id, driver_name, amount, status")
+        .eq("id", body.offer_id)
+        .single();
+      if (!offer || offer.request_id !== order.id) return json({ error: "Contraoferta no encontrada" }, 404);
+      if (offer.status !== "pending") return json({ sent: 0, skipped: "la contraoferta ya no está viva" });
+
+      const tokens = await tokensFor(admin, clientUserId(order));
+      return json(
+        await push(
+          admin,
+          tokens,
+          "Tienes una contraoferta",
+          `${offer.driver_name || "Un conductor"} te propone ${Number(offer.amount).toFixed(2)} €.`,
+          data,
+          CHANNEL_STATUS,
+        ),
+      );
+    }
+
+    // ---------- Negociación: el cliente aceptó → conductor ----------
+    case "offer_accepted": {
+      // El estado real manda: solo se avisa si el pedido quedó aceptado con
+      // conductor y precio pactado.
+      if (order.status !== "accepted" || !order.driver_id) {
+        return json({ sent: 0, skipped: "el pedido no está aceptado" });
+      }
+      const tokens = await tokensFor(admin, [order.driver_id]);
+      return json(
+        await push(
+          admin,
+          tokens,
+          "¡Trato hecho!",
+          `El cliente aceptó tu precio. Recogida en ${order.origin_address || "la dirección indicada"}.`,
+          data,
+          CHANNEL_OFFERS,
         ),
       );
     }
