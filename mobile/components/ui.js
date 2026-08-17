@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing, typography } from "../theme";
 
 /**
@@ -51,7 +52,7 @@ export function Caption({ children, style }) {
   return <Text style={[typography.caption, style]}>{children}</Text>;
 }
 
-export function Button({ title, onPress, loading, disabled, variant = "primary", style }) {
+export function Button({ title, icon, onPress, loading, disabled, variant = "primary", style }) {
   const isPlain = variant !== "primary";
   const blocked = disabled || loading;
   return (
@@ -71,7 +72,15 @@ export function Button({ title, onPress, loading, disabled, variant = "primary",
       {loading ? (
         <ActivityIndicator color={isPlain ? colors.primary : colors.primaryForeground} />
       ) : (
-        <Text style={[styles.buttonText, isPlain && { color: colors.primary }]}>{title}</Text>
+        <View style={styles.buttonInner}>
+          {/* Ionicons, como el canvas: nada de emojis en la interfaz. */}
+          {icon ? (
+            <Ionicons name={icon} size={18} color={isPlain ? colors.primary : colors.primaryForeground} />
+          ) : null}
+          {title ? (
+            <Text style={[styles.buttonText, isPlain && { color: colors.primary }]}>{title}</Text>
+          ) : null}
+        </View>
       )}
     </Pressable>
   );
@@ -130,6 +139,7 @@ const styles = StyleSheet.create({
   buttonPlain: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border },
   buttonDisabled: { opacity: 0.5 },
   buttonPressed: { opacity: 0.85 },
+  buttonInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm },
   buttonText: { color: colors.primaryForeground, fontSize: 16, fontFamily: "DMSans_700Bold" },
   input: {
     backgroundColor: colors.card,

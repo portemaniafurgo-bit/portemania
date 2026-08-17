@@ -27,7 +27,7 @@ export default function TipCard({ order, driverName }) {
       <Card style={{ backgroundColor: colors.successBg, borderColor: colors.success }}>
         <Body>
           Gracias — tu propina {order.tip_amount ? `de ${order.tip_amount} €` : ""} llega íntegra a{" "}
-          {driverName || "tu conductor"}. 💛
+          {driverName || "tu conductor"}.
         </Body>
       </Card>
     );

@@ -115,7 +115,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   optionSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  optionLabel: { fontSize: 15, fontWeight: "600", color: colors.foreground },
+  optionLabel: { fontSize: 15, fontFamily: "DMSans_500Medium", color: colors.foreground },
   radio: {
     width: 22,
     height: 22,
@@ -139,8 +139,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   counterSign: { fontSize: 20, color: colors.foreground },
-  counterValue: { fontSize: 16, fontWeight: "600", minWidth: 28, textAlign: "center", color: colors.foreground },
+  counterValue: { fontSize: 16, fontFamily: "DMSans_700Bold", minWidth: 28, textAlign: "center", color: colors.foreground },
   priceLine: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   priceTotal: { borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.md },
-  total: { fontSize: 22, fontWeight: "700", color: colors.primary },
+  total: { fontSize: 22, fontFamily: "Poppins_700Bold", color: colors.primary },
 });

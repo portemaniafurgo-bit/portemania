@@ -11,6 +11,8 @@ import { distanceKm } from "../../lib/eta";
 import { stopTracking } from "../../lib/tracking";
 import TrackingMap from "../../components/TrackingMap";
 import EmptyState from "../../components/EmptyState";
+import ServiceIcon, { SERVICE_ICONS } from "../../components/ServiceIcon";
+import { Ionicons } from "@expo/vector-icons";
 import { Body, Button, Caption, Card, ErrorText, Field, Heading, Loading, Title } from "../../components/ui";
 import { Counter } from "../../components/wizard";
 import { colors, radius, spacing } from "../../theme";
@@ -358,9 +360,8 @@ export default function Ofertas() {
               <Card style={expanded ? { borderColor: colors.primary, borderWidth: 2 } : null}>
                 <View style={styles.header}>
                   <View style={styles.serviceChip}>
-                    <Text style={styles.serviceChipText}>
-                      {service?.emoji} {service?.label || "Servicio"}
-                    </Text>
+                    <Ionicons name={SERVICE_ICONS[service?.key] || "cube-outline"} size={15} color={colors.primary} />
+                    <Text style={styles.serviceChipText}>{service?.label || "Servicio"}</Text>
                   </View>
                   {order.proposed_price != null ? (
                     <View style={{ alignItems: "flex-end" }}>
@@ -376,8 +377,8 @@ export default function Ofertas() {
                 <View style={styles.tags}>
                   {km != null ? (
                     <View style={[styles.tag, { backgroundColor: colors.primarySoft }]}>
-                      <Text style={[styles.tagText, { color: colors.primary, fontWeight: "600" }]}>
-                        📍 a {km.toFixed(1)} km de ti
+                      <Text style={[styles.tagText, { color: colors.primary, fontFamily: "DMSans_700Bold" }]}>
+                        a {km.toFixed(1)} km de ti
                       </Text>
                     </View>
                   ) : null}
@@ -388,7 +389,7 @@ export default function Ofertas() {
                   </View>
                   {order.needs_help ? (
                     <View style={[styles.tag, { backgroundColor: colors.warningBg }]}>
-                      <Text style={[styles.tagText, { color: colors.warning, fontWeight: "600" }]}>
+                      <Text style={[styles.tagText, { color: colors.warning, fontFamily: "DMSans_700Bold" }]}>
                         Con ayuda de carga
                       </Text>
                     </View>
@@ -499,7 +500,7 @@ export default function Ofertas() {
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   price: { fontSize: 22, fontFamily: "Poppins_700Bold", color: colors.primary },
-  serviceChip: { backgroundColor: colors.primarySoft, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },
+  serviceChip: { flexDirection: "row", alignItems: "center", gap: 5, backgroundColor: colors.primarySoft, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },
   serviceChipText: { fontSize: 14, fontFamily: "Poppins_600SemiBold", color: colors.primary },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   tag: { backgroundColor: colors.secondary, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },

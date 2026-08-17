@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Modal, StyleSheet, Text, View } from "react-native";
 import { Camera, Map } from "@maplibre/maplibre-react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { addressFromCoords } from "../lib/addresses";
 import { Button, Caption, Title } from "./ui";
 import { colors, radius, spacing } from "../theme";
@@ -71,7 +72,7 @@ export default function MapPicker({ visible, initial, zone = "albacete", onConfi
           </Map>
           {/* El pin vive FUERA del mapa, clavado en el centro de la pantalla. */}
           <View pointerEvents="none" style={styles.pinWrap}>
-            <Text style={styles.pin}>📍</Text>
+            <Ionicons name="location" size={46} color={colors.primary} style={styles.pin} />
           </View>
         </View>
 
@@ -96,5 +97,5 @@ const styles = StyleSheet.create({
   },
   // El emoji apunta con la punta abajo: se sube media altura para que la punta
   // caiga en el centro real del mapa.
-  pin: { fontSize: 44, marginBottom: 44, textShadowColor: "#0003", textShadowRadius: 4 },
+  pin: { marginBottom: 46 },
 });

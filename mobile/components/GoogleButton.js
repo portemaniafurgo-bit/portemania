@@ -57,5 +57,5 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   // El texto del botón de Google es gris oscuro neutro, no del color de marca.
-  text: { fontSize: 15, fontWeight: "600", color: "#3C4043" },
+  text: { fontSize: 15, fontFamily: "DMSans_500Medium", color: "#3C4043" },
 });

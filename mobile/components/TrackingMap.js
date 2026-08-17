@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { fetchRouteEta } from "../lib/eta";
 import { locationFreshness } from "../lib/orders";
 import { Caption } from "./ui";
@@ -90,7 +91,7 @@ export default function TrackingMap({ driverLocation, target, height = 260, self
           {driverLocation ? (
             <Marker id="driver" lngLat={[driverLocation.lng, driverLocation.lat]}>
               <View style={[styles.driverPin, !freshness?.fresh && { backgroundColor: colors.warning }]}>
-                <Text style={styles.driverPinText}>🚐</Text>
+                <Ionicons name="car" size={18} color="#FFFFFF" />
               </View>
             </Marker>
           ) : null}

@@ -10,6 +10,8 @@ import { serviceOf } from "../../../lib/services";
 import { Body, Button, Caption, Card, Field, Heading, Loading, Title } from "../../../components/ui";
 import { pickPhotos } from "../../../lib/photos";
 import TrackingMap from "../../../components/TrackingMap";
+import ServiceIcon from "../../../components/ServiceIcon";
+import { Ionicons } from "@expo/vector-icons";
 import ReportIncident from "../../../components/ReportIncident";
 import PayButton from "../../../components/PayButton";
 import TipCard from "../../../components/TipCard";
@@ -186,11 +188,12 @@ export default function OrderDetail() {
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <Stack.Screen options={{ headerShown: true, title: "Tu pedido" }} />
       <ScrollView ref={scrollRef} contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
-        <View style={{ gap: spacing.xs }}>
-          <Heading>
-            {service?.emoji} {service?.label || "Servicio"}
-          </Heading>
-          <Caption>{STATUS_LABELS[order.status] || order.status}</Caption>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+          <ServiceIcon serviceKey={service?.key} size={44} />
+          <View style={{ gap: 2, flex: 1 }}>
+            <Heading>{service?.label || "Servicio"}</Heading>
+            <Caption>{STATUS_LABELS[order.status] || order.status}</Caption>
+          </View>
         </View>
 
         {/* Línea de estados */}
@@ -201,7 +204,7 @@ export default function OrderDetail() {
               return (
                 <View key={status} style={styles.timelineRow}>
                   <View style={[styles.timelineDot, done && { backgroundColor: colors.primary }]} />
-                  <Text style={[styles.timelineLabel, done && { color: colors.foreground, fontWeight: "600" }]}>
+                  <Text style={[styles.timelineLabel, done && { color: colors.foreground, fontFamily: "DMSans_700Bold" }]}>
                     {STATUS_LABELS[status]}
                   </Text>
                 </View>
@@ -317,7 +320,7 @@ export default function OrderDetail() {
             <View style={styles.stars}>
               {[1, 2, 3, 4, 5].map(n => (
                 <Pressable key={n} onPress={() => setRating(n)}>
-                  <Text style={styles.star}>{n <= rating ? "★" : "☆"}</Text>
+                  <Ionicons name={n <= rating ? "star" : "star-outline"} size={32} color={colors.accent} />
                 </Pressable>
               ))}
             </View>
@@ -339,7 +342,11 @@ export default function OrderDetail() {
         {order.client_rating ? (
           <Card>
             <Caption>Tu valoración</Caption>
-            <Text style={styles.star}>{"★".repeat(order.client_rating)}</Text>
+            <View style={{ flexDirection: "row", gap: 2 }}>
+              {Array.from({ length: order.client_rating }, (_, i) => (
+                <Ionicons key={i} name="star" size={18} color={colors.accent} />
+              ))}
+            </View>
             {order.client_review ? <Body>{order.client_review}</Body> : null}
           </Card>
         ) : null}
@@ -432,7 +439,7 @@ export default function OrderDetail() {
                 {chatError ? <Caption style={{ color: colors.destructive }}>{chatError}</Caption> : null}
                 <View style={{ flexDirection: "row", gap: spacing.sm }}>
                   <Button
-                    title="📷"
+                    icon="camera-outline"
                     variant="plain"
                     loading={sending}
                     onPress={() => sendPhoto()}
@@ -463,7 +470,7 @@ const styles = StyleSheet.create({
   driverRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   avatar: { width: 56, height: 56, borderRadius: radius.full, backgroundColor: colors.secondary },
   avatarEmpty: { borderWidth: 1, borderColor: colors.border },
-  price: { fontSize: 20, fontWeight: "700", color: colors.foreground },
+  price: { fontSize: 20, fontFamily: "Poppins_700Bold", color: colors.foreground },
   bubble: { padding: spacing.md, borderRadius: radius.md, maxWidth: "85%", gap: 2 },
   bubbleMine: { alignSelf: "flex-end", backgroundColor: colors.primary },
   bubbleTheirs: { alignSelf: "flex-start", backgroundColor: colors.secondary },

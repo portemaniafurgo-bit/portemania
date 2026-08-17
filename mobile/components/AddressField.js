@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { currentAddress, suggestAddresses } from "../lib/addresses";
 import MapPicker from "./MapPicker";
 import { Caption, Field } from "./ui";
@@ -102,11 +103,11 @@ export default function AddressField({ label, value, onChange, zone = "albacete"
           {locating ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <Text style={styles.locateText}>📍 Mi ubicación</Text>
+            <View style={styles.locateRow}><Ionicons name="locate" size={16} color={colors.primary} /><Text style={styles.locateText}>Mi ubicación</Text></View>
           )}
         </Pressable>
         <Pressable onPress={() => setShowMap(true)} style={styles.locate}>
-          <Text style={styles.locateText}>🗺️ Ajustar en el mapa</Text>
+          <View style={styles.locateRow}><Ionicons name="map-outline" size={16} color={colors.primary} /><Text style={styles.locateText}>Ajustar en el mapa</Text></View>
         </Pressable>
       </View>
 
@@ -140,7 +141,8 @@ export default function AddressField({ label, value, onChange, zone = "albacete"
 
 const styles = StyleSheet.create({
   locate: { alignSelf: "flex-start", paddingVertical: spacing.xs },
-  locateText: { color: colors.primary, fontSize: 14, fontWeight: "600" },
+  locateRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  locateText: { color: colors.primary, fontSize: 14, fontFamily: "DMSans_500Medium" },
   list: {
     borderWidth: 1,
     borderColor: colors.border,

@@ -227,8 +227,8 @@ const styles = StyleSheet.create({
   avatarEmpty: { alignItems: "center", justifyContent: "center" },
   avatarInitial: { fontSize: 24, fontFamily: "Poppins_700Bold", color: colors.primary },
   verifiedChip: { alignSelf: "flex-start", backgroundColor: colors.successBg, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 2, marginTop: 2 },
-  verifiedText: { fontSize: 12, fontWeight: "700", color: colors.success },
-  docLabel: { fontSize: 14, fontWeight: "600", color: colors.foreground },
+  verifiedText: { fontSize: 12, fontFamily: "DMSans_700Bold", color: colors.success },
+  docLabel: { fontSize: 14, fontFamily: "DMSans_500Medium", color: colors.foreground },
   expiryInput: {
     borderWidth: 1,
     borderColor: colors.border,

@@ -3,6 +3,7 @@ import { Dimensions, Image, ScrollView, StyleSheet, Text, View } from "react-nat
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 import { Button, Caption } from "../components/ui";
 import { colors, radius, spacing } from "../theme";
 
@@ -15,17 +16,17 @@ export const ONBOARDING_KEY = "onboarding_seen_v1";
 
 const SLIDES = [
   {
-    emoji: "📦",
+    icon: "cube-outline",
     title: "Pide en un minuto",
     text: "Portes, mini mudanzas y paquetes en Albacete. Eliges el servicio, haces fotos de la carga y listo: precio cerrado, sin sorpresas.",
   },
   {
-    emoji: "🗺️",
+    icon: "navigate-outline",
     title: "Síguelo en vivo",
     text: "Ve a tu conductor moverse en el mapa, con la hora de llegada real. Y habla con él por chat sin salir de la app.",
   },
   {
-    emoji: "🤝",
+    icon: "pricetag-outline",
     title: "Tu precio, tu decisión",
     text: "¿Tienes un presupuesto? Propón tu precio: los conductores lo aceptan o te hacen una contraoferta, y cierras el trato tú.",
   },
@@ -71,7 +72,7 @@ export default function Onboarding() {
         {SLIDES.map(slide => (
           <View key={slide.title} style={[styles.slide, { width }]}>
             <View style={styles.emojiWrap}>
-              <Text style={styles.emoji}>{slide.emoji}</Text>
+              <Ionicons name={slide.icon} size={54} color={colors.primary} />
             </View>
             <Text style={styles.title}>{slide.title}</Text>
             <Text style={styles.text}>{slide.text}</Text>

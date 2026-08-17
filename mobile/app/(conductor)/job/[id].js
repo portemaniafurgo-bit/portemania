@@ -307,7 +307,7 @@ export default function TrabajoActivo() {
         {/* Banda de estado estilo Uber: qué pasa ahora y qué toca después. */}
         <View style={styles.statusBand}>
           <Text style={styles.statusBandTitle}>
-            {service?.emoji} {STATUS_LABELS[order.status] || order.status}
+            {STATUS_LABELS[order.status] || order.status}
           </Text>
           {step && !finished ? (
             <Text style={styles.statusBandNext}>Siguiente: {step.label.toLowerCase()}</Text>
@@ -511,7 +511,7 @@ export default function TrabajoActivo() {
               {chatError ? <Caption style={{ color: colors.destructive }}>{chatError}</Caption> : null}
               <View style={{ flexDirection: "row", gap: spacing.sm }}>
                 <Button
-                  title="📷"
+                  icon="camera-outline"
                   variant="plain"
                   loading={sending}
                   style={{ minWidth: 56 }}

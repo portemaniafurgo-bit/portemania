@@ -9,6 +9,8 @@ import { serviceOf } from "../../lib/services";
 import { countUnread } from "../../lib/unread";
 import { Button, Caption, Card, Heading, Loading, Title } from "../../components/ui";
 import EmptyState from "../../components/EmptyState";
+import ServiceIcon from "../../components/ServiceIcon";
+import { Ionicons } from "@expo/vector-icons";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -141,12 +143,16 @@ export default function MisPedidos() {
               <Pressable key={order.id} onPress={() => router.push(`/(cliente)/order/${order.id}`)}>
               <Card>
                 <View style={styles.header}>
-                  <Title>
-                    {service?.emoji} {service?.label || "Servicio"}
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, flex: 1 }}>
+                    <ServiceIcon serviceKey={service?.key} size={34} />
+                    <Title>{service?.label || "Servicio"}</Title>
                     {unread[order.id] ? (
-                      <Text style={styles.unread}>  💬 {unread[order.id]}</Text>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                        <Ionicons name="chatbubble-ellipses" size={15} color={colors.primary} />
+                        <Text style={styles.unread}>{unread[order.id]}</Text>
+                      </View>
                     ) : null}
-                  </Title>
+                  </View>
                   <View style={[styles.badge, { backgroundColor: status.bg }]}>
                     <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
                   </View>
@@ -172,8 +178,8 @@ export default function MisPedidos() {
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   badge: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.full },
-  badgeText: { fontSize: 12, fontWeight: "600" },
-  price: { fontSize: 16, fontWeight: "700", color: colors.foreground },
+  badgeText: { fontSize: 12, fontFamily: "DMSans_700Bold" },
+  price: { fontSize: 16, fontFamily: "Poppins_700Bold", color: colors.foreground },
   filters: { flexDirection: "row", gap: spacing.sm },
   filter: {
     paddingHorizontal: spacing.md,
@@ -184,6 +190,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
   },
   filterActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  filterText: { fontSize: 13, fontWeight: "600", color: colors.mutedForeground },
-  unread: { fontSize: 13, fontWeight: "700", color: colors.primary },
+  filterText: { fontSize: 13, fontFamily: "DMSans_500Medium", color: colors.mutedForeground },
+  unread: { fontSize: 13, fontFamily: "DMSans_700Bold", color: colors.primary },
 });

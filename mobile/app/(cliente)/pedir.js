@@ -10,6 +10,7 @@ import { pickPhotos, takePhoto } from "../../lib/photos";
 import { Body, Button, Caption, Card, ErrorText, Field, Heading, Title } from "../../components/ui";
 import { Counter, Option, PriceSummary, Steps, Toggle } from "../../components/wizard";
 import AddressField from "../../components/AddressField";
+import ServiceIcon from "../../components/ServiceIcon";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -161,7 +162,7 @@ export default function Pedir() {
                 <Pressable key={key} onPress={() => setService(key)}>
                   <Card style={selected ? { borderColor: colors.primary, borderWidth: 2 } : null}>
                     <View style={styles.row}>
-                      <Text style={styles.emoji}>{item.emoji}</Text>
+                      <ServiceIcon serviceKey={key} size={48} />
                       <View style={{ flex: 1, gap: 2 }}>
                         <Title>{item.label}</Title>
                         <Caption>{item.tagline}</Caption>
@@ -432,9 +433,10 @@ export default function Pedir() {
           <>
             <Heading>Resumen del pedido</Heading>
             <Card>
-              <Title>
-                {service.emoji} {service.label}
-              </Title>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                <ServiceIcon serviceKey={service.key} size={36} />
+                <Title>{service.label}</Title>
+              </View>
               <Caption>Recogida: {form.origin_address}</Caption>
               <Caption>Entrega: {form.destination_address}</Caption>
               <Caption>{form.cargo_description}</Caption>
@@ -596,7 +598,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     overflow: "hidden",
   },
-  price: { fontSize: 18, fontWeight: "700", color: colors.primary },
+  price: { fontSize: 18, fontFamily: "Poppins_700Bold", color: colors.primary },
   photos: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   photo: { width: 84, height: 84, borderRadius: radius.md, backgroundColor: colors.secondary },
   photoRemove: {
@@ -610,5 +612,5 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  photoRemoveText: { color: "#fff", fontSize: 16, lineHeight: 18, fontWeight: "700" },
+  photoRemoveText: { color: "#fff", fontSize: 16, lineHeight: 18, fontFamily: "DMSans_700Bold" },
 });

@@ -9,6 +9,7 @@ import { useAuth } from "../../lib/auth";
 import { serviceOf } from "../../lib/services";
 import { Caption, Card, Heading, Loading, Title } from "../../components/ui";
 import EmptyState from "../../components/EmptyState";
+import ServiceIcon from "../../components/ServiceIcon";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -70,9 +71,10 @@ export default function HistorialConductor() {
               <Pressable key={job.id} onPress={() => router.push(`/(conductor)/job/${job.id}`)}>
                 <Card>
                   <View style={styles.row}>
-                    <Title>
-                      {service?.emoji} {service?.label || "Servicio"}
-                    </Title>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                      <ServiceIcon serviceKey={service?.key} size={32} />
+                      <Title>{service?.label || "Servicio"}</Title>
+                    </View>
                     <View
                       style={[
                         styles.badge,
@@ -112,7 +114,7 @@ export default function HistorialConductor() {
 const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
   badge: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.full },
-  badgeText: { fontSize: 12, fontWeight: "600" },
+  badgeText: { fontSize: 12, fontFamily: "DMSans_700Bold" },
   price: { fontSize: 18, fontFamily: "Poppins_700Bold", color: colors.foreground },
   stars: { fontSize: 14, color: colors.accent },
 });
