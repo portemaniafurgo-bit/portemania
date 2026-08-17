@@ -12,7 +12,7 @@
  */
 export const colors = {
   background: "#F7F7FA",
-  foreground: "#1a1b20", // el negro de la landing
+  foreground: "#14141A", // el negro del canvas de rediseño (antes #1a1b20)
   card: "#FFFFFF",
 
   primary: "#7145d6", // morado de la landing
@@ -22,12 +22,13 @@ export const colors = {
 
   accent: "#F5B400", // amarillo de la marca (logo, estrellas)
 
-  secondary: "#F4F4F6",
-  muted: "#F4F4F6",
-  mutedForeground: "#64748B",
-  destructive: "#EF4444",
+  secondary: "#F3F2F6",
+  muted: "#F3F2F6",
+  mutedForeground: "#6C6C78", // gris del canvas
+  subtle: "#9A9AA6", // gris claro del canvas (metadatos, placeholders)
+  destructive: "#C93434", // rojo del canvas
   destructiveForeground: "#FFFFFF",
-  border: "#E5E7EB",
+  border: "#E1DFE6", // borde del canvas
   success: "#10B981",
   successBg: "#ECFDF5",
   warning: "#F59E0B",
@@ -44,9 +45,10 @@ export const radius = {
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
 export const typography = {
-  // Poppins: la tipografía con la que titula la landing (se carga en _layout).
+  // Del canvas de rediseño: Poppins para titular, DM Sans para el cuerpo.
+  // Ambas se cargan en app/_layout.js con fallback a la del sistema.
   heading: { fontSize: 20, fontFamily: "Poppins_700Bold", color: colors.foreground },
   title: { fontSize: 16, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
-  body: { fontSize: 15, color: colors.foreground },
-  caption: { fontSize: 13, color: colors.mutedForeground },
+  body: { fontSize: 15, fontFamily: "DMSans_400Regular", color: colors.foreground },
+  caption: { fontSize: 13, fontFamily: "DMSans_400Regular", color: colors.mutedForeground },
 };

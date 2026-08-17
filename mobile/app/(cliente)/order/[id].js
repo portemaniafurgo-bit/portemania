@@ -35,7 +35,70 @@ export default function OrderDetail() {
   const [chatError, setChatError] = useState("");
   const [sendingReceipt, setSendingReceipt] = useState(false);
   const [receiptSent, setReceiptSent] = useState(false);
+  // Negociación (canvas 1g): contraofertas de conductores EN VIVO.
+  const [priceOffers, setPriceOffers] = useState([]);
+  const [negotiating, setNegotiating] = useState(false);
   const scrollRef = useRef(null);
+
+  useEffect(() => {
+    if (!id) return;
+    let active = true;
+
+    const loadOffers = async () => {
+      const { data } = await supabase
+        .from("price_offers")
+        .select("id, driver_name, amount, message, status")
+        .eq("request_id", id)
+        .eq("status", "pending")
+        .order("created_date", { ascending: true });
+      if (active) setPriceOffers(data || []);
+    };
+    loadOffers();
+
+    const channel = supabase
+      .channel(`offers-${id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "price_offers", filter: `request_id=eq.${id}` },
+        loadOffers,
+      )
+      .subscribe();
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
+  }, [id]);
+
+  const acceptOffer = async offerId => {
+    setNegotiating(true);
+    setChatError("");
+    try {
+      const { data, error } = await supabase.rpc("accept_price_offer", { p_offer_id: offerId });
+      if (error) throw error;
+      setPriceOffers([]);
+      // Avisar al conductor ganador; no bloquea.
+      supabase.functions
+        .invoke("send-push", { body: { mode: "offer_accepted", order_id: data.id } })
+        .catch(() => {});
+    } catch (err) {
+      setChatError(err.message || "No se pudo aceptar la contraoferta.");
+    } finally {
+      setNegotiating(false);
+    }
+  };
+
+  const rejectOffer = async offerId => {
+    setNegotiating(true);
+    try {
+      const { error } = await supabase.rpc("reject_price_offer", { p_offer_id: offerId });
+      if (error) throw error;
+      setPriceOffers(prev => prev.filter(o => o.id !== offerId));
+    } catch (err) {
+      setChatError(err.message || "No se pudo rechazar.");
+    } finally {
+      setNegotiating(false);
+    }
+  };
 
   const sendText = async () => {
     setChatError("");
@@ -147,6 +210,49 @@ export default function OrderDetail() {
           </Card>
         )}
 
+        {/* Negociación: respuestas de conductores mientras busca dueño */}
+        {order.status === "pending" && order.proposed_price != null && (
+          <Card>
+            <View style={styles.offersHeader}>
+              <Title>Respuestas de conductores</Title>
+              <View style={styles.myOfferChip}>
+                <Text style={styles.myOfferChipText}>Tu oferta: {Number(order.proposed_price).toFixed(2)} €</Text>
+              </View>
+            </View>
+            {priceOffers.length === 0 ? (
+              <Caption>
+                Aún no hay contraofertas. Un conductor puede aceptar tu precio directamente o
+                proponerte otro — lo verás aquí al momento.
+              </Caption>
+            ) : (
+              priceOffers.map(offer => (
+                <View key={offer.id} style={styles.offerCard}>
+                  <View style={styles.offersHeader}>
+                    <Body style={{ fontFamily: "DMSans_700Bold" }}>{offer.driver_name || "Conductor"}</Body>
+                    <Text style={styles.offerAmount}>{Number(offer.amount).toFixed(2)} €</Text>
+                  </View>
+                  {offer.message ? <Caption>«{offer.message}»</Caption> : null}
+                  <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                    <Button
+                      title={`Aceptar por ${Number(offer.amount).toFixed(2)} €`}
+                      loading={negotiating}
+                      onPress={() => acceptOffer(offer.id)}
+                      style={{ flex: 2 }}
+                    />
+                    <Button
+                      title="No, gracias"
+                      variant="plain"
+                      disabled={negotiating}
+                      onPress={() => rejectOffer(offer.id)}
+                      style={{ flex: 1 }}
+                    />
+                  </View>
+                </View>
+              ))
+            )}
+          </Card>
+        )}
+
         {/* Mapa en vivo */}
         {active && <TrackingMap driverLocation={driverLocation} target={target} />}
 
@@ -195,11 +301,14 @@ export default function OrderDetail() {
           ) : null}
         </Card>
 
-        {/* Pago con tarjeta pendiente. En efectivo no aparece: se paga al
-            conductor al terminar. */}
+        {/* Pago con tarjeta pendiente. En efectivo no aparece; y mientras se
+            negocia tampoco: el importe aún no está pactado. */}
         {order.payment_method === "card" &&
           order.payment_status !== "paid" &&
-          order.status !== "cancelled" && <PayButton order={order} />}
+          order.status !== "cancelled" &&
+          !(order.status === "pending" && order.proposed_price != null) && (
+            <PayButton order={order} />
+          )}
 
         {/* Valoración: solo tras la entrega y una sola vez */}
         {order.status === "delivered" && !order.client_rating && (
@@ -362,4 +471,9 @@ const styles = StyleSheet.create({
   stars: { flexDirection: "row", gap: spacing.sm },
   star: { fontSize: 32, color: colors.accent },
   chatImage: { width: 200, height: 150, borderRadius: radius.md, backgroundColor: colors.secondary },
+  offersHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  myOfferChip: { backgroundColor: colors.primarySoft, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },
+  myOfferChipText: { fontSize: 12, fontFamily: "DMSans_700Bold", color: colors.primary },
+  offerCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
+  offerAmount: { fontSize: 20, fontFamily: "Poppins_700Bold", color: colors.primary },
 });

@@ -51,6 +51,9 @@ const emptyForm = (draft = {}) => ({
   // Programado: "DD/MM HH:MM" en texto; null = ahora mismo.
   scheduled_date: draft.scheduled_date || "",
   scheduled_time: draft.scheduled_time || "",
+  // Negociación (canvas 1e): precio propuesto por el cliente, opcional. El
+  // suelo del 60% lo valida el servidor (migración 0014).
+  proposed_price: draft.proposed_price || "",
 });
 
 /**
@@ -365,6 +368,7 @@ export function useRequestForm({ user } = {}) {
       recipient_phone: service.needsRecipient ? form.recipient_phone : null,
       payment_method: form.payment_method,
       notes: form.notes || null,
+      ...(form.proposed_price ? { proposed_price: Number(form.proposed_price) } : {}),
       helpers_count: 0,
       status: scheduledAt ? "scheduled" : "pending",
       ...(scheduledAt ? { scheduled_at: scheduledAt.toISOString() } : {}),

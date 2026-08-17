@@ -82,6 +82,11 @@ export default function Pedir() {
       setError("Revisa el día y la hora del pedido programado (ej.: 25/08 y 09:30, en el futuro).");
       return;
     }
+    // El servidor valida el suelo igualmente; frenar aquí da un mensaje mejor.
+    if (form.proposed_price && Number(form.proposed_price) < Math.ceil(quote.total * 0.6)) {
+      setError(`Tu oferta es demasiado baja: el mínimo para este servicio es ${Math.ceil(quote.total * 0.6)} €.`);
+      return;
+    }
     setSending(true);
     try {
       const duplicate = await findRecentDuplicate();
@@ -438,6 +443,42 @@ export default function Pedir() {
             <Card>
               <PriceSummary quote={quote} />
             </Card>
+
+            {/* Negociación (canvas 1e): el calculado manda; ofertar es opcional */}
+            {quote.total > 0 && (
+              <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary }}>
+                <Title>¿Quieres proponer tu precio?</Title>
+                <Caption>
+                  Opcional. Los conductores podrán aceptarlo o hacerte una contraoferta. Mínimo{" "}
+                  {Math.ceil(quote.total * 0.6)} €.
+                </Caption>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                  <View style={{ width: 120 }}>
+                    <Field
+                      value={String(form.proposed_price || "")}
+                      onChangeText={v => update("proposed_price", v.replace(/[^0-9.]/g, ""))}
+                      placeholder={`${quote.total}`}
+                      keyboardType="numeric"
+                      inputMode="decimal"
+                    />
+                  </View>
+                  <Title>€</Title>
+                  {form.proposed_price ? (
+                    <Button
+                      title="Quitar"
+                      variant="plain"
+                      onPress={() => update("proposed_price", "")}
+                      style={{ minHeight: 40, paddingVertical: 8 }}
+                    />
+                  ) : null}
+                </View>
+                {form.proposed_price && Number(form.proposed_price) < Math.ceil(quote.total * 0.6) ? (
+                  <Caption style={{ color: colors.destructive }}>
+                    Demasiado bajo: el mínimo para este servicio es {Math.ceil(quote.total * 0.6)} €.
+                  </Caption>
+                ) : null}
+              </Card>
+            )}
 
             <Card>
               <Caption>¿Cuándo lo necesitas?</Caption>

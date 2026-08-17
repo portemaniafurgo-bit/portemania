@@ -1,7 +1,10 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ONBOARDING_KEY } from "./onboarding";
 import { StatusBar } from "expo-status-bar";
 import { useFonts, Poppins_600SemiBold, Poppins_700Bold } from "@expo-google-fonts/poppins";
+import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StripeProvider } from "@stripe/stripe-react-native";
@@ -21,15 +24,29 @@ function RootNavigation() {
   const { session, role, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+  // null = aún leyendo el flag; true/false = decidido. Sin esperar a saberlo,
+  // el primer arranque parpadearía login → onboarding.
+  const [onboardingSeen, setOnboardingSeen] = useState(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(ONBOARDING_KEY)
+      .then(v => setOnboardingSeen(!!v))
+      .catch(() => setOnboardingSeen(true)); // ante la duda, no bloquear
+  }, [segments[0]]); // re-lee al navegar: al terminar el onboarding cambia
 
   usePushNotifications({ userId: session?.user?.id, role });
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || onboardingSeen === null) return;
 
     const group = segments[0];
 
     if (!session) {
+      // Primer arranque: la introducción, una sola vez (canvas 2b).
+      if (!onboardingSeen) {
+        if (group !== "onboarding") router.replace("/onboarding");
+        return;
+      }
       if (group !== "(auth)") router.replace("/(auth)/login");
       return;
     }
@@ -65,7 +82,13 @@ export default function RootLayout() {
   // La tipografía de la marca (la landing titula con Poppins). Si tarda o
   // falla, la app arranca igual con la del sistema: una fuente nunca puede
   // dejar la pantalla en blanco.
-  const [fontsLoaded] = useFonts({ Poppins_600SemiBold, Poppins_700Bold });
+  const [fontsLoaded] = useFonts({
+    Poppins_600SemiBold,
+    Poppins_700Bold,
+    DMSans_400Regular,
+    DMSans_500Medium,
+    DMSans_700Bold,
+  });
   if (!fontsLoaded) return <Loading label="Abriendo ClicyVoy…" />;
 
   return (

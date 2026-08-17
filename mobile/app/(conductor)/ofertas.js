@@ -11,7 +11,8 @@ import { distanceKm } from "../../lib/eta";
 import { stopTracking } from "../../lib/tracking";
 import TrackingMap from "../../components/TrackingMap";
 import EmptyState from "../../components/EmptyState";
-import { Body, Button, Caption, Card, ErrorText, Heading, Loading, Title } from "../../components/ui";
+import { Body, Button, Caption, Card, ErrorText, Field, Heading, Loading, Title } from "../../components/ui";
+import { Counter } from "../../components/wizard";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -40,6 +41,74 @@ export default function Ofertas() {
   // antes de aceptarlo) y mi posición para calcular "a X km de ti".
   const [expandedId, setExpandedId] = useState(null);
   const [myPos, setMyPos] = useState(null);
+  // Negociación (canvas 1i/1j): mis contraofertas vivas y la hoja de contraofertar.
+  const [myOffers, setMyOffers] = useState([]);
+  const [counterFor, setCounterFor] = useState(null);
+  const [counterAmount, setCounterAmount] = useState(0);
+  const [counterMessage, setCounterMessage] = useState("");
+  const [negotiating, setNegotiating] = useState(false);
+
+  const loadMyOffers = useCallback(async () => {
+    if (!user?.id) return;
+    const { data } = await supabase
+      .from("price_offers")
+      .select("id, request_id, amount, status")
+      .eq("driver_id", user.id)
+      .eq("status", "pending");
+    setMyOffers(data || []);
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadMyOffers();
+  }, [loadMyOffers]);
+
+  const myOfferFor = requestId => myOffers.find(o => o.request_id === requestId);
+
+  /** El conductor acepta el precio que propuso el cliente (RPC: fija el
+   *  final_price pactado, cosa que el update directo no puede). */
+  const acceptAtClientPrice = async order => {
+    setNegotiating(true);
+    setError("");
+    try {
+      const { data, error: err } = await supabase.rpc("accept_at_client_price", {
+        p_request_id: order.id,
+      });
+      if (err) throw err;
+      supabase.functions
+        .invoke("send-push", { body: { mode: "driver_assigned", order_id: data.id } })
+        .catch(() => {});
+      router.push(`/(conductor)/job/${data.id}`);
+    } catch (err) {
+      setError(err.message || "No se pudo aceptar.");
+      await load();
+    } finally {
+      setNegotiating(false);
+    }
+  };
+
+  const sendCounterOffer = async order => {
+    setNegotiating(true);
+    setError("");
+    try {
+      const { data, error: err } = await supabase.rpc("make_price_offer", {
+        p_request_id: order.id,
+        p_amount: counterAmount,
+        p_message: counterMessage || null,
+      });
+      if (err) throw err;
+      setCounterFor(null);
+      setCounterMessage("");
+      await loadMyOffers();
+      // Push al cliente; sin Firebase aún cae en silencio.
+      supabase.functions
+        .invoke("send-push", { body: { mode: "price_offer", order_id: order.id, offer_id: data.id } })
+        .catch(() => {});
+    } catch (err) {
+      setError(err.message || "No se pudo enviar la contraoferta.");
+    } finally {
+      setNegotiating(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -79,7 +148,7 @@ export default function Ofertas() {
 
     let query = supabase
       .from("transport_requests")
-      .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, estimated_price, needs_help, created_date")
+      .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, estimated_price, proposed_price, needs_help, created_date")
       .eq("status", "pending")
       .order("created_date", { ascending: false })
       .limit(50);
@@ -107,7 +176,10 @@ export default function Ofertas() {
         { event: "*", schema: "public", table: "transport_requests" },
         () => {
           clearTimeout(timer);
-          timer = setTimeout(load, 400);
+          timer = setTimeout(() => {
+            load();
+            loadMyOffers(); // si el cliente aceptó/rechazó, mi estado cambia
+          }, 400);
         },
       )
       .subscribe();
@@ -290,7 +362,14 @@ export default function Ofertas() {
                       {service?.emoji} {service?.label || "Servicio"}
                     </Text>
                   </View>
-                  <Text style={styles.price}>{order.estimated_price} €</Text>
+                  {order.proposed_price != null ? (
+                    <View style={{ alignItems: "flex-end" }}>
+                      <Text style={styles.price}>{Number(order.proposed_price).toFixed(0)} €</Text>
+                      <Caption>ofrece el cliente · tarifa {order.estimated_price} €</Caption>
+                    </View>
+                  ) : (
+                    <Text style={styles.price}>{order.estimated_price} €</Text>
+                  )}
                 </View>
                 <Caption>Recogida: {order.origin_address || "—"}</Caption>
                 <Caption>Entrega: {order.destination_address || "—"}</Caption>
@@ -324,12 +403,86 @@ export default function Ofertas() {
                   <Caption>Este pedido no tiene coordenadas de recogida (dirección manual).</Caption>
                 ) : null}
 
-                <Button
-                  title="Aceptar servicio"
-                  loading={accepting === order.id}
-                  disabled={!!activeJob || incomplete || profile?.docs_expired || !profile?.is_available}
-                  onPress={() => accept(order)}
-                />
+                {order.proposed_price == null ? (
+                  /* Sin negociación: flujo clásico intacto */
+                  <Button
+                    title="Aceptar servicio"
+                    loading={accepting === order.id}
+                    disabled={!!activeJob || incomplete || profile?.docs_expired || !profile?.is_available}
+                    onPress={() => accept(order)}
+                  />
+                ) : myOfferFor(order.id) && counterFor !== order.id ? (
+                  <View style={styles.myOfferBox}>
+                    <Body style={{ fontFamily: "DMSans_700Bold" }}>
+                      Tu contraoferta: {Number(myOfferFor(order.id).amount).toFixed(2)} €
+                    </Body>
+                    <Caption>Esperando al cliente.</Caption>
+                    <Button
+                      title="Cambiar contraoferta"
+                      variant="plain"
+                      onPress={() => {
+                        setCounterFor(order.id);
+                        setCounterAmount(Math.round(myOfferFor(order.id).amount));
+                        setCounterMessage("");
+                      }}
+                    />
+                  </View>
+                ) : counterFor === order.id ? (
+                  /* Hoja de contraoferta (canvas 1j): importe con +/− y motivo */
+                  <View style={styles.counterBox}>
+                    <Counter
+                      label="Tu contraoferta"
+                      value={counterAmount}
+                      onChange={setCounterAmount}
+                      min={5}
+                      max={500}
+                    />
+                    <Text style={styles.counterBig}>{counterAmount} €</Text>
+                    <Field
+                      value={counterMessage}
+                      onChangeText={setCounterMessage}
+                      placeholder="Motivo (opcional): distancia, plantas…"
+                    />
+                    <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                      <Button
+                        title="Enviar contraoferta"
+                        loading={negotiating}
+                        disabled={counterAmount < 5}
+                        onPress={() => sendCounterOffer(order)}
+                        style={{ flex: 2 }}
+                      />
+                      <Button
+                        title="Cancelar"
+                        variant="plain"
+                        disabled={negotiating}
+                        onPress={() => setCounterFor(null)}
+                        style={{ flex: 1 }}
+                      />
+                    </View>
+                  </View>
+                ) : (
+                  /* Negociación: aceptar el precio del cliente o contraofertar */
+                  <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                    <Button
+                      title={`Aceptar por ${Number(order.proposed_price).toFixed(0)} €`}
+                      loading={negotiating}
+                      disabled={!!activeJob || incomplete || profile?.docs_expired || !profile?.is_available}
+                      onPress={() => acceptAtClientPrice(order)}
+                      style={{ flex: 2 }}
+                    />
+                    <Button
+                      title="Contraofertar"
+                      variant="plain"
+                      disabled={!!activeJob || incomplete || profile?.docs_expired || !profile?.is_available}
+                      onPress={() => {
+                        setCounterFor(order.id);
+                        setCounterAmount(Math.round(order.estimated_price || order.proposed_price || 40));
+                        setCounterMessage("");
+                      }}
+                      style={{ flex: 1 }}
+                    />
+                  </View>
+                )}
                 {activeJob ? (
                   <Caption>Termina el servicio en curso antes de aceptar otro.</Caption>
                 ) : null}
@@ -351,4 +504,7 @@ const styles = StyleSheet.create({
   tags: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   tag: { backgroundColor: colors.secondary, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },
   tagText: { fontSize: 12, color: colors.mutedForeground },
+  myOfferBox: { backgroundColor: colors.primarySoft, borderRadius: radius.md, padding: spacing.md, gap: 4 },
+  counterBox: { backgroundColor: colors.secondary, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
+  counterBig: { fontSize: 28, fontFamily: "Poppins_700Bold", color: colors.primary, textAlign: "center" },
 });

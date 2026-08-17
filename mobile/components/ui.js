@@ -130,7 +130,7 @@ const styles = StyleSheet.create({
   buttonPlain: { backgroundColor: "transparent", borderWidth: 1, borderColor: colors.border },
   buttonDisabled: { opacity: 0.5 },
   buttonPressed: { opacity: 0.85 },
-  buttonText: { color: colors.primaryForeground, fontSize: 16, fontWeight: "600" },
+  buttonText: { color: colors.primaryForeground, fontSize: 16, fontFamily: "DMSans_700Bold" },
   input: {
     backgroundColor: colors.card,
     borderWidth: 1,
@@ -139,8 +139,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: 12,
     fontSize: 16,
+    fontFamily: "DMSans_400Regular",
     color: colors.foreground,
   },
-  errorText: { color: colors.destructive, fontSize: 13 },
+  errorText: { color: colors.destructive, fontSize: 13, fontFamily: "DMSans_400Regular" },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.sm, padding: spacing.xl },
 });
