@@ -243,25 +243,57 @@ export default function OrderDetail() {
     }
   };
 
-  const cancelOrder = () => {
-    Alert.alert("Cancelar el pedido", "Se cancelará y dejaremos de buscar conductor.", [
-      { text: "Seguir esperando", style: "cancel" },
-      {
-        text: "Cancelar pedido",
-        style: "destructive",
-        onPress: async () => {
-          await supabase.from("transport_requests").update({ status: "cancelled" }).eq("id", id);
-          patchOrder({ status: "cancelled" });
-          // Si ya había conductor asignado, hay que decírselo: puede estar
-          // conduciendo hacia la recogida.
-          if (order.driver_id) {
-            supabase.functions
-              .invoke("send-push", { body: { mode: "client_cancelled", order_id: id } })
-              .catch(() => {});
-          }
+  /**
+   * Cancelar. El coste lo dice el SERVIDOR antes de preguntar: nadie debe
+   * enterarse de una penalización después de haberla aceptado.
+   */
+  const cancelOrder = async () => {
+    const { data: fee } = await supabase.rpc("cancellation_fee_now", { p_request_id: id });
+    const penalty = Number(fee) || 0;
+
+    Alert.alert(
+      "Cancelar el pedido",
+      penalty > 0
+        ? `${driverFirst} ya ha salido hacia la recogida, así que cancelar ahora tiene una penalización de ${euro(penalty)}.\n\n¿Seguro que quieres cancelar?`
+        : order.driver_id
+          ? "Todavía estás a tiempo: cancelar ahora no tiene ningún coste."
+          : "Se cancelará y dejaremos de buscar conductor. No tiene ningún coste.",
+      [
+        { text: "No, seguir", style: "cancel" },
+        {
+          text: penalty > 0 ? `Cancelar y pagar ${euro(penalty)}` : "Cancelar pedido",
+          style: "destructive",
+          onPress: () => reallyCancel(penalty),
         },
-      },
-    ]);
+      ],
+    );
+  };
+
+  const reallyCancel = async penalty => {
+    setActionError("");
+    try {
+      const { data, error } = await supabase.rpc("cancel_order_as_client", {
+        p_request_id: id,
+        p_reason: null,
+      });
+      if (error) throw error;
+      patchOrder(data);
+      // Si ya había conductor asignado, hay que decírselo: puede estar
+      // conduciendo hacia la recogida.
+      if (order.driver_id) {
+        supabase.functions
+          .invoke("send-push", { body: { mode: "client_cancelled", order_id: id } })
+          .catch(() => {});
+      }
+      if (penalty > 0) {
+        Alert.alert(
+          "Pedido cancelado",
+          `Queda anotada la penalización de ${euro(penalty)}. Te la cobraremos con tu próximo servicio o te escribiremos para resolverlo.`,
+        );
+      }
+    } catch (err) {
+      setActionError(err.message || "No se pudo cancelar el pedido.");
+    }
   };
 
   if (loading) return <Loading label="Cargando el pedido…" />;
@@ -702,10 +734,30 @@ export default function OrderDetail() {
           ) : null}
         </Card>
 
-        {/* Cancelar: mientras nadie lo ha aceptado (o aún no se ha publicado) */}
-        {["pending", "scheduled"].includes(order.status) && (
+        {/* Cancelar: hasta que la carga esté recogida. Con conductor ya en
+            marcha cuesta, y el aviso lo dice antes de aceptar. */}
+        {["pending", "scheduled", "accepted", "in_transit"].includes(order.status) && (
           <Button title="Cancelar el pedido" variant="plain" onPress={cancelOrder} />
         )}
+
+        {/* Ya recogida: se resuelve hablando, como en cualquier plataforma. */}
+        {order.status === "picked_up" && (
+          <Caption style={{ textAlign: "center" }}>
+            Con la carga ya recogida el pedido no se cancela desde la app. Escríbele al conductor o
+            avísanos desde Ayuda.
+          </Caption>
+        )}
+
+        {order.cancellation_fee ? (
+          <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
+            <Body style={{ fontFamily: "DMSans_700Bold" }}>
+              Penalización por cancelar: {euro(Number(order.cancellation_fee))}
+            </Body>
+            <Caption>
+              El conductor ya había salido hacia la recogida. Se aplicará en tu próximo servicio.
+            </Caption>
+          </Card>
+        ) : null}
 
         <ReportIncident orderId={order.id} user={user} />
       </ScrollView>
