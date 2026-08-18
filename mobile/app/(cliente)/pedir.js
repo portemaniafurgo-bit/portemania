@@ -10,6 +10,7 @@ import { pickPhotos, takePhoto } from "../../lib/photos";
 import { Body, Button, Caption, Card, ErrorText, Field, Heading, Title } from "../../components/ui";
 import { Counter, Option, PriceSummary, Steps, Toggle } from "../../components/wizard";
 import AddressField from "../../components/AddressField";
+import AddressMapHero from "../../components/AddressMapHero";
 import ServiceIcon from "../../components/ServiceIcon";
 import { colors, radius, spacing } from "../../theme";
 
@@ -179,11 +180,24 @@ export default function Pedir() {
           </>
         )}
 
-        {/* ---------- Paso 1: contacto y direcciones ---------- */}
+        {/* ---------- Paso 1: direcciones SOBRE el mapa (canvas 1c) ---------- */}
         {step === 1 && (
           <>
-            <Heading>¿Dónde recogemos y dónde llevamos?</Heading>
-            <Card>
+            {/* Mapa a sangre completa; la hoja con los campos monta encima
+                con las esquinas redondeadas, como en el canvas. */}
+            <View style={styles.mapHero}>
+              <AddressMapHero
+                origin={form.origin_lat ? { lat: form.origin_lat, lng: form.origin_lng } : null}
+                destination={
+                  form.destination_lat
+                    ? { lat: form.destination_lat, lng: form.destination_lng }
+                    : null
+                }
+              />
+            </View>
+            <Card style={styles.sheet}>
+              <View style={styles.sheetHandle} />
+              <Heading>¿Dónde recogemos y dónde llevamos?</Heading>
               <Field
                 label="Teléfono de contacto"
                 value={form.client_phone}
@@ -613,4 +627,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   photoRemoveText: { color: "#fff", fontSize: 16, lineHeight: 18, fontFamily: "DMSans_700Bold" },
+  // El mapa sangra hasta los bordes de la pantalla (compensa el padding del
+  // ScrollView) y la hoja monta encima con esquinas redondeadas, como el canvas.
+  mapHero: { marginHorizontal: -spacing.lg, marginTop: -spacing.sm },
+  sheet: {
+    marginTop: -28,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginHorizontal: -4,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.border,
+    marginBottom: 2,
+  },
 });

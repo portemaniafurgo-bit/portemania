@@ -128,11 +128,11 @@ const styles = StyleSheet.create({
   button: {
     // rounded-full: la forma de botón de la landing.
     borderRadius: radius.full,
-    paddingVertical: 14,
+    paddingVertical: 12,
     paddingHorizontal: spacing.lg,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 48, // objetivo táctil cómodo: se usa conduciendo o cargando
+    minHeight: 46, // objetivo táctil cómodo: se usa conduciendo o cargando
   },
   buttonPrimary: { backgroundColor: colors.primary },
   buttonPrimaryPressed: { backgroundColor: colors.primaryPressed },
@@ -140,18 +140,18 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.5 },
   buttonPressed: { opacity: 0.85 },
   buttonInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm },
-  buttonText: { color: colors.primaryForeground, fontSize: 16, fontFamily: "DMSans_700Bold" },
+  buttonText: { color: colors.primaryForeground, fontSize: 14.5, fontFamily: "DMSans_700Bold" },
   input: {
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingVertical: 11,
+    fontSize: 14.5,
     fontFamily: "DMSans_400Regular",
     color: colors.foreground,
   },
-  errorText: { color: colors.destructive, fontSize: 13, fontFamily: "DMSans_400Regular" },
+  errorText: { color: colors.destructive, fontSize: 12, fontFamily: "DMSans_400Regular" },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.sm, padding: spacing.xl },
 });

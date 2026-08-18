@@ -66,16 +66,16 @@ await render(markOnly("#FFFFFF").replaceAll("#F5B400", "#FFFFFF"), {
   .png()
   .toFile(`${OUT}/android-icon-monochrome.png`);
 
-// Splash APILADO: isotipo grande arriba y wordmark centrado debajo (petición
-// del cliente 2026-08-11 — el logo horizontal quedaba pequeño y cortado en la
-// pantalla de arranque).
-const stackedLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 430">
-  <g transform="translate(180 5)">${MARK()}</g>
+// Splash APILADO en tono CLARO, para fondo MORADO #7145d6 (canvas 2a: «logo
+// apilado sobre morado, 900 ms»): el arco del pin en blanco, el resto amarillo,
+// y el wordmark Clicy blanco / Voy amarillo.
+const stackedLogoLight = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 430">
+  <g transform="translate(180 5)">${MARK("#FFFFFF")}</g>
   <text x="280" y="382" text-anchor="middle" font-family="'Poppins','Montserrat','Arial',sans-serif" font-weight="700" font-size="92">
-    <tspan fill="#111111">Clicy</tspan><tspan fill="#F5B400">Voy</tspan>
+    <tspan fill="#FFFFFF">Clicy</tspan><tspan fill="#F5B400">Voy</tspan>
   </text>
 </svg>`;
-await render(stackedLogo, { width: 840, height: 645, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+await render(stackedLogoLight, { width: 840, height: 645, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
   .png()
   .toFile(`${OUT}/splash-icon.png`);
 

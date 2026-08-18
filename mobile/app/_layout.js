@@ -5,6 +5,11 @@ import { ONBOARDING_KEY } from "./onboarding";
 import { StatusBar } from "expo-status-bar";
 import { useFonts, Poppins_600SemiBold, Poppins_700Bold } from "@expo-google-fonts/poppins";
 import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from "@expo-google-fonts/dm-sans";
+import * as SplashScreen from "expo-splash-screen";
+
+// El splash morado se queda ~900 ms (canvas 2a): sin esto se ocultaba en
+// cuanto React pintaba el primer frame y parecía que no había splash.
+SplashScreen.preventAutoHideAsync().catch(() => {});
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StripeProvider } from "@stripe/stripe-react-native";
@@ -89,7 +94,17 @@ export default function RootLayout() {
     DMSans_500Medium,
     DMSans_700Bold,
   });
-  if (!fontsLoaded) return <Loading label="Abriendo ClicyVoy…" />;
+
+  useEffect(() => {
+    if (!fontsLoaded) return;
+    // 900 ms totales de marca en pantalla y transición al contenido.
+    const timer = setTimeout(() => SplashScreen.hideAsync().catch(() => {}), 550);
+    return () => clearTimeout(timer);
+  }, [fontsLoaded]);
+
+  // Mientras el splash nativo está visible no se pinta nada debajo: devolver
+  // null evita el doble fondo blanco que delataba el cambio.
+  if (!fontsLoaded) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

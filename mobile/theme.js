@@ -45,10 +45,11 @@ export const radius = {
 export const spacing = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 };
 
 export const typography = {
-  // Del canvas de rediseño: Poppins para titular, DM Sans para el cuerpo.
-  // Ambas se cargan en app/_layout.js con fallback a la del sistema.
-  heading: { fontSize: 20, fontFamily: "Poppins_700Bold", color: colors.foreground },
-  title: { fontSize: 16, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
-  body: { fontSize: 15, fontFamily: "DMSans_400Regular", color: colors.foreground },
-  caption: { fontSize: 13, fontFamily: "DMSans_400Regular", color: colors.mutedForeground },
+  // ESCALA DEL CANVAS (medida sobre los artboards, no inventada): títulos de
+  // pantalla Poppins 600 17-19, títulos de sección 15-16, cuerpo DM Sans
+  // 12.5-14.5, metadatos 10.5-12. Más denso que la escala anterior.
+  heading: { fontSize: 18, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
+  title: { fontSize: 15, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
+  body: { fontSize: 13.5, fontFamily: "DMSans_400Regular", color: colors.foreground, lineHeight: 19 },
+  caption: { fontSize: 11.5, fontFamily: "DMSans_400Regular", color: colors.mutedForeground, lineHeight: 16 },
 };
