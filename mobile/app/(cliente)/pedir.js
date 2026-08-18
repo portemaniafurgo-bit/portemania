@@ -1,20 +1,24 @@
 import { useState } from "react";
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
+import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { useAuth } from "../../lib/auth";
 import { parseScheduledAt, useRequestForm } from "../../lib/useRequestForm";
 import { SERVICE_KEYS, SERVICES } from "../../lib/services";
 import { servicePriceFrom } from "../../lib/tariffs";
 import { pickPhotos, takePhoto } from "../../lib/photos";
 import { euro } from "../../lib/money";
-import { Body, Button, Caption, Card, ErrorText, Field, Heading, Title } from "../../components/ui";
-import { Counter, Option, Steps, Toggle } from "../../components/wizard";
+import { Body, Button, Caption, ErrorText, Field, Heading, Overline, Title } from "../../components/ui";
+import { Counter, Option, Toggle } from "../../components/wizard";
+import WizardChrome from "../../components/WizardChrome";
+import OfferControl from "../../components/OfferControl";
 import AddressField from "../../components/AddressField";
 import AddressMapHero from "../../components/AddressMapHero";
-import PriceSlider from "../../components/PriceSlider";
 import ServiceIcon from "../../components/ServiceIcon";
 import { colors, radius, spacing } from "../../theme";
 
@@ -22,9 +26,8 @@ import { colors, radius, spacing } from "../../theme";
  * Asistente de pedido, con los CINCO pasos del canvas (1b–1f):
  *   1 servicio · 2 direcciones · 3 la carga · 4 tu precio · 5 revisa y publica
  *
- * El precio tiene paso propio a propósito (canvas 1e): el calculado manda y
- * ofertar es opcional, pero es una decisión que merece pantalla, no una tarjeta
- * perdida al final del resumen.
+ * Cada paso usa el armazón del diseño: cabecera blanca fija con las barras y
+ * el título, cuerpo gris que rueda y un solo botón de 54 abajo del todo.
  *
  * Las validaciones y el cálculo viven en `lib/useRequestForm.js`, compartidos
  * con la web. Esta pantalla solo presenta. El precio que se ve es informativo:
@@ -33,6 +36,14 @@ import { colors, radius, spacing } from "../../theme";
 const TOTAL_STEPS = 5;
 const MAX_DESCRIPTION = 300;
 const MAX_PHOTOS = 6;
+
+/** «Publicar mi porte», «mi mudanza», «mi compra», «mi envío» (canvas 1f). */
+const PUBLISH_NOUN = {
+  porte: "mi porte",
+  mini_mudanza: "mi mudanza",
+  porte_tienda: "mi compra",
+  paquete: "mi envío",
+};
 
 export default function Pedir() {
   const router = useRouter();
@@ -67,7 +78,7 @@ export default function Pedir() {
   const [error, setError] = useState("");
   const [sending, setSending] = useState(false);
   const [locating, setLocating] = useState(false);
-  // El cliente eligió "Programarlo" (aunque aún no haya escrito el día): un
+  // El cliente eligió "Programar" (aunque aún no haya escrito el día): un
   // borrador recuperado con fecha también lo activa.
   const [wantSchedule, setWantSchedule] = useState(false);
   const scheduling = wantSchedule || !!form.scheduled_date;
@@ -130,12 +141,45 @@ export default function Pedir() {
     }
   };
 
+  /**
+   * Fecha y hora con los DIÁLOGOS NATIVOS de Android, encadenados: primero el
+   * calendario, después el reloj. Escribir "25/08" y "09:30" a mano en dos
+   * campos era pedirle al cliente que hiciera de teclado numérico.
+   */
+  const pickSchedule = () => {
+    const now = new Date();
+    const current = parseScheduledAt(form.scheduled_date, form.scheduled_time) || now;
+    DateTimePickerAndroid.open({
+      value: current,
+      mode: "date",
+      minimumDate: now,
+      onChange: (event, date) => {
+        if (event.type !== "set" || !date) return;
+        DateTimePickerAndroid.open({
+          value: current,
+          mode: "time",
+          is24Hour: true,
+          onChange: (timeEvent, time) => {
+            if (timeEvent.type !== "set" || !time) return;
+            const chosen = new Date(date);
+            chosen.setHours(time.getHours(), time.getMinutes(), 0, 0);
+            setWantSchedule(true);
+            update("scheduled_date", format(chosen, "dd/MM"));
+            update("scheduled_time", format(chosen, "HH:mm"));
+          },
+        });
+      },
+    });
+  };
+
+  const scheduledAt = parseScheduledAt(form.scheduled_date, form.scheduled_time);
+
   const create = async () => {
     setError("");
     // Programado a medias: mejor frenar aquí que crear un pedido "para ahora"
     // cuando el cliente creía haberlo dejado para el sábado.
-    if (scheduling && !parseScheduledAt(form.scheduled_date, form.scheduled_time)) {
-      setError("Revisa el día y la hora del pedido programado (ej.: 25/08 y 09:30, en el futuro).");
+    if (scheduling && !scheduledAt) {
+      setError("Elige el día y la hora del pedido programado.");
       return;
     }
     // El servidor valida el suelo igualmente; frenar aquí da un mensaje mejor.
@@ -178,600 +222,647 @@ export default function Pedir() {
     }
   };
 
-  const addFromCamera = async () => {
+  const addPhoto = () =>
+    Alert.alert("Añadir foto", "¿De dónde sale la imagen?", [
+      { text: "Cámara", onPress: async () => addSafely(takePhoto) },
+      { text: "Galería", onPress: async () => addSafely(pickPhotos) },
+      { text: "Cancelar", style: "cancel" },
+    ]);
+
+  const addSafely = async picker => {
     try {
-      await addPhotos(await takePhoto());
+      await addPhotos(await picker());
     } catch (err) {
       setError("No se pudo subir la foto: " + (err.message || "error de conexión"));
     }
   };
 
-  const addFromGallery = async () => {
-    try {
-      await addPhotos(await pickPhotos());
-    } catch (err) {
-      setError("No se pudo subir la foto: " + (err.message || "error de conexión"));
-    }
-  };
+  const discard = () =>
+    Alert.alert("Empezar de cero", "Se borrará lo que has escrito en este pedido.", [
+      { text: "Seguir aquí", style: "cancel" },
+      {
+        text: "Empezar de cero",
+        style: "destructive",
+        onPress: async () => {
+          await clearDraft();
+          setStep(0);
+        },
+      },
+    ]);
 
-  const CTA = ["Continuar con " + service.label, "Siguiente", "Siguiente", "Ver resumen"];
+  const STEPS = [
+    { title: "¿Qué necesitas\nmover hoy?", cta: `Continuar con ${service.label}`, ctaIcon: "arrow-forward" },
+    { title: "Recogida y entrega", cta: "Siguiente" },
+    {
+      title: "¿Qué movemos?",
+      subtitle: "Con fotos el conductor sabe si le cabe, y tú evitas sorpresas.",
+      cta: "Siguiente",
+    },
+    {
+      title: "Tu precio",
+      subtitle: "Puedes pedirlo al precio cerrado o proponer el tuyo y esperar respuestas.",
+      cta: "Ver resumen",
+    },
+    { title: "Revisa y publica", cta: `Publicar ${PUBLISH_NOUN[service.key] || "mi pedido"}` },
+  ];
+  const current = STEPS[step];
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right"]}>
-      <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={{ gap: spacing.sm }}>
-          <Caption>Paso {step + 1} de {TOTAL_STEPS}</Caption>
-          <Steps current={step} total={TOTAL_STEPS} />
+  // El paso 2 lleva el mapa a sangre y la hoja encima (canvas 1c), así que no
+  // usa el armazón de cabecera blanca.
+  if (step === 1) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.card }} edges={["top", "left", "right"]}>
+        <View style={styles.mapFull}>
+          <AddressMapHero
+            origin={form.origin_lat ? { lat: form.origin_lat, lng: form.origin_lng } : null}
+            destination={
+              form.destination_lat ? { lat: form.destination_lat, lng: form.destination_lng } : null
+            }
+          />
+          <View style={styles.mapTopBar}>
+            <Pressable onPress={back} style={styles.floatingCircle}>
+              <Ionicons name="chevron-back" size={20} color={colors.foreground} />
+            </Pressable>
+            <Pressable onPress={useMyLocation} style={styles.floatingPill} disabled={locating}>
+              <Ionicons name="locate" size={15} color={colors.primary} />
+              <Text style={styles.floatingPillText}>
+                {locating ? "Buscando…" : "Mi ubicación"}
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
-        {/* ---------- Paso 1: servicio (canvas 1b) ---------- */}
-        {step === 0 && (
-          <>
-            <Heading>¿Qué necesitas mover hoy?</Heading>
-            {SERVICE_KEYS.map(key => {
-              const item = SERVICES[key];
-              const price = servicePriceFrom(tariffs, key);
-              const selected = form.service === key;
-              return (
-                <Pressable key={key} onPress={() => setService(key)}>
-                  <Card style={selected ? { borderColor: colors.primary, backgroundColor: colors.primarySoft } : null}>
-                    <View style={styles.row}>
-                      <ServiceIcon serviceKey={key} size={48} />
-                      <View style={{ flex: 1, gap: 2 }}>
-                        <Title>{item.label}</Title>
-                        <Caption>{item.tagline}</Caption>
-                      </View>
-                      <View style={{ alignItems: "flex-end" }}>
-                        <Text style={styles.price}>{euro(price)}</Text>
-                        <Caption>desde</Caption>
-                      </View>
-                    </View>
-                  </Card>
-                </Pressable>
-              );
-            })}
-            <Caption>
-              Precios actualizados hoy. En el paso 4 podrás proponer tu propio precio.
-            </Caption>
-          </>
-        )}
+        <View style={styles.addressSheet}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.bars}>
+            {Array.from({ length: TOTAL_STEPS }, (_, i) => (
+              <View
+                key={i}
+                style={[styles.bar, { backgroundColor: i <= step ? colors.primary : colors.hairline }]}
+              />
+            ))}
+          </View>
+          <Heading>Recogida y entrega</Heading>
 
-        {/* ---------- Paso 2: direcciones SOBRE el mapa (canvas 1c) ---------- */}
-        {step === 1 && (
-          <>
-            {/* Mapa a sangre completa; la hoja con los campos monta encima
-                con las esquinas redondeadas, como en el canvas. */}
-            <View style={styles.mapHero}>
-              <AddressMapHero
-                origin={form.origin_lat ? { lat: form.origin_lat, lng: form.origin_lng } : null}
-                destination={
-                  form.destination_lat
-                    ? { lat: form.destination_lat, lng: form.destination_lng }
-                    : null
-                }
+          <Field
+            label="Teléfono de contacto"
+            value={form.client_phone}
+            onChangeText={v => update("client_phone", v)}
+            placeholder="600 000 000"
+            keyboardType="phone-pad"
+            inputMode="tel"
+          />
+          <AddressField
+            label="Recogida"
+            value={form.origin_address}
+            zone="albacete"
+            error={form.origin_address ? addressErrors.origin : ""}
+            onChange={(text, picked) => {
+              update("origin_address", text);
+              // Coordenadas del geocodificador: evitan una segunda búsqueda al
+              // enviar y son más fiables que re-geocodificar el texto.
+              update("origin_lat", picked?.lat ?? null);
+              update("origin_lng", picked?.lng ?? null);
+            }}
+          />
+
+          {service.hasZones && (
+            <View style={{ gap: spacing.sm }}>
+              <Overline>ZONA DE ENTREGA</Overline>
+              <Option
+                label="Albacete capital"
+                description="Entrega el mismo día"
+                selected={destinationZoneKey === "albacete"}
+                onPress={() => setZone("albacete")}
+              />
+              <Option
+                label="Villarrobledo"
+                description="Hasta 10 kg · entrega en 24 h"
+                selected={destinationZoneKey === "villarrobledo"}
+                onPress={() => setZone("villarrobledo")}
               />
             </View>
-            <Card style={styles.sheet}>
-              <View style={styles.sheetHandle} />
-              <View style={styles.rowBetween}>
-                <Heading>Recogida y entrega</Heading>
-                <Pressable onPress={useMyLocation} disabled={locating} style={styles.myLocation}>
-                  <Ionicons name="locate-outline" size={15} color={colors.primary} />
-                  <Text style={styles.myLocationText}>
-                    {locating ? "Buscando…" : "Mi ubicación"}
-                  </Text>
-                </Pressable>
-              </View>
-              <Field
-                label="Teléfono de contacto"
-                value={form.client_phone}
-                onChangeText={v => update("client_phone", v)}
-                placeholder="600 000 000"
-                keyboardType="phone-pad"
-                inputMode="tel"
-              />
-              <AddressField
-                label="Recogida"
-                value={form.origin_address}
-                zone="albacete"
-                error={form.origin_address ? addressErrors.origin : ""}
-                onChange={(text, picked) => {
-                  update("origin_address", text);
-                  // Coordenadas del geocodificador: evitan una segunda búsqueda
-                  // al enviar y son más fiables que re-geocodificar el texto.
-                  update("origin_lat", picked?.lat ?? null);
-                  update("origin_lng", picked?.lng ?? null);
-                }}
-              />
+          )}
 
-              {service.hasZones && (
-                <View style={{ gap: spacing.sm }}>
-                  <Caption>Zona de entrega</Caption>
-                  <Option
-                    label="Albacete capital"
-                    description="Entrega el mismo día"
-                    selected={destinationZoneKey === "albacete"}
-                    onPress={() => setZone("albacete")}
-                  />
-                  <Option
-                    label="Villarrobledo"
-                    description="Hasta 10 kg · entrega en 24 h"
-                    selected={destinationZoneKey === "villarrobledo"}
-                    onPress={() => setZone("villarrobledo")}
-                  />
+          <AddressField
+            label="Entrega"
+            value={form.destination_address}
+            zone={destinationZoneKey}
+            error={form.destination_address ? addressErrors.destination : ""}
+            onChange={(text, picked) => {
+              update("destination_address", text);
+              update("destination_lat", picked?.lat ?? null);
+              update("destination_lng", picked?.lng ?? null);
+            }}
+          />
+
+          <ErrorText>{error}</ErrorText>
+          <Button title="Siguiente" onPress={next} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <WizardChrome
+      step={step}
+      total={TOTAL_STEPS}
+      title={current.title}
+      subtitle={current.subtitle}
+      showStepLabel={step === 0}
+      onBack={step > 0 ? back : null}
+      cta={current.cta}
+      ctaIcon={current.ctaIcon}
+      ctaLoading={sending}
+      onCta={step === TOTAL_STEPS - 1 ? create : next}
+      footerExtra={<ErrorText>{error}</ErrorText>}
+    >
+      {/* ---------- Paso 1: servicio (canvas 1b) ---------- */}
+      {step === 0 && (
+        <>
+          {SERVICE_KEYS.map(key => {
+            const item = SERVICES[key];
+            const price = servicePriceFrom(tariffs, key);
+            const selected = form.service === key;
+            return (
+              <Pressable
+                key={key}
+                onPress={() => setService(key)}
+                style={[styles.serviceCard, selected && styles.serviceCardOn]}
+              >
+                <ServiceIcon serviceKey={key} size={48} iconSize={24} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.serviceName}>{item.label}</Text>
+                  <Text style={styles.serviceTagline}>{item.tagline}</Text>
                 </View>
-              )}
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text style={styles.servicePrice}>{euro(price)}</Text>
+                  <Text style={styles.serviceFrom}>desde</Text>
+                </View>
+              </Pressable>
+            );
+          })}
 
-              <AddressField
-                label="Entrega"
-                value={form.destination_address}
-                zone={destinationZoneKey}
-                error={form.destination_address ? addressErrors.destination : ""}
-                onChange={(text, picked) => {
-                  update("destination_address", text);
-                  update("destination_lat", picked?.lat ?? null);
-                  update("destination_lng", picked?.lng ?? null);
-                }}
-              />
-            </Card>
-          </>
-        )}
+          <View style={styles.note}>
+            <Ionicons name="flash-outline" size={16} color={colors.primary} />
+            <Text style={styles.noteText}>
+              Precios actualizados hoy. En el paso 4 podrás{" "}
+              <Text style={styles.noteStrong}>proponer tu propio precio</Text>.
+            </Text>
+          </View>
+        </>
+      )}
 
-        {/* ---------- Paso 3: la carga (canvas 1d) ---------- */}
-        {step === 2 && (
-          <>
-            <View style={{ gap: spacing.xs }}>
-              <Heading>¿Qué movemos?</Heading>
-              <Caption>Con fotos el conductor sabe si le cabe, y tú evitas sorpresas.</Caption>
+      {/* ---------- Paso 3: la carga (canvas 1d) ---------- */}
+      {step === 2 && (
+        <>
+          <View style={styles.plainCard}>
+            <View style={styles.rowBetween}>
+              <Overline>DESCRIPCIÓN</Overline>
+              <Text style={styles.counterText}>
+                {(form.cargo_description || "").length} / {MAX_DESCRIPTION}
+              </Text>
             </View>
+            <Field
+              value={form.cargo_description}
+              onChangeText={v => update("cargo_description", v.slice(0, MAX_DESCRIPTION))}
+              placeholder="Ej.: un sofá de 2 plazas y dos cajas medianas"
+              multiline
+              numberOfLines={3}
+              style={{ minHeight: 90, textAlignVertical: "top" }}
+            />
+          </View>
 
-            <Card>
-              <View style={styles.rowBetween}>
-                <Text style={styles.overline}>Descripción</Text>
-                <Caption>
-                  {(form.cargo_description || "").length} / {MAX_DESCRIPTION}
-                </Caption>
-              </View>
-              <Field
-                value={form.cargo_description}
-                onChangeText={v => update("cargo_description", v.slice(0, MAX_DESCRIPTION))}
-                placeholder="Ej.: un sofá de 2 plazas y dos cajas medianas"
-                multiline
-                numberOfLines={3}
-                style={{ minHeight: 90, textAlignVertical: "top" }}
-              />
-
-              <View style={styles.rowBetween}>
-                <Text style={styles.overline}>Fotos de la carga</Text>
-                <Caption>
-                  {photos.length} de {MAX_PHOTOS}
-                  {service.needsPhotos && photos.length === 0 ? " · al menos 1" : ""}
-                </Caption>
-              </View>
-              <View style={styles.photos}>
-                {photos.map((url, i) => (
-                  <Pressable key={url} onPress={() => removePhoto(i)}>
-                    <Image source={{ uri: url }} style={styles.photo} />
-                    <View style={styles.photoRemove}>
-                      <Ionicons name="close" size={13} color="#FFFFFF" />
-                    </View>
-                  </Pressable>
-                ))}
-                {photos.length < MAX_PHOTOS ? (
-                  <Pressable
-                    onPress={() =>
-                      Alert.alert("Añadir foto", "¿De dónde sale la imagen?", [
-                        { text: "Cámara", onPress: addFromCamera },
-                        { text: "Galería", onPress: addFromGallery },
-                        { text: "Cancelar", style: "cancel" },
-                      ])
-                    }
-                    style={styles.photoAdd}
-                    disabled={uploading}
-                  >
-                    <Ionicons
-                      name={uploading ? "hourglass-outline" : "add"}
-                      size={22}
-                      color={colors.primary}
-                    />
-                    <Caption>{uploading ? "Subiendo" : "Añadir"}</Caption>
-                  </Pressable>
-                ) : null}
-              </View>
-              <Caption>Toca una foto para quitarla. Se comprimen antes de subirlas.</Caption>
-            </Card>
-
-            {service.hasHelp && (
-              <Card>
-                <Toggle
-                  label="Ayuda del conductor"
-                  description={`Sube y baja contigo · +${tariffs.mudanza_help} €`}
-                  value={form.needs_help}
-                  onValueChange={v => update("needs_help", v)}
-                />
-                {form.needs_help ? (
-                  <>
-                    <Field
-                      label="¿Con qué necesitas ayuda?"
-                      value={form.help_description}
-                      onChangeText={v => update("help_description", v)}
-                      placeholder="Ej.: bajar un armario desde un tercero sin ascensor"
-                    />
-                    {service.hasAccess && (
-                      <>
-                        <Text style={styles.overline}>Planta recogida</Text>
-                        <Toggle
-                          label="Hay ascensor"
-                          value={form.origin_has_lift === true}
-                          onValueChange={v => update("origin_has_lift", v)}
-                        />
-                        {form.origin_has_lift === false && (
-                          <Counter
-                            label="Planta"
-                            value={form.origin_floors}
-                            onChange={v => update("origin_floors", v)}
-                            min={0}
-                            max={12}
-                          />
-                        )}
-                        <Text style={styles.overline}>Planta entrega</Text>
-                        <Toggle
-                          label="Hay ascensor"
-                          value={form.destination_has_lift === true}
-                          onValueChange={v => update("destination_has_lift", v)}
-                        />
-                        {form.destination_has_lift === false && (
-                          <Counter
-                            label="Planta"
-                            value={form.destination_floors}
-                            onChange={v => update("destination_floors", v)}
-                            min={0}
-                            max={12}
-                          />
-                        )}
-                      </>
-                    )}
-                  </>
-                ) : null}
-              </Card>
-            )}
-
-            {(!service.hasHelp || !form.needs_help) &&
-              service.key !== "paquete" &&
-              service.key !== "porte_tienda" && (
-                <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
-                  <Toggle
-                    label="La carga está a pie de calle"
-                    description="Sin ayuda contratada, el conductor no sube a domicilio: la mercancía tiene que estar preparada abajo."
-                    value={acceptPortal}
-                    onValueChange={setAcceptPortal}
-                  />
-                </Card>
-              )}
-
-            {/* Detalles propios de cada servicio: peso, objetos, horas, seguro
-                y destinatario. Describen la carga, así que viven con ella. */}
-            {(service.hasWeights ||
-              service.hasItemsLimit ||
-              service.hasExtraHours ||
-              service.hasInsurance ||
-              service.needsRecipient) && (
-              <Card>
-                {service.hasWeights && (
-                  <View style={{ gap: spacing.sm }}>
-                    <Text style={styles.overline}>Peso del paquete</Text>
-                    {weightOptions.map(w => (
-                      <Option
-                        key={w.key}
-                        label={w.label}
-                        description={euro(tariffs[w.priceKey], 2)}
-                        selected={form.package_weight === w.key}
-                        onPress={() => update("package_weight", w.key)}
-                      />
-                    ))}
-                  </View>
-                )}
-
-                {service.hasItemsLimit && (
-                  <Counter
-                    label={`Objetos a transportar (máx. ${service.maxItems})`}
-                    value={form.items_count}
-                    onChange={v => update("items_count", v)}
-                    min={1}
-                    max={service.maxItems}
-                  />
-                )}
-
-                {service.hasExtraHours && (
-                  <Counter
-                    label={`Horas extra (+${tariffs.mudanza_extra_hour} €/h)`}
-                    value={form.extra_hours}
-                    onChange={v => update("extra_hours", v)}
-                    min={0}
-                    max={8}
-                  />
-                )}
-
-                {service.hasInsurance && (
-                  <Toggle
-                    label="Seguro de mercancía"
-                    description={`Cobertura adicional por ${euro(tariffs.insurance)}`}
-                    value={form.insurance_selected}
-                    onValueChange={v => update("insurance_selected", v)}
-                  />
-                )}
-
-                {service.needsRecipient && (
-                  <>
-                    <Field
-                      label="¿Quién recibe el envío?"
-                      value={form.recipient_name}
-                      onChangeText={v => update("recipient_name", v)}
-                      placeholder="Nombre y apellidos"
-                    />
-                    <Field
-                      label="Teléfono del destinatario"
-                      value={form.recipient_phone}
-                      onChangeText={v => update("recipient_phone", v)}
-                      placeholder="600 000 000"
-                      keyboardType="phone-pad"
-                      inputMode="tel"
-                    />
-                  </>
-                )}
-
-                <Field
-                  label="Notas para el conductor (opcional)"
-                  value={form.notes}
-                  onChangeText={v => update("notes", v)}
-                  placeholder="Ej.: el portal es el del fondo"
-                />
-              </Card>
-            )}
-
-            <Card>
-              <Toggle
-                label="Acepto los términos del servicio"
-                description="Y confirmo que la carga no incluye material peligroso."
-                value={acceptTerms}
-                onValueChange={setAcceptTerms}
-              />
-            </Card>
-          </>
-        )}
-
-        {/* ---------- Paso 4: tu precio (canvas 1e) ---------- */}
-        {step === 3 && (
-          <>
-            <View style={{ gap: spacing.xs }}>
-              <Heading>Tu precio</Heading>
+          <View style={styles.plainCard}>
+            <View style={styles.rowBetween}>
+              <Overline>FOTOS DE LA CARGA</Overline>
               <Caption>
-                Puedes pedirlo al precio cerrado o proponer el tuyo y esperar respuestas.
+                {photos.length} de {MAX_PHOTOS}
+                {service.needsPhotos && photos.length === 0 ? " · al menos 1" : ""}
               </Caption>
             </View>
+            <View style={styles.photos}>
+              {photos.map((url, i) => (
+                <Pressable key={url} onPress={() => removePhoto(i)}>
+                  <Image source={{ uri: url }} style={styles.photo} />
+                  <View style={styles.photoRemove}>
+                    <Ionicons name="close" size={13} color="#FFFFFF" />
+                  </View>
+                </Pressable>
+              ))}
+              {photos.length < MAX_PHOTOS ? (
+                <Pressable onPress={addPhoto} style={styles.photoAdd} disabled={uploading}>
+                  <Ionicons
+                    name={uploading ? "hourglass-outline" : "add"}
+                    size={22}
+                    color={colors.primary}
+                  />
+                  <Caption style={{ fontSize: 11 }}>{uploading ? "Subiendo" : "Añadir"}</Caption>
+                </Pressable>
+              ) : null}
+            </View>
+          </View>
 
-            {/* El precio calculado, con su desglose */}
-            <Card>
-              <View style={styles.rowBetween}>
-                <Text style={styles.overline}>Precio cerrado ClicyVoy</Text>
-                <Text style={styles.closedPrice}>{euro(quote.total, 2)}</Text>
+          {service.hasHelp && (
+            <View style={styles.plainCard}>
+              <Toggle
+                label="Ayuda del conductor"
+                description={`Sube y baja contigo · +${tariffs.mudanza_help} €`}
+                value={form.needs_help}
+                onValueChange={v => update("needs_help", v)}
+              />
+              {form.needs_help ? (
+                <>
+                  <Field
+                    label="¿Con qué necesitas ayuda?"
+                    value={form.help_description}
+                    onChangeText={v => update("help_description", v)}
+                    placeholder="Ej.: bajar un armario desde un tercero sin ascensor"
+                  />
+                  {service.hasAccess && (
+                    <>
+                      <Overline>PLANTA RECOGIDA</Overline>
+                      <Toggle
+                        label="Hay ascensor"
+                        value={form.origin_has_lift === true}
+                        onValueChange={v => update("origin_has_lift", v)}
+                      />
+                      {form.origin_has_lift === false && (
+                        <Counter
+                          label="Planta"
+                          value={form.origin_floors}
+                          onChange={v => update("origin_floors", v)}
+                          min={0}
+                          max={12}
+                        />
+                      )}
+                      <Overline>PLANTA ENTREGA</Overline>
+                      <Toggle
+                        label="Hay ascensor"
+                        value={form.destination_has_lift === true}
+                        onValueChange={v => update("destination_has_lift", v)}
+                      />
+                      {form.destination_has_lift === false && (
+                        <Counter
+                          label="Planta"
+                          value={form.destination_floors}
+                          onChange={v => update("destination_floors", v)}
+                          min={0}
+                          max={12}
+                        />
+                      )}
+                    </>
+                  )}
+                </>
+              ) : null}
+            </View>
+          )}
+
+          {(!service.hasHelp || !form.needs_help) &&
+            service.key !== "paquete" &&
+            service.key !== "porte_tienda" && (
+              <View style={[styles.plainCard, { backgroundColor: colors.warningBg }]}>
+                <Toggle
+                  label="La carga está a pie de calle"
+                  description="Sin ayuda contratada, el conductor no sube a domicilio: la mercancía tiene que estar preparada abajo."
+                  value={acceptPortal}
+                  onValueChange={setAcceptPortal}
+                />
               </View>
+            )}
+
+          {/* Detalles propios de cada servicio: peso, objetos, horas, seguro y
+              destinatario. Describen la carga, así que viven con ella. */}
+          {(service.hasWeights ||
+            service.hasItemsLimit ||
+            service.hasExtraHours ||
+            service.hasInsurance ||
+            service.needsRecipient) && (
+            <View style={styles.plainCard}>
+              {service.hasWeights && (
+                <View style={{ gap: spacing.sm }}>
+                  <Overline>PESO DEL PAQUETE</Overline>
+                  {weightOptions.map(w => (
+                    <Option
+                      key={w.key}
+                      label={w.label}
+                      description={euro(tariffs[w.priceKey], 2)}
+                      selected={form.package_weight === w.key}
+                      onPress={() => update("package_weight", w.key)}
+                    />
+                  ))}
+                </View>
+              )}
+
+              {service.hasItemsLimit && (
+                <Counter
+                  label={`Objetos a transportar (máx. ${service.maxItems})`}
+                  value={form.items_count}
+                  onChange={v => update("items_count", v)}
+                  min={1}
+                  max={service.maxItems}
+                />
+              )}
+
+              {service.hasExtraHours && (
+                <Counter
+                  label={`Horas extra (+${tariffs.mudanza_extra_hour} €/h)`}
+                  value={form.extra_hours}
+                  onChange={v => update("extra_hours", v)}
+                  min={0}
+                  max={8}
+                />
+              )}
+
+              {service.hasInsurance && (
+                <Toggle
+                  label="Seguro de mercancía"
+                  description={`Cobertura adicional por ${euro(tariffs.insurance)}`}
+                  value={form.insurance_selected}
+                  onValueChange={v => update("insurance_selected", v)}
+                />
+              )}
+
+              {service.needsRecipient && (
+                <>
+                  <Field
+                    label="¿Quién recibe el envío?"
+                    value={form.recipient_name}
+                    onChangeText={v => update("recipient_name", v)}
+                    placeholder="Nombre y apellidos"
+                  />
+                  <Field
+                    label="Teléfono del destinatario"
+                    value={form.recipient_phone}
+                    onChangeText={v => update("recipient_phone", v)}
+                    placeholder="600 000 000"
+                    keyboardType="phone-pad"
+                    inputMode="tel"
+                  />
+                </>
+              )}
+
+              <Field
+                label="Notas para el conductor (opcional)"
+                value={form.notes}
+                onChangeText={v => update("notes", v)}
+                placeholder="Ej.: el portal es el del fondo"
+              />
+            </View>
+          )}
+
+          <View style={styles.plainCard}>
+            <Toggle
+              label="Acepto los términos del servicio"
+              description="Y confirmo que la carga no incluye material peligroso."
+              value={acceptTerms}
+              onValueChange={setAcceptTerms}
+            />
+          </View>
+        </>
+      )}
+
+      {/* ---------- Paso 4: tu precio (canvas 1e) ---------- */}
+      {step === 3 && (
+        <>
+          <View style={styles.plainCard}>
+            <Overline>PRECIO CERRADO CLICYVOY</Overline>
+            <Text style={styles.closedPrice}>{euro(quote.total, 2)}</Text>
+            <View style={{ gap: 9 }}>
               {quote.lines?.map(line => (
                 <View key={line.key} style={styles.rowBetween}>
-                  <Caption style={{ flex: 1 }}>{line.label}</Caption>
-                  <Caption>{line.amount ? euro(line.amount, 2) : "incluido"}</Caption>
+                  <Text style={styles.lineLabel}>{line.label}</Text>
+                  <Text style={[styles.lineLabel, !line.amount && { color: colors.mutedForeground }]}>
+                    {line.amount ? euro(line.amount, 2) : "incluido"}
+                  </Text>
                 </View>
               ))}
-            </Card>
+            </View>
+          </View>
 
-            {/* Y la oferta propia, opcional */}
-            {quote.total > 0 && (
-              <Card>
-                <Text style={styles.overline}>Proponer mi precio</Text>
-                <Text style={styles.offerBig}>{euro(offer ?? quote.total)}</Text>
-                {/* «Arrastra el importe» (canvas 1e): del suelo del 60% a 1,5×
-                    la tarifa. Sin oferta, la barra descansa en la tarifa. */}
-                <PriceSlider
-                  min={floor}
-                  max={Math.ceil(quote.total * 1.5)}
-                  value={offer ?? quote.total}
-                  onChange={v => update("proposed_price", String(v))}
-                />
-                <View style={styles.rowBetween}>
-                  <Caption>mínimo {euro(floor)}</Caption>
-                  <Caption>precio cerrado {euro(quote.total)}</Caption>
-                </View>
-                {offer ? (
-                  <Button
-                    title="Quitar mi oferta y pedirlo al precio cerrado"
-                    variant="plain"
-                    onPress={() => update("proposed_price", "")}
-                  />
-                ) : null}
-                <Caption>
+          {quote.total > 0 && (
+            <>
+              <OfferControl
+                value={offer ?? quote.total}
+                min={floor}
+                max={Math.ceil(quote.total * 1.5)}
+                closed={quote.total}
+                enabled={offer != null}
+                onToggle={on => update("proposed_price", on ? String(quote.total) : "")}
+                onChange={v => update("proposed_price", String(v))}
+              />
+              <View style={styles.infoRow}>
+                <Ionicons name="information-circle-outline" size={18} color={colors.subtle} />
+                <Text style={styles.infoText}>
                   Los conductores pueden aceptar tu precio o contraofertar. Tú decides con quién vas.
-                </Caption>
-              </Card>
-            )}
-          </>
-        )}
-
-        {/* ---------- Paso 5: revisa y publica (canvas 1f) ---------- */}
-        {step === 4 && (
-          <>
-            <Heading>Revisa y publica</Heading>
-
-            <Card>
-              <View style={styles.rowBetween}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, flex: 1 }}>
-                  <ServiceIcon serviceKey={service.key} size={36} />
-                  <View style={{ flex: 1, gap: 2 }}>
-                    <Title>
-                      {service.label}
-                      {form.needs_help ? " con ayuda" : ""}
-                    </Title>
-                    <Caption>
-                      {[
-                        photos.length ? `${photos.length} foto${photos.length === 1 ? "" : "s"}` : null,
-                        form.cargo_description,
-                      ]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </Caption>
-                  </View>
-                </View>
-                <Pressable onPress={() => setStep(2)}>
-                  <Text style={styles.editLink}>Editar</Text>
-                </Pressable>
+                </Text>
               </View>
+            </>
+          )}
+        </>
+      )}
 
-              <View style={styles.divider} />
-
-              <View style={styles.rowBetween}>
-                <View style={{ flex: 1, gap: 6 }}>
-                  <View style={styles.addressRow}>
-                    <View style={[styles.addressDot, { backgroundColor: colors.primary }]} />
-                    <Body style={{ flex: 1 }}>{form.origin_address || "—"}</Body>
-                  </View>
-                  <View style={styles.addressRow}>
-                    <View style={[styles.addressDot, { backgroundColor: colors.foreground }]} />
-                    <Body style={{ flex: 1 }}>{form.destination_address || "—"}</Body>
-                  </View>
+      {/* ---------- Paso 5: revisa y publica (canvas 1f) ---------- */}
+      {step === 4 && (
+        <>
+          <View style={styles.plainCard}>
+            <View style={styles.rowBetween}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md, flex: 1 }}>
+                <ServiceIcon serviceKey={service.key} size={44} iconSize={22} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Title>
+                    {service.label}
+                    {form.needs_help ? " con ayuda" : ""}
+                  </Title>
+                  <Caption>
+                    {[
+                      photos.length ? `${photos.length} foto${photos.length === 1 ? "" : "s"}` : null,
+                      form.cargo_description,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </Caption>
                 </View>
-                <Pressable onPress={() => setStep(1)}>
-                  <Text style={styles.editLink}>Editar</Text>
-                </Pressable>
               </View>
-            </Card>
+              <Pressable onPress={() => setStep(2)} hitSlop={8}>
+                <Text style={styles.editLink}>Editar</Text>
+              </Pressable>
+            </View>
 
-            <Card>
-              <Text style={styles.overline}>¿Cuándo?</Text>
-              <Option
-                label="Lo antes posible"
-                description="Se publica ahora a los conductores"
-                selected={!scheduling}
+            <View style={styles.divider} />
+
+            <View style={styles.rowBetween}>
+              <View style={{ flex: 1, gap: 8 }}>
+                <View style={styles.addressRow}>
+                  <View style={[styles.addressDot, { backgroundColor: colors.primary }]} />
+                  <Body style={{ flex: 1 }}>{form.origin_address || "—"}</Body>
+                </View>
+                <View style={styles.addressRow}>
+                  <View style={[styles.addressDot, { backgroundColor: colors.foreground }]} />
+                  <Body style={{ flex: 1 }}>{form.destination_address || "—"}</Body>
+                </View>
+              </View>
+              <Pressable onPress={() => setStep(1)} hitSlop={8}>
+                <Text style={styles.editLink}>Editar</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* ¿CUÁNDO? — dos pastillas y, si programa, los diálogos nativos */}
+          <View style={styles.plainCard}>
+            <Overline>¿CUÁNDO?</Overline>
+            <View style={{ flexDirection: "row", gap: spacing.sm }}>
+              <Pressable
                 onPress={() => {
                   setWantSchedule(false);
                   update("scheduled_date", "");
                   update("scheduled_time", "");
                 }}
-              />
-              <Option
-                label="Programar"
-                description="Elige día y hora; se publicará automáticamente"
-                selected={scheduling}
-                onPress={() => setWantSchedule(true)}
-              />
-              {scheduling ? (
-                <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                  <View style={{ flex: 1 }}>
-                    <Field
-                      label="Día (DD/MM)"
-                      value={form.scheduled_date}
-                      onChangeText={v => update("scheduled_date", v)}
-                      placeholder="25/08"
-                      keyboardType="numbers-and-punctuation"
-                    />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Field
-                      label="Hora (HH:MM)"
-                      value={form.scheduled_time}
-                      onChangeText={v => update("scheduled_time", v)}
-                      placeholder="09:30"
-                      keyboardType="numbers-and-punctuation"
-                    />
-                  </View>
-                </View>
-              ) : null}
-            </Card>
-
-            <Card>
-              <Text style={styles.overline}>Pago</Text>
-              <Option
-                label="Tarjeta o Google Pay"
-                description="Se paga desde la app, con el importe pactado"
-                selected={form.payment_method === "card"}
-                onPress={() => update("payment_method", "card")}
-              />
-              <Option
-                label="Efectivo al conductor"
-                description="Pagas al terminar el servicio"
-                selected={form.payment_method === "cash"}
-                onPress={() => update("payment_method", "cash")}
-              />
-            </Card>
-
-            {/* Lo que se va a publicar, con la oferta si la hay */}
-            <View style={styles.totalBar}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <Caption>{offer ? "Tu oferta" : "Precio cerrado"}</Caption>
-                {offer ? <Caption>cerrado {euro(quote.total)}</Caption> : null}
-              </View>
-              <Text style={styles.totalValue}>{euro(offer ?? quote.total, 2)}</Text>
+                style={[styles.whenPill, !scheduling && styles.whenPillOn]}
+              >
+                <Text style={[styles.whenText, !scheduling && { color: colors.primary }]}>
+                  Lo antes posible
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={pickSchedule}
+                style={[styles.whenPill, scheduling && styles.whenPillOn]}
+              >
+                <Text style={[styles.whenText, scheduling && { color: colors.primary }]}>
+                  Programar
+                </Text>
+              </Pressable>
             </View>
-          </>
-        )}
+            {scheduling ? (
+              <Pressable onPress={pickSchedule} style={styles.scheduleRow}>
+                <Ionicons name="calendar-outline" size={18} color={colors.primary} />
+                <Body style={{ flex: 1 }}>
+                  {scheduledAt
+                    ? format(scheduledAt, "EEEE d 'de' MMMM 'a las' HH:mm", { locale: es })
+                    : "Elegir día y hora"}
+                </Body>
+                <Ionicons name="chevron-forward" size={16} color={colors.subtle} />
+              </Pressable>
+            ) : null}
+          </View>
 
-        <ErrorText>{error}</ErrorText>
-
-        {/* ---------- Navegación ---------- */}
-        <View style={{ flexDirection: "row", gap: spacing.sm }}>
-          {step > 0 && <Button title="Atrás" variant="plain" onPress={back} style={{ flex: 1 }} />}
-          {step < TOTAL_STEPS - 1 ? (
-            <Button title={CTA[step]} onPress={next} style={{ flex: 2 }} />
-          ) : (
-            <Button
-              title={`Publicar mi ${service.label.toLowerCase()}`}
-              onPress={create}
-              loading={sending}
-              style={{ flex: 2 }}
+          <View style={styles.plainCard}>
+            <Overline>PAGO</Overline>
+            <Option
+              label="Tarjeta o Google Pay"
+              description="Se paga desde la app, con el importe pactado"
+              selected={form.payment_method === "card"}
+              onPress={() => update("payment_method", "card")}
             />
-          )}
-        </View>
+            <Option
+              label="Efectivo al conductor"
+              description="Pagas al terminar el servicio"
+              selected={form.payment_method === "cash"}
+              onPress={() => update("payment_method", "cash")}
+            />
+          </View>
 
-        {step > 0 && (
-          <Pressable
-            onPress={() =>
-              Alert.alert("Empezar de cero", "Se borrará lo que has escrito en este pedido.", [
-                { text: "Seguir aquí", style: "cancel" },
-                {
-                  text: "Empezar de cero",
-                  style: "destructive",
-                  onPress: async () => {
-                    await clearDraft();
-                    setStep(0);
-                  },
-                },
-              ])
-            }
-          >
+          <View style={styles.totalBar}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Caption>{offer ? "Tu oferta" : "Precio cerrado"}</Caption>
+              {offer ? <Caption>cerrado {euro(quote.total)}</Caption> : null}
+            </View>
+            <Text style={styles.totalValue}>{euro(offer ?? quote.total, 2)}</Text>
+          </View>
+
+          <Pressable onPress={discard}>
             <Caption style={{ textAlign: "center" }}>Descartar y empezar de cero</Caption>
           </Pressable>
-        )}
-
-        <Body style={{ height: spacing.xl }} />
-      </ScrollView>
-    </SafeAreaView>
+        </>
+      )}
+    </WizardChrome>
   );
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   rowBetween: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
-  price: { fontSize: 18, fontFamily: "Poppins_700Bold", color: colors.foreground },
-  overline: {
-    fontSize: 11.5,
-    fontFamily: "DMSans_700Bold",
-    color: colors.mutedForeground,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
+  // Tarjeta del canvas: blanca, radio 20, sin borde y con sombra plana.
+  plainCard: { backgroundColor: colors.card, borderRadius: radius.lg, padding: 16, gap: spacing.md },
+
+  // Paso 1 — tarjetas de servicio
+  serviceCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 18,
   },
-  myLocation: { flexDirection: "row", alignItems: "center", gap: 4 },
-  myLocationText: { fontSize: 12.5, fontFamily: "DMSans_700Bold", color: colors.primary },
+  serviceCardOn: { borderWidth: 2, borderColor: colors.primary, padding: 17 },
+  serviceName: { fontSize: 17, lineHeight: 21, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
+  serviceTagline: { fontSize: 13, lineHeight: 18, fontFamily: "DMSans_400Regular", color: colors.mutedForeground, marginTop: 3 },
+  servicePrice: { fontSize: 20, fontFamily: "Poppins_700Bold", color: colors.foreground },
+  serviceFrom: { fontSize: 11, fontFamily: "DMSans_400Regular", color: colors.subtle, marginTop: 2 },
+  note: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    padding: 12,
+    paddingHorizontal: 14,
+  },
+  noteText: { flex: 1, fontSize: 12, lineHeight: 17, fontFamily: "DMSans_400Regular", color: colors.mutedForeground },
+  noteStrong: { fontFamily: "DMSans_700Bold", color: colors.ink },
+
+  // Paso 2 — mapa a sangre y hoja
+  mapFull: { flex: 1 },
+  mapTopBar: {
+    position: "absolute",
+    left: spacing.screen,
+    right: spacing.screen,
+    top: spacing.md,
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  floatingCircle: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
+  },
+  floatingPill: {
+    height: 42,
+    paddingHorizontal: 16,
+    borderRadius: 21,
+    backgroundColor: colors.card,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    elevation: 3,
+  },
+  floatingPillText: { fontSize: 12.5, fontFamily: "DMSans_500Medium", color: colors.foreground },
+  addressSheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
+    padding: spacing.screen,
+    paddingTop: 10,
+    gap: spacing.md,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#DEDCE4",
+    marginBottom: 14,
+  },
+  bars: { flexDirection: "row", gap: 6, marginBottom: 4 },
+  bar: { flex: 1, height: 4, borderRadius: 2 },
+
+  // Paso 3
+  counterText: { fontSize: 11.5, fontFamily: "DMSans_400Regular", color: "#B5B4BE" },
   photos: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   photo: { width: 84, height: 84, borderRadius: radius.md, backgroundColor: colors.secondary },
   photoAdd: {
@@ -797,38 +888,44 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  closedPrice: { fontSize: 22, fontFamily: "Poppins_700Bold", color: colors.foreground },
-  offerBig: { fontSize: 34, fontFamily: "Poppins_700Bold", color: colors.primary, textAlign: "center" },
-  divider: { height: 1, backgroundColor: colors.border },
+
+  // Paso 4
+  closedPrice: { fontSize: 34, lineHeight: 38, fontFamily: "Poppins_700Bold", color: colors.foreground },
+  lineLabel: { fontSize: 13.5, fontFamily: "DMSans_400Regular", color: colors.ink },
+  infoRow: { flexDirection: "row", gap: 10, alignItems: "flex-start", paddingHorizontal: 4 },
+  infoText: { flex: 1, fontSize: 12.5, lineHeight: 19, fontFamily: "DMSans_400Regular", color: colors.mutedForeground },
+
+  // Paso 5
+  divider: { height: 1, backgroundColor: colors.hairline },
   addressRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
   addressDot: { width: 7, height: 7, borderRadius: radius.full, marginTop: 7 },
   editLink: { fontSize: 13, fontFamily: "DMSans_700Bold", color: colors.primary },
+  whenPill: {
+    flex: 1,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  whenPillOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  whenText: { fontSize: 13, fontFamily: "Poppins_600SemiBold", color: colors.mutedForeground },
+  scheduleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    padding: 14,
+  },
   totalBar: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.md,
     backgroundColor: colors.primarySoft,
     borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    padding: spacing.lg,
+    padding: 18,
   },
   totalValue: { fontSize: 24, fontFamily: "Poppins_700Bold", color: colors.primary },
-  // El mapa sangra hasta los bordes de la pantalla (compensa el padding del
-  // ScrollView) y la hoja monta encima con esquinas redondeadas, como el canvas.
-  mapHero: { marginHorizontal: -spacing.lg, marginTop: -spacing.sm },
-  sheet: {
-    marginTop: -28,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    marginHorizontal: -4,
-  },
-  sheetHandle: {
-    alignSelf: "center",
-    width: 44,
-    height: 4,
-    borderRadius: radius.full,
-    backgroundColor: colors.border,
-    marginBottom: 2,
-  },
 });

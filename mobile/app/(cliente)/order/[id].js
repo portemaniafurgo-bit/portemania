@@ -313,11 +313,9 @@ export default function OrderDetail() {
         {/* Canvas 1i — ENTREGADO: hora, firma y todo el post-servicio debajo. */}
         {delivered && (
           <View style={styles.deliveredHero}>
-            <View style={styles.deliveredCheck}>
-              <Ionicons name="checkmark" size={34} color="#FFFFFF" />
-            </View>
+            <Ionicons name="checkmark-done" size={27} color={colors.success} />
             <Heading>{deliveredAt ? `Entregado a las ${deliveredAt}` : "Entregado"}</Heading>
-            <Caption style={{ textAlign: "center" }}>
+            <Caption>
               {order.proof_signature_url
                 ? `${driverFirst} firmó la entrega${order.recipient_name ? ` con ${order.recipient_name}` : ""}`
                 : `${driverFirst} completó la entrega`}
@@ -702,16 +700,8 @@ const styles = StyleSheet.create({
   offerTagText: { fontSize: 10.5, fontFamily: "DMSans_700Bold" },
 
   // Canvas 1i — entregado
-  deliveredHero: { alignItems: "center", gap: spacing.sm, paddingVertical: spacing.md },
-  deliveredCheck: {
-    width: 64,
-    height: 64,
-    borderRadius: radius.full,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: spacing.xs,
-  },
+  // Canvas 2h: el visto verde y el titular, alineados a la izquierda.
+  deliveredHero: { gap: 6, paddingTop: spacing.sm },
   receiptRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md },
   receiptDivider: { height: 1, backgroundColor: colors.border },
 

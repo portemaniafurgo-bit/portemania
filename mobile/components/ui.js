@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { colors, radius, spacing, typography } from "../theme";
+import { button, colors, radius, spacing, typography } from "../theme";
 
 /**
  * Piezas de UI mínimas y compartidas, con el mismo lenguaje visual que la web
@@ -36,8 +36,18 @@ export function Card({ children, style }) {
   return <View style={[styles.card, style]}>{children}</View>;
 }
 
+/** Título de pantalla grande del canvas (27 px, dos líneas en el paso 1). */
+export function Display({ children, style }) {
+  return <Text style={[typography.display, style]}>{children}</Text>;
+}
+
 export function Heading({ children, style }) {
   return <Text style={[typography.heading, style]}>{children}</Text>;
+}
+
+/** Etiqueta de sección: «PRECIO CERRADO CLICYVOY», «¿CUÁNDO?», «PAGO». */
+export function Overline({ children, style }) {
+  return <Text style={[typography.overline, style]}>{children}</Text>;
 }
 
 export function Title({ children, style }) {
@@ -52,7 +62,20 @@ export function Caption({ children, style }) {
   return <Text style={[typography.caption, style]}>{children}</Text>;
 }
 
-export function Button({ title, icon, onPress, loading, disabled, variant = "primary", style }) {
+/**
+ * Botón principal del canvas: 54 de alto, radio 27, Poppins 600 16. `icon` va
+ * delante; `iconAfter` detrás (la flecha de «Continuar con …»).
+ */
+export function Button({
+  title,
+  icon,
+  iconAfter,
+  onPress,
+  loading,
+  disabled,
+  variant = "primary",
+  style,
+}) {
   const isPlain = variant !== "primary";
   const blocked = disabled || loading;
   return (
@@ -79,6 +102,13 @@ export function Button({ title, icon, onPress, loading, disabled, variant = "pri
           ) : null}
           {title ? (
             <Text style={[styles.buttonText, isPlain && { color: colors.primary }]}>{title}</Text>
+          ) : null}
+          {iconAfter ? (
+            <Ionicons
+              name={iconAfter}
+              size={18}
+              color={isPlain ? colors.primary : colors.primaryForeground}
+            />
           ) : null}
         </View>
       )}
@@ -118,23 +148,23 @@ export function Loading({ label = "Cargando…" }) {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  screenContent: { padding: spacing.lg, gap: spacing.lg },
+  screenContent: { padding: spacing.screen, gap: spacing.lg },
   card: {
     backgroundColor: colors.card,
-    borderRadius: radius.lg,
+    borderRadius: radius.lg, // 20, el radio de tarjeta del canvas
     borderWidth: 1,
     borderColor: colors.border,
-    padding: spacing.lg,
+    padding: 18,
     gap: spacing.md,
   },
   button: {
-    // rounded-full: la forma de botón de la landing.
-    borderRadius: radius.full,
-    paddingVertical: 12,
-    paddingHorizontal: spacing.lg,
+    // 54 × radio 27, la medida exacta del canvas (y objetivo táctil cómodo:
+    // la app se usa conduciendo o cargando).
+    height: button.height,
+    borderRadius: button.radius,
+    paddingHorizontal: spacing.screen,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 46, // objetivo táctil cómodo: se usa conduciendo o cargando
   },
   buttonPrimary: { backgroundColor: colors.primary },
   buttonPrimaryPressed: { backgroundColor: colors.primaryPressed },
@@ -142,25 +172,24 @@ const styles = StyleSheet.create({
   buttonDisabled: { opacity: 0.5 },
   buttonPressed: { opacity: 0.85 },
   buttonInner: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.sm },
-  buttonText: { color: colors.primaryForeground, fontSize: 14.5, fontFamily: "DMSans_700Bold" },
+  buttonText: {
+    color: colors.primaryForeground,
+    fontSize: button.fontSize,
+    fontFamily: "Poppins_600SemiBold",
+  },
   input: {
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 11,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: 14,
     fontSize: 14.5,
     fontFamily: "DMSans_400Regular",
     color: colors.foreground,
   },
-  fieldLabel: {
-    fontSize: 11.5,
-    fontFamily: "DMSans_700Bold",
-    color: colors.mutedForeground,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
-  },
+  // «EMAIL», «DESCRIPCIÓN»…: DM Sans 500 12 en gris claro, como el canvas.
+  fieldLabel: { ...typography.overline, textTransform: "uppercase" },
   errorText: { color: colors.destructive, fontSize: 12, fontFamily: "DMSans_400Regular" },
   // Fondo explícito: un contenedor transparente a pantalla completa se ve
   // NEGRO sobre el fondo de la ventana de Android.

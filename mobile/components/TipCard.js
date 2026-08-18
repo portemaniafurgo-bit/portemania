@@ -131,13 +131,15 @@ export default function TipCard({ order, driverName }) {
 const styles = StyleSheet.create({
   head: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   row: { flexDirection: "row", gap: spacing.sm },
+  // Canvas 2h: 52 de alto, radio 16 y borde de 1,5.
   tip: {
     flex: 1,
-    paddingVertical: 12,
-    borderRadius: radius.full,
-    borderWidth: 1,
+    height: 52,
+    borderRadius: 16,
+    borderWidth: 1.5,
     borderColor: colors.border,
     alignItems: "center",
+    justifyContent: "center",
   },
   tipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   tipText: { fontSize: 15, fontFamily: "Poppins_600SemiBold", color: colors.mutedForeground },
