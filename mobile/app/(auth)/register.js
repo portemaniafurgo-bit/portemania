@@ -38,6 +38,10 @@ export default function Register() {
   const [password, setPassword] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState("");
+  // Paso 2 del alta: facturación. Opcional, pero es AQUÍ donde la gente tiene
+  // el NIF a mano; pedírselo el día que necesita la factura es tarde.
+  const [needsInvoice, setNeedsInvoice] = useState(false);
+  const [billing, setBilling] = useState({ isCompany: false, name: "", taxId: "", address: "" });
   // Aviso propio del email ya registrado: en el canvas vive DEBAJO del campo,
   // con su enlace para entrar, no en el error general del formulario.
   const [emailTaken, setEmailTaken] = useState(false);
@@ -81,8 +85,95 @@ export default function Register() {
     if (data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
       setEmailTaken(true);
       setLoading(false);
+      return;
+    }
+
+    // Cuenta creada: se ofrece rellenar la facturación AHORA, que es cuando la
+    // gente tiene el NIF a mano. Quien no la necesite entra directo.
+    if (data?.user) {
+      setNeedsInvoice(true);
+      setLoading(false);
     }
   };
+
+  /** Guarda los datos fiscales del recién registrado y entra en la app. */
+  const saveBilling = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const { data: session } = await supabase.auth.getUser();
+      if (session?.user?.id) {
+        await supabase
+          .from("profiles")
+          .update({
+            billing_name: billing.name.trim() || fullName.trim(),
+            billing_tax_id: billing.taxId.replace(/\s+/g, "").toUpperCase() || null,
+            billing_address: billing.address.trim() || null,
+            billing_is_company: billing.isCompany,
+          })
+          .eq("id", session.user.id);
+      }
+    } catch {
+      // Si falla, no se bloquea el alta: los datos se pueden poner luego desde
+      // Perfil → Datos de facturación.
+    } finally {
+      setLoading(false);
+      setNeedsInvoice(false);
+    }
+  };
+
+  // ---------- Paso 2: datos de facturación (se puede saltar) ----------
+  if (needsInvoice) {
+    return (
+      <Screen>
+        <View style={{ gap: spacing.xs, marginTop: spacing.xl }}>
+          <Heading>¿Necesitas factura?</Heading>
+          <Caption>
+            El servicio lo presta el conductor, que es transportista autónomo, y la factura la
+            emite él con estos datos. Puedes dejarlo para luego: sin ellos recibirás un recibo.
+          </Caption>
+        </View>
+
+        <View style={{ gap: spacing.lg }}>
+          <Toggle
+            label="Facturar a nombre de una empresa"
+            value={billing.isCompany}
+            onValueChange={v => setBilling(b => ({ ...b, isCompany: v }))}
+          />
+          <Field
+            label={billing.isCompany ? "Razón social" : "Nombre y apellidos"}
+            value={billing.name}
+            onChangeText={v => setBilling(b => ({ ...b, name: v }))}
+            placeholder={billing.isCompany ? "Transportes Ejemplo S.L." : fullName || "María López"}
+          />
+          <Field
+            label={billing.isCompany ? "CIF" : "NIF"}
+            value={billing.taxId}
+            onChangeText={v => setBilling(b => ({ ...b, taxId: v }))}
+            placeholder={billing.isCompany ? "B02123456" : "02123456X"}
+            autoCapitalize="characters"
+          />
+          <Field
+            label="Dirección fiscal"
+            value={billing.address}
+            onChangeText={v => setBilling(b => ({ ...b, address: v }))}
+            placeholder="Calle, número, CP y población"
+          />
+          <Button
+            title="Guardar y entrar"
+            loading={loading}
+            disabled={!billing.taxId.trim()}
+            onPress={saveBilling}
+          />
+          <Pressable onPress={() => setNeedsInvoice(false)}>
+            <Text style={[styles.linkStrong, { textAlign: "center" }]}>
+              Ahora no, entrar sin factura
+            </Text>
+          </Pressable>
+        </View>
+      </Screen>
+    );
+  }
 
   return (
     <Screen>
