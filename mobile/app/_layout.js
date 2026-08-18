@@ -37,7 +37,9 @@ function RootNavigation() {
     AsyncStorage.getItem(ONBOARDING_KEY)
       .then(v => setOnboardingSeen(!!v))
       .catch(() => setOnboardingSeen(true)); // ante la duda, no bloquear
-  }, [segments[0]]); // re-lee al navegar: al terminar el onboarding cambia
+    // Se re-lee al navegar Y al cambiar la sesión: el cierre de sesión es el
+    // momento en que el flag vuelve a importar.
+  }, [segments[0], session]);
 
   usePushNotifications({ userId: session?.user?.id, role });
 
@@ -69,7 +71,11 @@ function RootNavigation() {
     if (group !== target) {
       router.replace(role === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir");
     }
-  }, [session, role, loading, segments, router]);
+    // ⚠️ onboardingSeen DEBE estar en las dependencias: el guardia lo lee, y
+    // sin escucharlo, cuando el flag se resolvía después que la sesión el
+    // efecto no re-evaluaba — el onboarding se saltaba en silencio (bug real
+    // reportado el 2026-08-18: "nunca vi las pantallas de introducción").
+  }, [session, role, loading, segments, router, onboardingSeen]);
 
   if (loading) return <Loading label="Abriendo ClicyVoy…" />;
 

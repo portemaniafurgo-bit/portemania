@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import { serviceOf } from "../../lib/services";
 import { countUnread } from "../../lib/unread";
+import { euro } from "../../lib/money";
 import { Button, Caption, Card, Heading, Loading, Title } from "../../components/ui";
 import EmptyState from "../../components/EmptyState";
 import ServiceIcon from "../../components/ServiceIcon";
@@ -92,6 +93,12 @@ export default function MisPedidos() {
     if (user) load();
   }, [user, load]);
 
+  useFocusEffect(
+    useCallback(() => {
+      if (user) load();
+    }, [user, load]),
+  );
+
   const onRefresh = async () => {
     setRefreshing(true);
     await load();
@@ -159,8 +166,10 @@ export default function MisPedidos() {
                 </View>
                 <Caption>{order.origin_address || "—"}</Caption>
                 <Caption>→ {order.destination_address || "—"}</Caption>
-                {order.estimated_price != null && (
-                  <Text style={styles.price}>{order.estimated_price} €</Text>
+                {(order.final_price ?? order.estimated_price) != null && (
+                  <Text style={styles.price}>
+                    {euro(Number(order.final_price ?? order.estimated_price), 2)}
+                  </Text>
                 )}
                 {["delivered", "cancelled"].includes(order.status) ? (
                   <Button title="Repetir este pedido" variant="plain" onPress={() => repeat(order)} />

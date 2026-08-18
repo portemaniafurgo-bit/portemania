@@ -1,18 +1,19 @@
-import { useEffect, useRef, useState } from "react";
-import { Alert, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../lib/auth";
 import { fetchMyDriverProfile } from "../../../lib/driverProfile";
 import * as Location from "expo-location";
-import { STATUS_LABELS, useChat, useOrder } from "../../../lib/orders";
+import { STATUS_LABELS, useOrder } from "../../../lib/orders";
 import { serviceOf } from "../../../lib/services";
 import { geocodeAlbacete } from "../../../lib/eta";
 import { startTracking, stopTracking } from "../../../lib/tracking";
 import TrackingMap from "../../../components/TrackingMap";
+import ChatLink from "../../../components/ChatLink";
 import { uploadProofPhoto, uploadSignature } from "../../../lib/deliveryProof";
-import { markChatRead } from "../../../lib/unread";
+import { countUnread } from "../../../lib/unread";
 import { takePhoto } from "../../../lib/photos";
 import SignaturePad from "../../../components/SignaturePad";
 import { Body, Button, Caption, Card, ErrorText, Field, Heading, Loading, Title } from "../../../components/ui";
@@ -44,12 +45,11 @@ const CANCEL_REASONS = [
 export default function TrabajoActivo() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
-  const { user, role } = useAuth();
-  const { order, loading } = useOrder(id);
-  const { messages, send, sending } = useChat(id, { user, role });
+  const { user } = useAuth();
+  const { order, loading, patchOrder } = useOrder(id);
 
   const [profile, setProfile] = useState(null);
-  const [draft, setDraft] = useState("");
+  const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
   const [feedbackTags, setFeedbackTags] = useState([]);
@@ -57,7 +57,6 @@ export default function TrabajoActivo() {
   const [showProof, setShowProof] = useState(false);
   const [proofPhotoUri, setProofPhotoUri] = useState(null);
   const [recipientName, setRecipientName] = useState("");
-  const [chatError, setChatError] = useState("");
   // Mi posición para el mapa EMBEBIDO (estilo Uber): sale del GPS del propio
   // móvil en primer plano, no de la BD — es más fresca y no gasta consultas.
   const [myPos, setMyPos] = useState(null);
@@ -105,6 +104,7 @@ export default function TrabajoActivo() {
           driver_feedback_text: feedbackText.trim() || null,
         })
         .eq("id", id);
+      patchOrder({ driver_feedback_tags: feedbackTags, driver_feedback_text: feedbackText.trim() || null });
     } catch (err) {
       setError("No se pudo enviar la opinión: " + (err.message || "error de conexión"));
     } finally {
@@ -116,9 +116,21 @@ export default function TrabajoActivo() {
     fetchMyDriverProfile(user).then(setProfile);
   }, [user]);
 
-  useEffect(() => {
-    if (id) markChatRead(id);
-  }, [messages.length, id]);
+  // Aviso de mensajes sin leer en la fila del chat. Se recalcula al volver de
+  // la pantalla de chat (que es donde se marcan como leídos).
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      if (id && user?.id) {
+        countUnread([id], user.id).then(counts => {
+          if (active) setUnreadCount(counts[id] || 0);
+        });
+      }
+      return () => {
+        active = false;
+      };
+    }, [id, user?.id]),
+  );
 
   // Geocodificación de respaldo del destino del mapa (solo si el pedido no
   // trae coordenadas). Va ANTES de los return tempranos: es un hook.
@@ -195,11 +207,14 @@ export default function TrabajoActivo() {
       const extra = {};
       if (step.to === "picked_up") extra.pickup_time = new Date().toISOString();
 
-      const { error: err } = await supabase
+      const { data, error: err } = await supabase
         .from("transport_requests")
         .update({ status: step.to, ...extra })
-        .eq("id", id);
+        .eq("id", id)
+        .select()
+        .single();
       if (err) throw err;
+      patchOrder(data); // sin esperar a Realtime: la pantalla avanza YA
 
       supabase.functions
         .invoke("send-push", { body: { mode: "status_changed", order_id: id } })
@@ -231,8 +246,14 @@ export default function TrabajoActivo() {
         if (recipientName.trim()) patch.recipient_name = recipientName.trim();
       }
 
-      const { error: err } = await supabase.from("transport_requests").update(patch).eq("id", id);
+      const { data, error: err } = await supabase
+        .from("transport_requests")
+        .update(patch)
+        .eq("id", id)
+        .select()
+        .single();
       if (err) throw err;
+      patchOrder(data); // el viaje queda TERMINADO en pantalla al instante
 
       await stopTracking();
       setShowProof(false);
@@ -484,68 +505,19 @@ export default function TrabajoActivo() {
           </Card>
         )}
 
-        {/* Chat con el cliente */}
-        <Card>
-          <Title>Chat con el cliente</Title>
-          {messages.length === 0 ? (
-            <Caption>Todavía no hay mensajes.</Caption>
-          ) : (
-            messages.map(m => {
-              const mine = m.sender_id === user?.id;
-              return (
-                <View key={m.id} style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
-                  {!mine ? <Caption>{m.sender_name}</Caption> : null}
-                  {m.image_url ? <Image source={{ uri: m.image_url }} style={styles.chatImage} /> : null}
-                  {m.message && m.message !== "📷 Foto" ? (
-                    <Text style={[styles.bubbleText, mine && { color: "#fff" }]}>{m.message}</Text>
-                  ) : null}
-                </View>
-              );
-            })
-          )}
-          {finished ? (
-            <Caption>El servicio ha terminado: el chat queda como historial.</Caption>
-          ) : (
-            <View style={{ gap: spacing.sm }}>
-              <Field value={draft} onChangeText={setDraft} placeholder="Escribe un mensaje…" multiline />
-              {chatError ? <Caption style={{ color: colors.destructive }}>{chatError}</Caption> : null}
-              <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                <Button
-                  icon="camera-outline"
-                  variant="plain"
-                  loading={sending}
-                  style={{ minWidth: 56 }}
-                  onPress={async () => {
-                    setChatError("");
-                    try {
-                      const uris = await takePhoto();
-                      if (!uris[0]) return;
-                      await send(draft, { imageUri: uris[0] });
-                      setDraft("");
-                    } catch {
-                      setChatError("No se pudo enviar la foto.");
-                    }
-                  }}
-                />
-                <Button
-                  title="Enviar"
-                  loading={sending}
-                  disabled={!draft.trim()}
-                  style={{ flex: 1 }}
-                  onPress={async () => {
-                    setChatError("");
-                    try {
-                      await send(draft);
-                      setDraft("");
-                    } catch {
-                      setChatError("No se pudo enviar el mensaje.");
-                    }
-                  }}
-                />
-              </View>
-            </View>
-          )}
-        </Card>
+        {/* El chat es una PANTALLA COMPLETA (canvas 2g): desde aquí solo se
+            entra, con el aviso de mensajes sin leer. */}
+        <ChatLink
+          href={`/(conductor)/chat/${order.id}`}
+          title={`Chat con ${(order.client_name || "el cliente").split(" ")[0]}`}
+          subtitle={
+            finished
+              ? "La conversación queda como historial"
+              : unreadCount > 0
+                ? `${unreadCount} mensaje${unreadCount > 1 ? "s" : ""} sin leer`
+                : "Mensajes y fotos con el cliente"
+          }
+        />
       </ScrollView>
     </SafeAreaView>
   );
@@ -553,10 +525,6 @@ export default function TrabajoActivo() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.background },
-  bubble: { padding: spacing.md, borderRadius: radius.md, maxWidth: "85%", gap: 2 },
-  bubbleMine: { alignSelf: "flex-end", backgroundColor: colors.primary },
-  bubbleTheirs: { alignSelf: "flex-start", backgroundColor: colors.secondary },
-  bubbleText: { fontSize: 15, color: colors.foreground },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   chip: {
     paddingHorizontal: spacing.md,
@@ -567,7 +535,6 @@ const styles = StyleSheet.create({
   },
   chipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   chipText: { fontSize: 13, color: colors.mutedForeground },
-  chatImage: { width: 200, height: 150, borderRadius: radius.md, backgroundColor: colors.secondary },
   statusBand: {
     backgroundColor: colors.primary,
     borderRadius: radius.lg,

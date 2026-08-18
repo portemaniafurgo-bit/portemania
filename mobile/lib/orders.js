@@ -88,7 +88,14 @@ export function useOrder(orderId) {
     };
   }, [orderId, loadDriver]);
 
-  return { order, driver, loading };
+  // Aplicar en local el resultado de un update PROPIO sin esperar al evento
+  // Realtime: si el canal se cayó (MIUI congela sockets), la pantalla se
+  // quedaba vieja tras "Trabajo finalizado" — bug real reportado el 2026-08-18.
+  const patchOrder = useCallback(patch => {
+    if (patch) setOrder(prev => (prev ? { ...prev, ...patch } : patch));
+  }, []);
+
+  return { order, driver, loading, patchOrder };
 }
 
 /**

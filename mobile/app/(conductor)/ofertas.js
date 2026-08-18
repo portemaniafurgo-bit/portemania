@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
@@ -164,6 +164,18 @@ export default function Ofertas() {
   useEffect(() => {
     if (user) load();
   }, [user, load]);
+
+  // Volver a la pestaña REFRESCA: tras terminar un viaje, el aviso de
+  // "servicio en curso" y la lista no pueden quedarse viejos si Realtime
+  // se cayó (bug real reportado el 2026-08-18).
+  useFocusEffect(
+    useCallback(() => {
+      if (user) {
+        load();
+        loadMyOffers();
+      }
+    }, [user, load, loadMyOffers]),
+  );
 
   // Ofertas en vivo: cuando un pedido nuevo entra (o uno pendiente cambia de
   // manos), la lista se recarga sola — sin el polling de 10 s de la web. El

@@ -48,6 +48,8 @@ export default function ConductorLayout() {
       {/* El trabajo activo no es una pestaña: se entra al aceptar una oferta o
           desde el aviso de "servicio en curso". */}
       <Tabs.Screen name="job/[id]" options={{ href: null }} />
+      {/* Chat a pantalla completa (canvas 2g): sin barra de pestañas. */}
+      <Tabs.Screen name="chat/[id]" options={{ href: null, tabBarStyle: { display: "none" } }} />
     </Tabs>
   );
 }

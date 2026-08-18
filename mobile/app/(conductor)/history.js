@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import { serviceOf } from "../../lib/services";
+import { euro } from "../../lib/money";
+import { Ionicons } from "@expo/vector-icons";
 import { Caption, Card, Heading, Loading, Title } from "../../components/ui";
 import EmptyState from "../../components/EmptyState";
 import ServiceIcon from "../../components/ServiceIcon";
@@ -37,6 +39,12 @@ export default function HistorialConductor() {
   useEffect(() => {
     if (user) load();
   }, [user, load]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (user) load();
+    }, [user, load]),
+  );
 
   if (jobs === null) return <Loading label="Cargando tu historial…" />;
 
@@ -96,9 +104,13 @@ export default function HistorialConductor() {
                   </Caption>
                   <Caption>{job.origin_address} → {job.destination_address}</Caption>
                   <View style={styles.row}>
-                    <Text style={styles.price}>{job.final_price || job.estimated_price || 0} €</Text>
+                    <Text style={styles.price}>{euro(job.final_price || job.estimated_price || 0, 2)}</Text>
                     {job.client_rating ? (
-                      <Text style={styles.stars}>{"★".repeat(job.client_rating)}</Text>
+                      <View style={{ flexDirection: "row", gap: 2 }}>
+                        {Array.from({ length: job.client_rating }, (_, i) => (
+                          <Ionicons key={i} name="star" size={14} color={colors.accent} />
+                        ))}
+                      </View>
                     ) : null}
                   </View>
                 </Card>
@@ -116,5 +128,4 @@ const styles = StyleSheet.create({
   badge: { paddingHorizontal: spacing.md, paddingVertical: 4, borderRadius: radius.full },
   badgeText: { fontSize: 12, fontFamily: "DMSans_700Bold" },
   price: { fontSize: 18, fontFamily: "Poppins_700Bold", color: colors.foreground },
-  stars: { fontSize: 14, color: colors.accent },
 });

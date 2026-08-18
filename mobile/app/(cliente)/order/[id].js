@@ -1,49 +1,78 @@
-import { useEffect, useRef, useState } from "react";
-import { Alert, Dimensions, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  Alert,
+  Dimensions,
+  Image,
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams } from "expo-router";
+import { format } from "date-fns";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../lib/auth";
-import { STATUS_FLOW, STATUS_LABELS, useChat, useDriverLocation, useOrder } from "../../../lib/orders";
-import { markChatRead } from "../../../lib/unread";
+import { STATUS_FLOW, STATUS_LABELS, useDriverLocation, useOrder } from "../../../lib/orders";
 import { serviceOf } from "../../../lib/services";
+import { euro, rating1 } from "../../../lib/money";
 import { Body, Button, Caption, Card, Field, Heading, Loading, Title } from "../../../components/ui";
-import { pickPhotos } from "../../../lib/photos";
 import TrackingMap from "../../../components/TrackingMap";
 import ServiceIcon from "../../../components/ServiceIcon";
 import { Ionicons } from "@expo/vector-icons";
 import ReportIncident from "../../../components/ReportIncident";
 import PayButton from "../../../components/PayButton";
 import TipCard from "../../../components/TipCard";
+import ChatLink from "../../../components/ChatLink";
 import { downloadReceipt } from "../../../lib/receipt";
 import { colors, radius, spacing } from "../../../theme";
 
 /**
- * Detalle del pedido para el cliente: la pantalla que justifica la app.
- *
- * Todo llega por Realtime — estado, posición del conductor y chat — así que no
- * hay ningún sondeo. La web refresca cada 5-10 s en tres sitios distintos.
+ * Detalle del pedido para el cliente. Tres modos, calcados del canvas:
+ *  - 1g «Buscando conductor…»: Tu oferta / Respuestas / Caduca en + tarjetas
+ *    de conductores EN VIVO con «Aceptar por X €» y «Subir mi oferta a X €».
+ *  - 1h pedido activo: mapa a sangre + hoja con ETA y frescura.
+ *  - 1i «Entregado a las HH:MM»: firma, «¿Cómo ha ido con X?», propina 1/2/5 €
+ *    y recibo (PDF / email).
  */
+
+// La búsqueda con oferta caduca a los 15 min: pasado eso el contador marca 0:00
+// y conviene subir la oferta o cancelar. (Solo informativo: el pedido sigue
+// publicado — nadie cancela dinero en silencio.)
+const OFFER_WINDOW_MS = 15 * 60_000;
+
+const distanceKm = (aLat, aLng, bLat, bLng) => {
+  if (!aLat || !aLng || !bLat || !bLng) return null;
+  const rad = x => (x * Math.PI) / 180;
+  const h =
+    Math.sin(rad(bLat - aLat) / 2) ** 2 +
+    Math.cos(rad(aLat)) * Math.cos(rad(bLat)) * Math.sin(rad(bLng - aLng) / 2) ** 2;
+  return 6371 * 2 * Math.asin(Math.sqrt(h));
+};
+
 export default function OrderDetail() {
   const { id } = useLocalSearchParams();
-  const { user, role } = useAuth();
-  const { order, driver, loading } = useOrder(id);
+  const { user } = useAuth();
+  const { order, driver, loading, patchOrder } = useOrder(id);
   const driverLocation = useDriverLocation(driver);
-  const { messages, send, sending } = useChat(id, { user, role });
-  const [draft, setDraft] = useState("");
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
   const [savingReview, setSavingReview] = useState(false);
-  const [chatError, setChatError] = useState("");
+  const [actionError, setActionError] = useState("");
   const [sendingReceipt, setSendingReceipt] = useState(false);
   const [receiptSent, setReceiptSent] = useState(false);
-  // Negociación (canvas 1g): contraofertas de conductores EN VIVO.
+  // Negociación (canvas 1g): contraofertas de conductores EN VIVO, con su
+  // perfil (valoración, furgoneta, distancia) para decidir con datos.
   const [priceOffers, setPriceOffers] = useState([]);
+  const [offerProfiles, setOfferProfiles] = useState({});
   const [negotiating, setNegotiating] = useState(false);
+  const [now, setNow] = useState(Date.now());
   // Canvas 1h: en pedido activo el mapa llena la pantalla y la hoja pinta
   // ETA/frescura por su cuenta (TrackingMap se los pasa por onInfo).
   const [mapInfo, setMapInfo] = useState({ route: null, freshness: null });
-  const scrollRef = useRef(null);
 
   useEffect(() => {
     if (!id) return;
@@ -52,11 +81,26 @@ export default function OrderDetail() {
     const loadOffers = async () => {
       const { data } = await supabase
         .from("price_offers")
-        .select("id, driver_name, amount, message, status")
+        .select("id, driver_id, driver_name, amount, message, status")
         .eq("request_id", id)
         .eq("status", "pending")
         .order("created_date", { ascending: true });
-      if (active) setPriceOffers(data || []);
+      if (!active) return;
+      setPriceOffers(data || []);
+
+      // Perfil de cada conductor que responde. Si la RLS no deja ver alguno,
+      // su tarjeta sale igual, solo que sin valoración ni distancia.
+      const ids = [...new Set((data || []).map(o => o.driver_id).filter(Boolean))];
+      if (!ids.length) return;
+      const { data: profiles } = await supabase
+        .from("driver_profiles")
+        .select("created_by_id, full_name, photo_url, rating, vehicle_brand, vehicle_plate, current_lat, current_lng")
+        .in("created_by_id", ids)
+        .order("created_date", { ascending: true });
+      if (!active || !profiles) return;
+      const map = {};
+      for (const p of profiles) if (!map[p.created_by_id]) map[p.created_by_id] = p;
+      setOfferProfiles(map);
     };
     loadOffers();
 
@@ -74,19 +118,29 @@ export default function OrderDetail() {
     };
   }, [id]);
 
+  const searching = order?.status === "pending" && order?.proposed_price != null;
+
+  // El contador «Caduca en» late cada segundo solo mientras se busca.
+  useEffect(() => {
+    if (!searching) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [searching]);
+
   const acceptOffer = async offerId => {
     setNegotiating(true);
-    setChatError("");
+    setActionError("");
     try {
       const { data, error } = await supabase.rpc("accept_price_offer", { p_offer_id: offerId });
       if (error) throw error;
+      patchOrder(data); // el pedido pasa a aceptado en pantalla YA
       setPriceOffers([]);
       // Avisar al conductor ganador; no bloquea.
       supabase.functions
         .invoke("send-push", { body: { mode: "offer_accepted", order_id: data.id } })
         .catch(() => {});
     } catch (err) {
-      setChatError(err.message || "No se pudo aceptar la contraoferta.");
+      setActionError(err.message || "No se pudo aceptar la contraoferta.");
     } finally {
       setNegotiating(false);
     }
@@ -99,31 +153,30 @@ export default function OrderDetail() {
       if (error) throw error;
       setPriceOffers(prev => prev.filter(o => o.id !== offerId));
     } catch (err) {
-      setChatError(err.message || "No se pudo rechazar.");
+      setActionError(err.message || "No se pudo descartar.");
     } finally {
       setNegotiating(false);
     }
   };
 
-  const sendText = async () => {
-    setChatError("");
+  // «Subir mi oferta a X €» (canvas 1g): iguala la contraoferta más baja para
+  // que TODOS los conductores vean el precio nuevo, no solo el que la hizo.
+  const raiseOffer = async amount => {
+    setNegotiating(true);
+    setActionError("");
     try {
-      await send(draft);
-      setDraft("");
-    } catch {
-      setChatError("No se pudo enviar el mensaje. Comprueba tu conexión.");
-    }
-  };
-
-  const sendPhoto = async () => {
-    setChatError("");
-    try {
-      const uris = await pickPhotos(1);
-      if (!uris[0]) return;
-      await send(draft, { imageUri: uris[0] });
-      setDraft("");
-    } catch {
-      setChatError("No se pudo enviar la foto. Comprueba tu conexión.");
+      const { data, error } = await supabase
+        .from("transport_requests")
+        .update({ proposed_price: amount })
+        .eq("id", id)
+        .select()
+        .single();
+      if (error) throw error;
+      patchOrder(data);
+    } catch (err) {
+      setActionError(err.message || "No se pudo subir la oferta.");
+    } finally {
+      setNegotiating(false);
     }
   };
 
@@ -136,6 +189,7 @@ export default function OrderDetail() {
         .from("transport_requests")
         .update({ client_rating: rating, client_review: review.trim() || null })
         .eq("id", id);
+      patchOrder({ client_rating: rating, client_review: review.trim() || null });
     } finally {
       setSavingReview(false);
     }
@@ -149,22 +203,11 @@ export default function OrderDetail() {
         style: "destructive",
         onPress: async () => {
           await supabase.from("transport_requests").update({ status: "cancelled" }).eq("id", id);
+          patchOrder({ status: "cancelled" });
         },
       },
     ]);
   };
-
-  const seenCount = useRef(null);
-  useEffect(() => {
-    // Bajar al final SOLO cuando entra un mensaje nuevo estando ya en la
-    // pantalla. En la carga inicial no: saltar de golpe al fondo le escondía el
-    // mapa y el estado a quien abría el pedido. Leído se marca siempre.
-    if (seenCount.current !== null && messages.length > seenCount.current) {
-      scrollRef.current?.scrollToEnd({ animated: true });
-    }
-    seenCount.current = messages.length;
-    if (id) markChatRead(id);
-  }, [messages.length, id]);
 
   if (loading) return <Loading label="Cargando el pedido…" />;
   if (!order) {
@@ -179,6 +222,7 @@ export default function OrderDetail() {
 
   const service = serviceOf(order);
   const active = ["accepted", "in_transit", "picked_up"].includes(order.status);
+  const delivered = order.status === "delivered";
   // Hasta recoger la carga el conductor va a la recogida; después, a la entrega.
   const goingToPickup = ["accepted", "in_transit"].includes(order.status);
   const target = goingToPickup
@@ -186,11 +230,28 @@ export default function OrderDetail() {
     : { lat: order.destination_lat, lng: order.destination_lng, label: "la entrega" };
 
   const currentStep = STATUS_FLOW.indexOf(order.status);
+  const driverFirst = (order.driver_name || driver?.full_name || "El conductor").split(" ")[0];
+
+  // Contador de caducidad de la búsqueda (solo informativo).
+  const expiresMs = searching
+    ? Math.max(0, new Date(order.created_date).getTime() + OFFER_WINDOW_MS - now)
+    : 0;
+  const expiresLabel = `${Math.floor(expiresMs / 60_000)}:${String(
+    Math.floor((expiresMs % 60_000) / 1000),
+  ).padStart(2, "0")}`;
+
+  // «Subir mi oferta»: a la contraoferta más baja que supere la mía.
+  const counters = priceOffers
+    .map(o => Number(o.amount))
+    .filter(a => a > Number(order.proposed_price));
+  const raiseTo = counters.length ? Math.min(...counters) : null;
+
+  const deliveredAt = order.delivery_time ? format(new Date(order.delivery_time), "HH:mm") : null;
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <Stack.Screen options={{ headerShown: true, title: "Tu pedido" }} />
-      <ScrollView ref={scrollRef} contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
         {/* Canvas 1h — pedido EN CURSO: el mapa llena la parte alta a sangre
             y la hoja monta encima con asa; ETA y frescura viven en la hoja. */}
         {active && (
@@ -239,7 +300,156 @@ export default function OrderDetail() {
           </Card>
         )}
 
-        {!active && (
+        {/* Canvas 1i — ENTREGADO: hora, firma y todo el post-servicio debajo. */}
+        {delivered && (
+          <View style={styles.deliveredHero}>
+            <View style={styles.deliveredCheck}>
+              <Ionicons name="checkmark" size={34} color="#FFFFFF" />
+            </View>
+            <Heading>{deliveredAt ? `Entregado a las ${deliveredAt}` : "Entregado"}</Heading>
+            <Caption style={{ textAlign: "center" }}>
+              {order.proof_signature_url
+                ? `${driverFirst} firmó la entrega${order.recipient_name ? ` con ${order.recipient_name}` : ""}`
+                : `${driverFirst} completó la entrega`}
+            </Caption>
+          </View>
+        )}
+
+        {/* Canvas 1g — BUSCANDO CONDUCTOR con oferta. */}
+        {searching && (
+          <>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+              <ActivityIndicator color={colors.primary} />
+              <View style={{ gap: 2, flex: 1 }}>
+                <Heading>Buscando conductor…</Heading>
+                <Caption>{service?.label || "Servicio"}</Caption>
+              </View>
+            </View>
+
+            {/* Tu oferta · Respuestas · Caduca en */}
+            <View style={styles.statsRow}>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{euro(Number(order.proposed_price))}</Text>
+                <Caption>Tu oferta</Caption>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={styles.statValue}>{priceOffers.length}</Text>
+                <Caption>Respuestas</Caption>
+              </View>
+              <View style={styles.statBox}>
+                <Text style={[styles.statValue, expiresMs === 0 && { color: colors.destructive }]}>
+                  {expiresLabel}
+                </Text>
+                <Caption>Caduca en</Caption>
+              </View>
+            </View>
+
+            <View style={styles.sectionHeader}>
+              <Text style={styles.overline}>Conductores que han respondido</Text>
+              <View style={styles.liveBadge}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>En vivo</Text>
+              </View>
+            </View>
+
+            {priceOffers.length === 0 ? (
+              <Card>
+                <Caption>
+                  Aún no hay respuestas. Un conductor puede aceptar tu precio directamente o
+                  proponerte otro — lo verás aquí al momento.
+                </Caption>
+              </Card>
+            ) : (
+              priceOffers.map(offer => {
+                const prof = offerProfiles[offer.driver_id];
+                const name = offer.driver_name || prof?.full_name || "Conductor";
+                const acceptsMyPrice = Number(offer.amount) === Number(order.proposed_price);
+                const km = prof
+                  ? distanceKm(prof.current_lat, prof.current_lng, order.origin_lat, order.origin_lng)
+                  : null;
+                return (
+                  <Card key={offer.id} style={{ gap: spacing.md }}>
+                    <View style={styles.offerTop}>
+                      {prof?.photo_url ? (
+                        <Image source={{ uri: prof.photo_url }} style={styles.offerAvatar} />
+                      ) : (
+                        <View style={[styles.offerAvatar, styles.offerAvatarEmpty]}>
+                          <Text style={styles.offerInitial}>{name.slice(0, 1).toUpperCase()}</Text>
+                        </View>
+                      )}
+                      <View style={{ flex: 1, gap: 2 }}>
+                        <Title>{name}</Title>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 3 }}>
+                          {prof?.rating ? (
+                            <>
+                              <Ionicons name="star" size={11} color={colors.accent} />
+                              <Caption>{rating1(prof.rating)}</Caption>
+                            </>
+                          ) : null}
+                          {km != null ? (
+                            <Caption>
+                              {prof?.rating ? " · " : ""}a {km.toFixed(1).replace(".", ",")} km
+                            </Caption>
+                          ) : null}
+                        </View>
+                      </View>
+                      <View style={{ alignItems: "flex-end", gap: 4 }}>
+                        <Text style={styles.offerAmount}>{euro(Number(offer.amount))}</Text>
+                        <View
+                          style={[
+                            styles.offerTag,
+                            { backgroundColor: acceptsMyPrice ? colors.successBg : colors.warningBg },
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.offerTagText,
+                              { color: acceptsMyPrice ? colors.success : "#8A6D00" },
+                            ]}
+                          >
+                            {acceptsMyPrice ? "acepta tu precio" : "contraoferta"}
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+
+                    {offer.message ? <Body>«{offer.message}»</Body> : null}
+                    {prof ? (
+                      <Caption>
+                        {prof.vehicle_brand || "Furgoneta"}
+                        {prof.vehicle_plate ? ` · ${prof.vehicle_plate}` : ""}
+                      </Caption>
+                    ) : null}
+
+                    <Button
+                      title={`Aceptar por ${euro(Number(offer.amount))}`}
+                      loading={negotiating}
+                      onPress={() => acceptOffer(offer.id)}
+                    />
+                    <Pressable onPress={() => rejectOffer(offer.id)} disabled={negotiating}>
+                      <Caption style={{ textAlign: "center" }}>Descartar esta respuesta</Caption>
+                    </Pressable>
+                  </Card>
+                );
+              })
+            )}
+
+            {raiseTo != null && (
+              <Button
+                title={`Subir mi oferta a ${euro(raiseTo)}`}
+                variant="plain"
+                loading={negotiating}
+                onPress={() => raiseOffer(raiseTo)}
+              />
+            )}
+            {actionError ? (
+              <Caption style={{ color: colors.destructive, textAlign: "center" }}>{actionError}</Caption>
+            ) : null}
+          </>
+        )}
+
+        {/* Cabecera genérica (pendiente sin oferta, programado, cancelado) */}
+        {!active && !delivered && !searching && (
           <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
             <ServiceIcon serviceKey={service?.key} size={44} />
             <View style={{ gap: 2, flex: 1 }}>
@@ -249,8 +459,9 @@ export default function OrderDetail() {
           </View>
         )}
 
-        {/* Línea de estados */}
-        {order.status !== "cancelled" && (
+        {/* Línea de estados: durante el servicio, no en la búsqueda con oferta
+            ni en el cierre — el canvas no la pinta ahí. */}
+        {!searching && !delivered && order.status !== "cancelled" && (
           <Card>
             {STATUS_FLOW.map((status, i) => {
               const done = currentStep >= i;
@@ -266,52 +477,110 @@ export default function OrderDetail() {
           </Card>
         )}
 
-        {/* Negociación: respuestas de conductores mientras busca dueño */}
-        {order.status === "pending" && order.proposed_price != null && (
+        {/* Pago con tarjeta pendiente. En efectivo no aparece; y mientras se
+            negocia tampoco: el importe aún no está pactado. */}
+        {order.payment_method === "card" &&
+          order.payment_status !== "paid" &&
+          order.status !== "cancelled" &&
+          !searching && <PayButton order={order} />}
+
+        {/* Canvas 1i — «¿Cómo ha ido con Javier?» */}
+        {delivered && !order.client_rating && (
           <Card>
-            <View style={styles.offersHeader}>
-              <Title>Respuestas de conductores</Title>
-              <View style={styles.myOfferChip}>
-                <Text style={styles.myOfferChipText}>Tu oferta: {Number(order.proposed_price).toFixed(2)} €</Text>
-              </View>
+            <Title>¿Cómo ha ido con {driverFirst}?</Title>
+            <View style={styles.stars}>
+              {[1, 2, 3, 4, 5].map(n => (
+                <Pressable key={n} onPress={() => setRating(n)}>
+                  <Ionicons name={n <= rating ? "star" : "star-outline"} size={34} color={colors.accent} />
+                </Pressable>
+              ))}
             </View>
-            {priceOffers.length === 0 ? (
-              <Caption>
-                Aún no hay contraofertas. Un conductor puede aceptar tu precio directamente o
-                proponerte otro — lo verás aquí al momento.
-              </Caption>
-            ) : (
-              priceOffers.map(offer => (
-                <View key={offer.id} style={styles.offerCard}>
-                  <View style={styles.offersHeader}>
-                    <Body style={{ fontFamily: "DMSans_700Bold" }}>{offer.driver_name || "Conductor"}</Body>
-                    <Text style={styles.offerAmount}>{Number(offer.amount).toFixed(2)} €</Text>
-                  </View>
-                  {offer.message ? <Caption>«{offer.message}»</Caption> : null}
-                  <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                    <Button
-                      title={`Aceptar por ${Number(offer.amount).toFixed(2)} €`}
-                      loading={negotiating}
-                      onPress={() => acceptOffer(offer.id)}
-                      style={{ flex: 2 }}
-                    />
-                    <Button
-                      title="No, gracias"
-                      variant="plain"
-                      disabled={negotiating}
-                      onPress={() => rejectOffer(offer.id)}
-                      style={{ flex: 1 }}
-                    />
-                  </View>
-                </View>
-              ))
-            )}
+            <Field
+              value={review}
+              onChangeText={setReview}
+              placeholder="Cuenta algo del servicio (opcional)"
+              multiline
+            />
+            <Button
+              title="Enviar valoración"
+              disabled={rating === 0}
+              loading={savingReview}
+              onPress={submitReview}
+            />
           </Card>
         )}
 
+        {delivered && order.client_rating ? (
+          <Card>
+            <View style={{ flexDirection: "row", gap: 4 }}>
+              {Array.from({ length: order.client_rating }, (_, i) => (
+                <Ionicons key={i} name="star" size={20} color={colors.accent} />
+              ))}
+            </View>
+            <Body style={{ fontFamily: "DMSans_700Bold" }}>Perfecto, se lo diremos</Body>
+            {order.client_review ? <Caption>{order.client_review}</Caption> : null}
+          </Card>
+        ) : null}
+
+        {/* Propina: cargo Stripe aparte, 100 % para el conductor */}
+        {delivered && <TipCard order={order} driverName={driverFirst} />}
+
+        {/* Recibo (canvas 1i): dos filas, PDF y email */}
+        {delivered && (
+          <Card style={{ gap: 0 }}>
+            <Pressable
+              style={styles.receiptRow}
+              onPress={async () => {
+                setActionError("");
+                try {
+                  await downloadReceipt(order, service);
+                } catch {
+                  setActionError("No se pudo generar el recibo. Inténtalo de nuevo.");
+                }
+              }}
+            >
+              <Ionicons name="download-outline" size={20} color={colors.primary} />
+              <Body style={{ flex: 1 }}>Descargar recibo en PDF</Body>
+              <Ionicons name="chevron-forward" size={16} color={colors.subtle} />
+            </Pressable>
+            <View style={styles.receiptDivider} />
+            <Pressable
+              style={styles.receiptRow}
+              disabled={sendingReceipt || receiptSent}
+              onPress={async () => {
+                setSendingReceipt(true);
+                setActionError("");
+                try {
+                  const { data } = await supabase.functions.invoke("send-receipt", {
+                    body: { order_id: order.id },
+                  });
+                  if (data?.sent) setReceiptSent(true);
+                  else setActionError(data?.error || "No se pudo enviar el recibo.");
+                } catch {
+                  setActionError("No se pudo enviar el recibo.");
+                } finally {
+                  setSendingReceipt(false);
+                }
+              }}
+            >
+              <Ionicons
+                name={receiptSent ? "checkmark-circle" : "mail-outline"}
+                size={20}
+                color={receiptSent ? colors.success : colors.primary}
+              />
+              <Body style={{ flex: 1 }}>
+                {receiptSent ? "Enviado a tu email" : "Enviármelo por email"}
+              </Body>
+              {!receiptSent && <Ionicons name="chevron-forward" size={16} color={colors.subtle} />}
+            </Pressable>
+            {actionError ? (
+              <Caption style={{ color: colors.destructive, marginTop: spacing.sm }}>{actionError}</Caption>
+            ) : null}
+          </Card>
+        )}
 
         {/* Conductor */}
-        {driver && (
+        {driver && !delivered && (
           <Card>
             <View style={styles.driverRow}>
               {driver.photo_url ? (
@@ -324,7 +593,7 @@ export default function OrderDetail() {
                 <Caption>
                   {driver.vehicle_brand || "Furgoneta"}
                   {driver.vehicle_plate ? ` · ${driver.vehicle_plate}` : ""}
-                  {driver.rating ? ` · ★ ${Number(driver.rating).toFixed(1)}` : ""}
+                  {driver.rating ? ` · ★ ${rating1(driver.rating)}` : ""}
                 </Caption>
               </View>
             </View>
@@ -336,6 +605,15 @@ export default function OrderDetail() {
               />
             ) : null}
           </Card>
+        )}
+
+        {/* Chat: pantalla completa (canvas 2g); desde aquí solo se entra. */}
+        {order.driver_id && (
+          <ChatLink
+            href={`/(cliente)/chat/${order.id}`}
+            title={`Chat con ${driverFirst}`}
+            subtitle={delivered ? "La conversación queda como historial" : "Mensajes y fotos con tu conductor"}
+          />
         )}
 
         {/* Direcciones y precio */}
@@ -350,99 +628,10 @@ export default function OrderDetail() {
               <Body>{order.cargo_description}</Body>
             </>
           ) : null}
-          {order.estimated_price != null ? (
-            <Text style={styles.price}>{order.estimated_price} €</Text>
+          {(order.final_price ?? order.estimated_price) != null ? (
+            <Text style={styles.price}>{euro(Number(order.final_price ?? order.estimated_price), 2)}</Text>
           ) : null}
         </Card>
-
-        {/* Pago con tarjeta pendiente. En efectivo no aparece; y mientras se
-            negocia tampoco: el importe aún no está pactado. */}
-        {order.payment_method === "card" &&
-          order.payment_status !== "paid" &&
-          order.status !== "cancelled" &&
-          !(order.status === "pending" && order.proposed_price != null) && (
-            <PayButton order={order} />
-          )}
-
-        {/* Valoración: solo tras la entrega y una sola vez */}
-        {order.status === "delivered" && !order.client_rating && (
-          <Card>
-            <Title>¿Qué tal ha ido?</Title>
-            <View style={styles.stars}>
-              {[1, 2, 3, 4, 5].map(n => (
-                <Pressable key={n} onPress={() => setRating(n)}>
-                  <Ionicons name={n <= rating ? "star" : "star-outline"} size={32} color={colors.accent} />
-                </Pressable>
-              ))}
-            </View>
-            <Field
-              value={review}
-              onChangeText={setReview}
-              placeholder="Cuéntanos cómo ha ido (opcional)"
-              multiline
-            />
-            <Button
-              title="Enviar valoración"
-              disabled={rating === 0}
-              loading={savingReview}
-              onPress={submitReview}
-            />
-          </Card>
-        )}
-
-        {order.client_rating ? (
-          <Card>
-            <Caption>Tu valoración</Caption>
-            <View style={{ flexDirection: "row", gap: 2 }}>
-              {Array.from({ length: order.client_rating }, (_, i) => (
-                <Ionicons key={i} name="star" size={18} color={colors.accent} />
-              ))}
-            </View>
-            {order.client_review ? <Body>{order.client_review}</Body> : null}
-          </Card>
-        ) : null}
-
-        {/* Propina: tras la entrega, cargo Stripe aparte, 100% para el conductor */}
-        {order.status === "delivered" && <TipCard order={order} driverName={driver?.full_name} />}
-
-        {/* Recibo: PDF generado en el móvil + envío por email (Edge Function) */}
-        {order.status === "delivered" && (
-          <View style={{ flexDirection: "row", gap: spacing.sm }}>
-            <Button
-              title="Recibo PDF"
-              variant="plain"
-              style={{ flex: 1 }}
-              onPress={async () => {
-                try {
-                  await downloadReceipt(order, service);
-                } catch {
-                  setChatError("No se pudo generar el recibo. Inténtalo de nuevo.");
-                }
-              }}
-            />
-            <Button
-              title={receiptSent ? "Enviado ✓" : "Recibo por email"}
-              variant="plain"
-              style={{ flex: 1 }}
-              loading={sendingReceipt}
-              disabled={receiptSent}
-              onPress={async () => {
-                setSendingReceipt(true);
-                try {
-                  const { data } = await supabase.functions.invoke("send-receipt", {
-                    body: { order_id: order.id },
-                  });
-                  if (data?.sent) setReceiptSent(true);
-                  else setChatError(data?.error || "No se pudo enviar el recibo.");
-                } catch {
-                  setChatError("No se pudo enviar el recibo.");
-                } finally {
-                  setSendingReceipt(false);
-                }
-              }}
-            />
-          </View>
-        )}
 
         {/* Cancelar: mientras nadie lo ha aceptado (o aún no se ha publicado) */}
         {["pending", "scheduled"].includes(order.status) && (
@@ -450,64 +639,6 @@ export default function OrderDetail() {
         )}
 
         <ReportIncident orderId={order.id} user={user} />
-
-        {/* Chat */}
-        {order.driver_id && (
-          <Card>
-            <Title>Chat con el conductor</Title>
-            {messages.length === 0 ? (
-              <Caption>Todavía no hay mensajes.</Caption>
-            ) : (
-              messages.map(m => {
-                const mine = m.sender_id === user?.id;
-                return (
-                  <View
-                    key={m.id}
-                    style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
-                  >
-                    {!mine ? <Caption>{m.sender_name}</Caption> : null}
-                    {m.image_url ? (
-                      <Image source={{ uri: m.image_url }} style={styles.chatImage} />
-                    ) : null}
-                    {m.message && m.message !== "📷 Foto" ? (
-                      <Text style={[styles.bubbleText, mine && { color: "#fff" }]}>{m.message}</Text>
-                    ) : null}
-                  </View>
-                );
-              })
-            )}
-
-            {order.status === "delivered" || order.status === "cancelled" ? (
-              <Caption>El pedido ha terminado: el chat queda como historial.</Caption>
-            ) : (
-              <View style={{ gap: spacing.sm }}>
-                <Field
-                  value={draft}
-                  onChangeText={setDraft}
-                  placeholder="Escribe un mensaje…"
-                  multiline
-                />
-                {chatError ? <Caption style={{ color: colors.destructive }}>{chatError}</Caption> : null}
-                <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                  <Button
-                    icon="camera-outline"
-                    variant="plain"
-                    loading={sending}
-                    onPress={() => sendPhoto()}
-                    style={{ minWidth: 56 }}
-                  />
-                  <Button
-                    title="Enviar"
-                    loading={sending}
-                    disabled={!draft.trim()}
-                    onPress={() => sendText()}
-                    style={{ flex: 1 }}
-                  />
-                </View>
-              </View>
-            )}
-          </Card>
-        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -522,18 +653,54 @@ const styles = StyleSheet.create({
   avatar: { width: 56, height: 56, borderRadius: radius.full, backgroundColor: colors.secondary },
   avatarEmpty: { borderWidth: 1, borderColor: colors.border },
   price: { fontSize: 20, fontFamily: "Poppins_700Bold", color: colors.foreground },
-  bubble: { padding: spacing.md, borderRadius: radius.md, maxWidth: "85%", gap: 2 },
-  bubbleMine: { alignSelf: "flex-end", backgroundColor: colors.primary },
-  bubbleTheirs: { alignSelf: "flex-start", backgroundColor: colors.secondary },
-  bubbleText: { fontSize: 15, color: colors.foreground },
   stars: { flexDirection: "row", gap: spacing.sm },
-  star: { fontSize: 32, color: colors.accent },
-  chatImage: { width: 200, height: 150, borderRadius: radius.md, backgroundColor: colors.secondary },
-  offersHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
-  myOfferChip: { backgroundColor: colors.primarySoft, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },
-  myOfferChipText: { fontSize: 12, fontFamily: "DMSans_700Bold", color: colors.primary },
-  offerCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
-  offerAmount: { fontSize: 20, fontFamily: "Poppins_700Bold", color: colors.primary },
+
+  // Canvas 1g — búsqueda y negociación
+  statsRow: { flexDirection: "row", gap: spacing.md },
+  statBox: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.md,
+    alignItems: "center",
+    gap: 2,
+  },
+  statValue: { fontSize: 17, fontFamily: "Poppins_700Bold", color: colors.foreground },
+  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  overline: {
+    fontSize: 11.5,
+    fontFamily: "DMSans_700Bold",
+    color: colors.mutedForeground,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
+  },
+  liveBadge: { flexDirection: "row", alignItems: "center", gap: 5 },
+  liveDot: { width: 7, height: 7, borderRadius: radius.full, backgroundColor: colors.success },
+  liveText: { fontSize: 11.5, fontFamily: "DMSans_500Medium", color: colors.success },
+  offerTop: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  offerAvatar: { width: 44, height: 44, borderRadius: radius.full, backgroundColor: colors.primarySoft },
+  offerAvatarEmpty: { alignItems: "center", justifyContent: "center" },
+  offerInitial: { fontSize: 17, fontFamily: "Poppins_700Bold", color: colors.primary },
+  offerAmount: { fontSize: 19, fontFamily: "Poppins_700Bold", color: colors.foreground },
+  offerTag: { borderRadius: radius.full, paddingHorizontal: spacing.sm, paddingVertical: 2 },
+  offerTagText: { fontSize: 10.5, fontFamily: "DMSans_700Bold" },
+
+  // Canvas 1i — entregado
+  deliveredHero: { alignItems: "center", gap: spacing.sm, paddingVertical: spacing.md },
+  deliveredCheck: {
+    width: 64,
+    height: 64,
+    borderRadius: radius.full,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.xs,
+  },
+  receiptRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md },
+  receiptDivider: { height: 1, backgroundColor: colors.border },
+
   // Canvas 1h: mapa a sangre + hoja con asa montando encima.
   fullMapWrap: { marginHorizontal: -spacing.lg, marginTop: -spacing.lg },
   sheet: {
