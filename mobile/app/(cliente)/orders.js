@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useFocusEffect, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
@@ -41,7 +41,11 @@ export default function MisPedidos() {
   const router = useRouter();
   const [orders, setOrders] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState("active");
+  // «Mis recibos» (perfil) entra aquí ya filtrado por entregados.
+  const { filter: filterParam } = useLocalSearchParams();
+  const [filter, setFilter] = useState(
+    ["active", "delivered", "cancelled"].includes(filterParam) ? filterParam : "active",
+  );
   const [unread, setUnread] = useState({});
 
   const load = useCallback(async () => {
@@ -92,6 +96,12 @@ export default function MisPedidos() {
   useEffect(() => {
     if (user) load();
   }, [user, load]);
+
+  // La pestaña ya está montada cuando se entra desde «Mis recibos», así que el
+  // estado inicial no basta: hay que obedecer al parámetro cuando cambia.
+  useEffect(() => {
+    if (["active", "delivered", "cancelled"].includes(filterParam)) setFilter(filterParam);
+  }, [filterParam]);
 
   useFocusEffect(
     useCallback(() => {

@@ -13,6 +13,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useRouter } from "expo-router";
+import { format, isToday, isYesterday } from "date-fns";
+import { es } from "date-fns/locale";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../lib/auth";
 import { useChat, useOrder } from "../lib/orders";
@@ -27,6 +29,13 @@ import { colors, radius, spacing } from "../theme";
  * línea y barra de escritura fija abajo. Lo usan cliente y conductor; solo
  * cambia quién es "la otra parte".
  */
+/** «Hoy», «Ayer» o «12 de agosto» para el separador de día. */
+function dayLabel(date) {
+  if (isToday(date)) return "Hoy";
+  if (isYesterday(date)) return "Ayer";
+  return format(date, "d 'de' MMMM", { locale: es });
+}
+
 export default function ChatThread({ orderId, partnerRole }) {
   const router = useRouter();
   const { user, role } = useAuth();
@@ -34,6 +43,8 @@ export default function ChatThread({ orderId, partnerRole }) {
   const { messages, send, sending } = useChat(orderId, { user, role });
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
+  // Texto del último mensaje que no se pudo enviar, para reintentarlo.
+  const [failed, setFailed] = useState(null);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -51,14 +62,19 @@ export default function ChatThread({ orderId, partnerRole }) {
     partnerRole === "driver" ? order.driver_name || "Conductor" : order.client_name || "Cliente";
   const partnerPhoto = partnerRole === "driver" ? driver?.photo_url : null;
 
-  const sendText = async () => {
-    if (!draft.trim()) return;
+  const sendText = async (text = draft) => {
+    if (!text.trim()) return;
     setError("");
+    setFailed(null);
     try {
-      await send(draft);
+      await send(text);
       setDraft("");
     } catch {
-      setError("No se pudo enviar. Comprueba tu conexión.");
+      // Canvas 2g: el mensaje que no salió se queda EN LA CONVERSACIÓN, en
+      // gris, con «Reintentar» debajo. Perderlo al fallar la red es lo que
+      // hace que la gente escriba lo mismo tres veces.
+      setFailed(text);
+      setDraft("");
     }
   };
 
@@ -120,25 +136,54 @@ export default function ChatThread({ orderId, partnerRole }) {
               Todavía no hay mensajes. Escribe el primero.
             </Caption>
           ) : (
-            messages.map(m => {
+            messages.map((m, i) => {
               const mine = m.sender_id === user?.id;
+              const date = new Date(m.created_date);
+              // Separador de día (canvas 2g): «Hoy · 10:24» al abrir la
+              // conversación y cada vez que cambia la fecha.
+              const previous = messages[i - 1];
+              const newDay =
+                !previous ||
+                new Date(previous.created_date).toDateString() !== date.toDateString();
               return (
-                <View
-                  key={m.id}
-                  style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}
-                >
-                  {m.image_url ? (
-                    <Image source={{ uri: m.image_url }} style={styles.image} />
+                <View key={m.id} style={{ gap: spacing.sm }}>
+                  {newDay ? (
+                    <Caption style={styles.daySeparator}>
+                      {dayLabel(date)} · {format(date, "HH:mm")}
+                    </Caption>
                   ) : null}
-                  {m.message && m.message !== "📷 Foto" ? (
-                    <Text style={[styles.bubbleText, mine && { color: "#FFFFFF" }]}>
-                      {m.message}
+                  <View style={[styles.bubble, mine ? styles.bubbleMine : styles.bubbleTheirs]}>
+                    {m.image_url ? (
+                      <Image source={{ uri: m.image_url }} style={styles.image} />
+                    ) : null}
+                    {m.message && m.message !== "📷 Foto" ? (
+                      <Text style={[styles.bubbleText, mine && { color: "#FFFFFF" }]}>
+                        {m.message}
+                      </Text>
+                    ) : null}
+                    <Text style={[styles.time, mine && { color: "#FFFFFFAA" }]}>
+                      {format(date, "HH:mm")}
                     </Text>
-                  ) : null}
+                  </View>
                 </View>
               );
             })
           )}
+
+          {/* Mensaje que no salió: se queda a la vista con su reintento */}
+          {failed ? (
+            <View style={{ alignSelf: "flex-end", alignItems: "flex-end", gap: 3 }}>
+              <View style={[styles.bubble, styles.bubbleFailed]}>
+                <Text style={styles.bubbleText}>{failed}</Text>
+              </View>
+              <Pressable onPress={() => sendText(failed)}>
+                <Caption style={{ color: colors.destructive }}>
+                  No se ha enviado · <Text style={styles.retry}>Reintentar</Text>
+                </Caption>
+              </Pressable>
+            </View>
+          ) : null}
+
           {error ? (
             <Caption style={{ color: colors.destructive, textAlign: "center" }}>{error}</Caption>
           ) : null}
@@ -163,7 +208,7 @@ export default function ChatThread({ orderId, partnerRole }) {
               multiline
             />
             <Pressable
-              onPress={sendText}
+              onPress={() => sendText()}
               disabled={sending || !draft.trim()}
               style={[styles.send, (!draft.trim() || sending) && { opacity: 0.4 }]}
             >
@@ -197,7 +242,11 @@ const styles = StyleSheet.create({
   bubble: { maxWidth: "80%", borderRadius: 16, padding: spacing.md, gap: 4 },
   bubbleMine: { alignSelf: "flex-end", backgroundColor: colors.primary, borderBottomRightRadius: 4 },
   bubbleTheirs: { alignSelf: "flex-start", backgroundColor: colors.card, borderBottomLeftRadius: 4, borderWidth: 1, borderColor: colors.border },
+  bubbleFailed: { backgroundColor: colors.secondary, borderWidth: 1, borderColor: colors.border, opacity: 0.85 },
   bubbleText: { fontSize: 14, fontFamily: "DMSans_400Regular", color: colors.foreground, lineHeight: 19 },
+  time: { fontSize: 10.5, fontFamily: "DMSans_400Regular", color: colors.subtle, alignSelf: "flex-end" },
+  daySeparator: { textAlign: "center", marginTop: spacing.sm },
+  retry: { fontFamily: "DMSans_700Bold", color: colors.destructive, textDecorationLine: "underline" },
   image: { width: 210, height: 158, borderRadius: radius.md, backgroundColor: colors.secondary },
   inputBar: {
     flexDirection: "row",

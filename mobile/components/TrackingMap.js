@@ -33,6 +33,9 @@ export default function TrackingMap({
   target,
   height = 260,
   self = false,
+  // "pickup" pinta el destino como recogida (morado); cualquier otra cosa, como
+  // entrega (negro con bandera).
+  targetKind = "dropoff",
   // Modo canvas 1h: solo el mapa (la hoja de encima pinta ETA y frescura por
   // su cuenta vía onInfo), sin borde ni radios.
   bare = false,
@@ -100,7 +103,14 @@ export default function TrackingMap({
 
           {target?.lat ? (
             <Marker id="target" lngLat={[target.lng, target.lat]}>
-              <View style={styles.targetPin} />
+              {/* Canvas 2l: recogida morada, entrega negra con bandera amarilla. */}
+              {targetKind === "pickup" ? (
+                <View style={[styles.targetPin, { backgroundColor: colors.primary }]} />
+              ) : (
+                <View style={styles.dropoffPin}>
+                  <Ionicons name="flag" size={12} color={colors.accent} />
+                </View>
+              )}
             </Marker>
           ) : null}
 
@@ -163,10 +173,20 @@ const styles = StyleSheet.create({
   },
   driverPinText: { fontSize: 16 },
   targetPin: {
-    width: 16,
-    height: 16,
+    width: 18,
+    height: 18,
     borderRadius: radius.full,
-    backgroundColor: colors.destructive,
+    backgroundColor: colors.primary,
+    borderWidth: 3,
+    borderColor: "#fff",
+  },
+  dropoffPin: {
+    width: 26,
+    height: 26,
+    borderRadius: radius.full,
+    backgroundColor: colors.foreground,
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 2,
     borderColor: "#fff",
   },

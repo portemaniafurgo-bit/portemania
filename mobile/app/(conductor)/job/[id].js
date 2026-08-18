@@ -6,8 +6,10 @@ import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../lib/auth";
 import { fetchMyDriverProfile } from "../../../lib/driverProfile";
 import * as Location from "expo-location";
+import { Ionicons } from "@expo/vector-icons";
 import { STATUS_LABELS, useOrder } from "../../../lib/orders";
 import { serviceOf } from "../../../lib/services";
+import { euro } from "../../../lib/money";
 import { geocodeAlbacete } from "../../../lib/eta";
 import { startTracking, stopTracking } from "../../../lib/tracking";
 import TrackingMap from "../../../components/TrackingMap";
@@ -16,7 +18,7 @@ import { uploadProofPhoto, uploadSignature } from "../../../lib/deliveryProof";
 import { countUnread } from "../../../lib/unread";
 import { takePhoto } from "../../../lib/photos";
 import SignaturePad from "../../../components/SignaturePad";
-import { Body, Button, Caption, Card, ErrorText, Field, Heading, Loading, Title } from "../../../components/ui";
+import { Body, Button, Caption, Card, ErrorText, Field, Loading, Title } from "../../../components/ui";
 import { colors, radius, spacing } from "../../../theme";
 
 /**
@@ -35,6 +37,12 @@ const STEPS = [
 // Mismas etiquetas que la web: el admin ya las tiene tabuladas.
 const FEEDBACK_TAGS = ["Precio justo", "Precio injusto", "Mucho tiempo de espera"];
 
+/** «3ª con ascensor» / «2ª sin ascensor», como rotula el canvas las plantas. */
+function floorLabel(floors, hasLift) {
+  if (!floors) return null;
+  return `${floors}ª ${hasLift ? "con" : "sin"} ascensor`;
+}
+
 const CANCEL_REASONS = [
   "Avería o problema con la furgoneta",
   "No puedo llegar a tiempo",
@@ -51,6 +59,8 @@ export default function TrabajoActivo() {
   const [profile, setProfile] = useState(null);
   const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState("");
+  // ETA hacia el destino de ahora, que pinta la banda de estado (canvas 1k).
+  const [eta, setEta] = useState({ route: null, freshness: null });
   const [saving, setSaving] = useState(false);
   const [feedbackTags, setFeedbackTags] = useState([]);
   const [feedbackText, setFeedbackText] = useState("");
@@ -178,6 +188,8 @@ export default function TrabajoActivo() {
   }
 
   const service = serviceOf(order);
+  // Lo pactado manda sobre lo calculado: es lo que va a cobrar.
+  const pactado = order.final_price ?? order.estimated_price ?? null;
   const step = STEPS.find(s => s.from === order.status);
   const finished = ["delivered", "cancelled"].includes(order.status);
   const canCancel = ["accepted", "in_transit"].includes(order.status);
@@ -307,6 +319,15 @@ export default function TrabajoActivo() {
     ]);
   };
 
+  /** Primero el motivo, luego la confirmación: cancelar es cosa seria y la
+   *  empresa necesita saber por qué. */
+  const chooseCancelReason = () => {
+    Alert.alert("Cancelar el servicio", "¿Qué ha pasado?", [
+      ...CANCEL_REASONS.map(reason => ({ text: reason, onPress: () => cancel(reason) })),
+      { text: "Volver", style: "cancel" },
+    ]);
+  };
+
   const navigate = (app) => {
     const destination = encodeURIComponent(navTarget || "");
     const url =
@@ -325,10 +346,27 @@ export default function TrabajoActivo() {
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <Stack.Screen options={{ headerShown: true, title: "Servicio" }} />
       <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
-        {/* Banda de estado estilo Uber: qué pasa ahora y qué toca después. */}
+        {/* Banda de estado (canvas 1k): servicio y precio pactado arriba, qué
+            pasa ahora en grande, qué toca después debajo, y el ETA a la derecha. */}
         <View style={styles.statusBand}>
+          <View style={styles.statusBandTop}>
+            <Text style={styles.statusBandService}>
+              {service?.label || "Servicio"}
+              {pactado != null ? ` · ${euro(pactado)} pactado` : ""}
+            </Text>
+            {eta?.route && !finished ? (
+              <View style={styles.etaChip}>
+                <Ionicons name="time-outline" size={12} color="#FFFFFF" />
+                <Text style={styles.etaText}>
+                  {eta.route.minutes} min · {String(eta.route.km).replace(".", ",")} km
+                </Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={styles.statusBandTitle}>
-            {STATUS_LABELS[order.status] || order.status}
+            {goingToPickup && order.status === "in_transit"
+              ? "De camino a recoger"
+              : STATUS_LABELS[order.status] || order.status}
           </Text>
           {step && !finished ? (
             <Text style={styles.statusBandNext}>Siguiente: {step.label.toLowerCase()}</Text>
@@ -352,42 +390,82 @@ export default function TrabajoActivo() {
         {/* Mapa DENTRO de la app (petición del cliente: como Uber). Los botones
             de Maps/Waze quedan debajo como navegación paso a paso opcional. */}
         {!finished && (
-          <TrackingMap driverLocation={myPos} target={mapTarget} height={230} self />
+          <TrackingMap
+            driverLocation={myPos}
+            target={mapTarget}
+            height={230}
+            self
+            targetKind={goingToPickup ? "pickup" : "dropoff"}
+            onInfo={setEta}
+          />
         )}
 
+        {/* La dirección DE AHORA en grande, con su planta, y la otra debajo:
+            el conductor solo necesita saber a dónde va (canvas 1k). */}
         <Card>
-          <Caption>Recogida</Caption>
-          <Body>{order.origin_address || "—"}</Body>
-          <Caption>Entrega</Caption>
-          <Body>{order.destination_address || "—"}</Body>
-          {order.cargo_description ? (
-            <>
-              <Caption>Carga</Caption>
-              <Body>{order.cargo_description}</Body>
-            </>
-          ) : null}
-          {order.needs_help ? <Caption>El cliente ha pedido ayuda con la carga.</Caption> : null}
-          {order.client_phone ? (
-            <Button
-              title="Llamar al cliente"
-              variant="plain"
-              onPress={() => Linking.openURL(`tel:${order.client_phone}`)}
-            />
-          ) : null}
-        </Card>
+          <Caption>{goingToPickup ? "Recogida" : "Entrega"}</Caption>
+          <Text style={styles.address}>
+            {(goingToPickup ? order.origin_address : order.destination_address) || "—"}
+          </Text>
+          <Caption>
+            {[
+              goingToPickup
+                ? floorLabel(order.origin_floors, order.origin_has_lift)
+                : floorLabel(order.destination_floors, order.destination_has_lift),
+              order.needs_help ? "con ayuda" : null,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </Caption>
 
-        {!finished && (
-          <Card>
-            <Title>Navegación paso a paso</Title>
+          {!finished ? (
             <View style={{ flexDirection: "row", gap: spacing.sm }}>
-              <Button title="Google Maps" variant="plain" onPress={() => navigate("gmaps")} style={{ flex: 1 }} />
+              <Button title="Google Maps" icon="navigate-outline" variant="plain" onPress={() => navigate("gmaps")} style={{ flex: 1 }} />
               <Button title="Waze" variant="plain" onPress={() => navigate("waze")} style={{ flex: 1 }} />
             </View>
-            <Caption>
-              Tu posición se sigue enviando aunque salgas de la app o bloquees el móvil.
-            </Caption>
-          </Card>
-        )}
+          ) : null}
+
+          <View style={styles.divider} />
+          <Caption>{goingToPickup ? "Después, entrega en" : "Se recogió en"}</Caption>
+          <Body>{(goingToPickup ? order.destination_address : order.origin_address) || "—"}</Body>
+        </Card>
+
+        {/* El cliente y su carga, como en el canvas: quién es y qué se mueve. */}
+        <Card>
+          <View style={styles.clientRow}>
+            <View style={styles.clientAvatar}>
+              <Text style={styles.clientInitial}>
+                {(order.client_name || "C").slice(0, 1).toUpperCase()}
+              </Text>
+            </View>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Title>{order.client_name || "Cliente"}</Title>
+              <Caption>
+                {[
+                  order.cargo_description,
+                  order.cargo_photos?.length
+                    ? `${order.cargo_photos.length} foto${order.cargo_photos.length === 1 ? "" : "s"}`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ") || "Sin descripción de la carga"}
+              </Caption>
+            </View>
+            {order.client_phone ? (
+              <Pressable
+                onPress={() => Linking.openURL(`tel:${order.client_phone}`)}
+                style={styles.callButton}
+                hitSlop={8}
+              >
+                <Ionicons name="call" size={18} color={colors.primary} />
+              </Pressable>
+            ) : null}
+          </View>
+        </Card>
+
+        {!finished ? (
+          <Caption>Tu posición se sigue enviando aunque salgas de la app o bloquees el móvil.</Caption>
+        ) : null}
 
         <ErrorText>{error}</ErrorText>
 
@@ -492,17 +570,12 @@ export default function TrabajoActivo() {
           </Card>
         )}
 
+        {/* Un solo enlace discreto (canvas 1k): el motivo se elige después, en
+            una lista, no con cuatro botones compitiendo con el principal. */}
         {canCancel && (
-          <Card>
-            <Title>¿No puedes hacerlo?</Title>
-            <Caption>
-              Solo se puede cancelar antes de recoger la carga. El pedido vuelve a pendientes y se
-              avisa a la empresa.
-            </Caption>
-            {CANCEL_REASONS.map(reason => (
-              <Button key={reason} title={reason} variant="plain" onPress={() => cancel(reason)} />
-            ))}
-          </Card>
+          <Pressable onPress={chooseCancelReason} disabled={saving} style={{ paddingVertical: spacing.sm }}>
+            <Text style={styles.cancelLink}>Cancelar servicio</Text>
+          </Pressable>
         )}
 
         {/* El chat es una PANTALLA COMPLETA (canvas 2g): desde aquí solo se
@@ -541,8 +614,42 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
   },
-  statusBandTitle: { fontSize: 18, fontFamily: "Poppins_700Bold", color: "#FFFFFF" },
-  statusBandNext: { fontSize: 13, color: "#FFFFFFCC" },
+  statusBandTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
+  statusBandService: { fontSize: 12, fontFamily: "DMSans_700Bold", color: "#FFFFFFCC" },
+  statusBandTitle: { fontSize: 20, fontFamily: "Poppins_700Bold", color: "#FFFFFF" },
+  statusBandNext: { fontSize: 13, fontFamily: "DMSans_400Regular", color: "#FFFFFFCC" },
+  etaChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#FFFFFF2E",
+    borderRadius: radius.full,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+  },
+  etaText: { fontSize: 11.5, fontFamily: "DMSans_700Bold", color: "#FFFFFF" },
+  address: { fontSize: 17, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
+  divider: { height: 1, backgroundColor: colors.border },
+  clientRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
+  clientAvatar: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.full,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clientInitial: { fontSize: 17, fontFamily: "Poppins_700Bold", color: colors.primary },
+  callButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelLink: { fontSize: 13.5, fontFamily: "DMSans_500Medium", color: colors.destructive, textAlign: "center" },
   stepper: { flexDirection: "row", gap: spacing.xs, marginTop: spacing.xs },
   stepperBar: { flex: 1, height: 4, borderRadius: radius.full },
 });

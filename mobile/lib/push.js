@@ -25,9 +25,11 @@ Notifications.setNotificationHandler({
     const prefs = await getNotificationPrefs();
     const mode = notification?.request?.content?.data?.mode || "";
     const muted =
-      (mode === "chat_message" && !prefs.chat) ||
       (["price_offer", "offer_accepted", "new_request"].includes(mode) && !prefs.offers) ||
-      (["status_changed", "driver_assigned", "driver_arriving", "driver_cancelled"].includes(mode) && !prefs.status);
+      (["news", "promo"].includes(mode) && !prefs.news) ||
+      // El chat va con el estado del pedido: los dos son el servicio en curso.
+      (["chat_message", "status_changed", "driver_assigned", "driver_arriving", "driver_cancelled"].includes(mode) &&
+        !prefs.status);
     return {
       shouldShowBanner: !muted,
       shouldShowList: !muted,

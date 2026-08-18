@@ -1,17 +1,20 @@
 import { useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { useStripe } from "@stripe/stripe-react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { supabase } from "../lib/supabase";
+import { euro } from "../lib/money";
 import { Body, Button, Caption, Card, ErrorText, Title } from "./ui";
-import { colors, spacing } from "../theme";
+import { colors, radius, spacing } from "../theme";
 
 /**
- * Propina al conductor tras la entrega. Cargo Stripe APARTE del servicio,
- * 100 % para el conductor (propuesta §2.2 «Post-servicio»).
+ * Propina al conductor tras la entrega (canvas 2h): tres importes en fila,
+ * «100 % para el conductor» y el total con propina antes de pagar.
  *
- * El importe elegido aquí solo es una petición: el servidor lo valida
- * (0,50–20 €), crea el cargo y `confirm-tip` verifica en Stripe que se pagó de
- * verdad antes de anotarlo. Un solo intento por pedido (idempotencia).
+ * Cargo Stripe APARTE del servicio. El importe elegido aquí solo es una
+ * petición: el servidor lo valida (0,50–20 €), crea el cargo y `confirm-tip`
+ * verifica en Stripe que se pagó de verdad antes de anotarlo. Un solo intento
+ * por pedido (idempotencia).
  */
 const OPTIONS = [1, 2, 5];
 
@@ -25,13 +28,18 @@ export default function TipCard({ order, driverName }) {
   if (order.tip_amount || done) {
     return (
       <Card style={{ backgroundColor: colors.successBg, borderColor: colors.success }}>
-        <Body>
-          Gracias — tu propina {order.tip_amount ? `de ${order.tip_amount} €` : ""} llega íntegra a{" "}
-          {driverName || "tu conductor"}.
-        </Body>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+          <Ionicons name="heart" size={20} color={colors.success} />
+          <Body style={{ flex: 1 }}>
+            Gracias — tu propina {order.tip_amount ? `de ${euro(Number(order.tip_amount), 2)} ` : ""}
+            llega íntegra a {driverName || "tu conductor"}.
+          </Body>
+        </View>
       </Card>
     );
   }
+
+  const servicePrice = Number(order.final_price ?? order.estimated_price ?? 0);
 
   const tip = async () => {
     if (!amount) return;
@@ -80,25 +88,59 @@ export default function TipCard({ order, driverName }) {
 
   return (
     <Card>
-      <Title>¿Le dejas propina a {driverName || "tu conductor"}?</Title>
-      <Caption>Va íntegra para él. Se cobra a tu tarjeta, aparte del servicio.</Caption>
-      <View style={styles.row}>
-        {OPTIONS.map(value => (
-          <Button
-            key={value}
-            title={`${value} €`}
-            variant={amount === value ? "primary" : "plain"}
-            onPress={() => setAmount(value)}
-            style={{ flex: 1 }}
-          />
-        ))}
+      <View style={styles.head}>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Title>Dejar propina</Title>
+          <Caption>100 % para el conductor</Caption>
+        </View>
       </View>
+
+      <View style={styles.row}>
+        {OPTIONS.map(value => {
+          const active = amount === value;
+          return (
+            <Pressable
+              key={value}
+              onPress={() => setAmount(active ? null : value)}
+              style={[styles.tip, active && styles.tipOn]}
+            >
+              <Text style={[styles.tipText, active && { color: colors.primary }]}>{euro(value)}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
+      {servicePrice > 0 ? (
+        <View style={styles.totalRow}>
+          <Caption>Total con propina</Caption>
+          <Text style={styles.total}>{euro(servicePrice + (amount || 0), 2)}</Text>
+        </View>
+      ) : null}
+
       <ErrorText>{error}</ErrorText>
-      <Button title="Dar propina" onPress={tip} loading={loading} disabled={!amount} />
+      <Button
+        title={amount ? `Dar ${euro(amount)} de propina` : "Elige un importe"}
+        onPress={tip}
+        loading={loading}
+        disabled={!amount}
+      />
     </Card>
   );
 }
 
 const styles = StyleSheet.create({
+  head: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   row: { flexDirection: "row", gap: spacing.sm },
+  tip: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+  },
+  tipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  tipText: { fontSize: 15, fontFamily: "Poppins_600SemiBold", color: colors.mutedForeground },
+  totalRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  total: { fontSize: 17, fontFamily: "Poppins_700Bold", color: colors.foreground },
 });

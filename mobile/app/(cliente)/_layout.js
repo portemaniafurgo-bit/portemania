@@ -44,6 +44,9 @@ export default function ClienteLayout() {
       {/* Chat a pantalla completa (canvas 2g): sin barra de pestañas, que el
           teclado y la conversación ocupen todo. */}
       <Tabs.Screen name="chat/[id]" options={{ href: null, tabBarStyle: { display: "none" } }} />
+      {/* Ajustes del perfil (canvas 2i): se entra desde Perfil. */}
+      <Tabs.Screen name="pagos" options={{ href: null }} />
+      <Tabs.Screen name="ayuda" options={{ href: null }} />
     </Tabs>
   );
 }

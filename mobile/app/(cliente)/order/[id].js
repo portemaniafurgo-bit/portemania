@@ -44,6 +44,16 @@ import { colors, radius, spacing } from "../../../theme";
 // publicado — nadie cancela dinero en silencio.)
 const OFFER_WINDOW_MS = 15 * 60_000;
 
+// Lo que devuelve la app al elegir estrella (canvas 1i). Con 1-2 no se promete
+// nada que no se vaya a hacer: se le dice que la empresa lo va a mirar.
+const RATE_LABELS = {
+  1: "Sentimos que haya ido así, lo revisamos",
+  2: "Gracias por decirlo, lo revisamos",
+  3: "Tomamos nota para mejorar",
+  4: "Nos alegra, se lo diremos",
+  5: "Perfecto, se lo diremos",
+};
+
 const distanceKm = (aLat, aLng, bLat, bLng) => {
   if (!aLat || !aLng || !bLat || !bLng) return null;
   const rad = x => (x * Math.PI) / 180;
@@ -495,6 +505,10 @@ export default function OrderDetail() {
                 </Pressable>
               ))}
             </View>
+            {/* La etiqueta responde a la estrella elegida (canvas 1i: rateLabel) */}
+            {rating > 0 ? (
+              <Body style={{ fontFamily: "DMSans_700Bold" }}>{RATE_LABELS[rating]}</Body>
+            ) : null}
             <Field
               value={review}
               onChangeText={setReview}
@@ -517,7 +531,7 @@ export default function OrderDetail() {
                 <Ionicons key={i} name="star" size={20} color={colors.accent} />
               ))}
             </View>
-            <Body style={{ fontFamily: "DMSans_700Bold" }}>Perfecto, se lo diremos</Body>
+            <Body style={{ fontFamily: "DMSans_700Bold" }}>{RATE_LABELS[order.client_rating]}</Body>
             {order.client_review ? <Caption>{order.client_review}</Caption> : null}
           </Card>
         ) : null}

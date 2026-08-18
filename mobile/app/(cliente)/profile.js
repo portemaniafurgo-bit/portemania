@@ -1,36 +1,104 @@
+import { useCallback, useState } from "react";
+import { Linking, StyleSheet, Text, View } from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import Constants from "expo-constants";
 import { useAuth } from "../../lib/auth";
+import { getDefaultPayment, PAYMENT_LABELS } from "../../lib/payment";
 import DeleteAccount from "../../components/DeleteAccount";
 import NotificationPrefs from "../../components/NotificationPrefs";
-import { Body, Button, Caption, Card, Heading, Screen, Title } from "../../components/ui";
+import { SettingsGroup, SettingsRow } from "../../components/SettingsRow";
+import { Caption, Heading, Screen, Title } from "../../components/ui";
+import { colors, radius, spacing } from "../../theme";
 
 /**
- * Cuenta del cliente. En la Etapa 6 se añade aquí el BORRADO DE CUENTA, que
- * Google Play exige a toda app que permita registrarse.
+ * Perfil del cliente (canvas 2i): identidad arriba, avisos con sus tres
+ * interruptores, y las filas de pago, recibos y ayuda. Cerrar sesión y borrar
+ * cuenta al final — esta última la exige Google Play en toda app con registro.
  */
 export default function Perfil() {
   const { user, role, signOut } = useAuth();
+  const router = useRouter();
+  const [payment, setPayment] = useState("cash");
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      getDefaultPayment().then(value => active && setPayment(value));
+      return () => {
+        active = false;
+      };
+    }, []),
+  );
+
+  const name = user?.user_metadata?.full_name || "Sin nombre";
+  const phone = user?.user_metadata?.phone;
+  const version = Constants.expoConfig?.version || "0.1.4";
 
   return (
     <Screen>
-      <Heading>Mi cuenta</Heading>
+      <Heading>Perfil</Heading>
 
-      <Card>
-        <Title>{user?.user_metadata?.full_name || "Sin nombre"}</Title>
-        <Caption>{user?.email}</Caption>
-        {user?.user_metadata?.phone ? <Caption>{user.user_metadata.phone}</Caption> : null}
-        {role && role !== "client" ? <Caption>Rol: {role}</Caption> : null}
-      </Card>
-
-      <Card>
-        <Body>¿Necesitas administrar pedidos o tarifas?</Body>
-        <Caption>El panel de administración sigue siendo web: clicyvoy.es/admin</Caption>
-      </Card>
+      <View style={styles.identity}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarInitial}>{name.slice(0, 1).toUpperCase()}</Text>
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Title>{name}</Title>
+          {phone ? <Caption>{phone}</Caption> : null}
+          <Caption>{user?.email}</Caption>
+          {role && role !== "client" ? <Caption>Rol: {role}</Caption> : null}
+        </View>
+      </View>
 
       <NotificationPrefs />
 
-      <Button title="Cerrar sesión" variant="plain" onPress={signOut} />
+      <SettingsGroup>
+        <SettingsRow
+          icon="card-outline"
+          label="Métodos de pago"
+          value={PAYMENT_LABELS[payment]}
+          onPress={() => router.push("/(cliente)/pagos")}
+        />
+        <SettingsRow
+          icon="receipt-outline"
+          label="Mis recibos"
+          onPress={() => router.push("/(cliente)/orders?filter=delivered")}
+        />
+        <SettingsRow
+          icon="help-buoy-outline"
+          label="Ayuda y contacto"
+          onPress={() => router.push("/(cliente)/ayuda")}
+          last
+        />
+      </SettingsGroup>
+
+      <SettingsGroup>
+        <SettingsRow icon="log-out-outline" label="Cerrar sesión" onPress={signOut} />
+        <SettingsRow
+          icon="information-circle-outline"
+          label="Administrar pedidos o tarifas"
+          hint="El panel de administración sigue siendo web"
+          onPress={() => Linking.openURL("https://clicyvoy.es/admin")}
+          last
+        />
+      </SettingsGroup>
 
       <DeleteAccount />
+
+      <Caption style={{ textAlign: "center" }}>ClicyVoy {version} · Albacete</Caption>
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  identity: { flexDirection: "row", alignItems: "center", gap: spacing.lg },
+  avatar: {
+    width: 60,
+    height: 60,
+    borderRadius: radius.full,
+    backgroundColor: colors.primarySoft,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarInitial: { fontSize: 24, fontFamily: "Poppins_700Bold", color: colors.primary },
+});

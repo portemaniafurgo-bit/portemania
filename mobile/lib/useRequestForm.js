@@ -6,6 +6,7 @@ import { DEFAULT_TARIFFS, fetchTariffs, quoteRequest, weightsForZone, MAX_STOPS 
 import { geocodeAlbacete, fetchRouteEta } from "./eta";
 import { isInZone, postalCodeError } from "./zones";
 import { uploadPhoto } from "./photos";
+import { getDefaultPayment } from "./payment";
 
 /**
  * Estado, validación, precio y envío del asistente de pedido en la app.
@@ -95,16 +96,25 @@ export function useRequestForm({ user } = {}) {
 
   // --- Borrador local ------------------------------------------------------
   useEffect(() => {
-    AsyncStorage.getItem(DRAFT_KEY)
-      .then(raw => {
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(DRAFT_KEY);
+        // Sin borrador, el método de pago arranca en el preferido del perfil
+        // (canvas 2i → Métodos de pago); con borrador manda lo que dejó a medias.
+        const preferred = await getDefaultPayment();
         if (raw) {
           const saved = JSON.parse(raw);
           setForm(emptyForm(saved.form || {}));
           setPhotos(saved.photos || []);
+        } else {
+          setForm(prev => ({ ...prev, payment_method: preferred }));
         }
-      })
-      .catch(() => {})
-      .finally(() => setDraftLoaded(true));
+      } catch {
+        /* borrador ilegible: se empieza en limpio, no se rompe el asistente */
+      } finally {
+        setDraftLoaded(true);
+      }
+    })();
   }, []);
 
   useEffect(() => {
