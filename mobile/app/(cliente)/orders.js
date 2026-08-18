@@ -8,6 +8,8 @@ import { useAuth } from "../../lib/auth";
 import { serviceOf } from "../../lib/services";
 import { countUnread } from "../../lib/unread";
 import { euro } from "../../lib/money";
+import { format, isToday, isYesterday } from "date-fns";
+import { es } from "date-fns/locale";
 import { Button, Caption, Card, Heading, Loading, Title } from "../../components/ui";
 import EmptyState from "../../components/EmptyState";
 import ServiceIcon from "../../components/ServiceIcon";
@@ -35,6 +37,15 @@ const STATUS = {
   delivered: { label: "Entregado", color: colors.success, bg: colors.successBg },
   cancelled: { label: "Cancelado", color: colors.destructive, bg: "#FEF2F2" },
 };
+
+/** «Hoy 11:08», «Ayer 18:40» o «12 ago 09:15». */
+function whenLabel(order) {
+  const date = new Date(order.delivery_time || order.scheduled_at || order.created_date);
+  const hour = format(date, "HH:mm");
+  if (isToday(date)) return `Hoy ${hour}`;
+  if (isYesterday(date)) return `Ayer ${hour}`;
+  return format(date, "d MMM · HH:mm", { locale: es });
+}
 
 export default function MisPedidos() {
   const { user } = useAuth();
@@ -174,6 +185,8 @@ export default function MisPedidos() {
                     <Text style={[styles.badgeText, { color: status.color }]}>{status.label}</Text>
                   </View>
                 </View>
+                {/* Cuándo se pidió (canvas 2f: cada tarjeta lleva su fecha) */}
+                <Caption>{whenLabel(order)}</Caption>
                 <Caption>{order.origin_address || "—"}</Caption>
                 <Caption>→ {order.destination_address || "—"}</Caption>
                 {(order.final_price ?? order.estimated_price) != null && (
