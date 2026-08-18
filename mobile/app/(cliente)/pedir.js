@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
@@ -8,6 +8,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { useAuth } from "../../lib/auth";
+import { supabase } from "../../lib/supabase";
 import { parseScheduledAt, useRequestForm } from "../../lib/useRequestForm";
 import { SERVICE_KEYS, SERVICES } from "../../lib/services";
 import { INCLUDED_HOURS, offerFloor, servicePriceFrom } from "../../lib/tariffs";
@@ -84,6 +85,13 @@ export default function Pedir() {
   // borrador recuperado con fecha también lo activa.
   const [wantSchedule, setWantSchedule] = useState(false);
   const scheduling = wantSchedule || !!form.scheduled_date;
+  // Penalización de una cancelación anterior sin saldar: la suma el servidor al
+  // crear el pedido, pero el cliente tiene que verla antes de publicar.
+  const [pendingFee, setPendingFee] = useState(0);
+
+  useEffect(() => {
+    supabase.rpc("pending_cancellation_fee").then(({ data }) => setPendingFee(Number(data) || 0));
+  }, []);
 
   // Suelo de la oferta: nunca por debajo de 30 €, ni del 60 % de la tarifa.
   const floor = offerFloor(quote.total);
@@ -813,12 +821,30 @@ export default function Pedir() {
             />
           </View>
 
+          {/* Deuda de una cancelación anterior: se cobra con este servicio y
+              se avisa ANTES de publicar, no al ver la factura. */}
+          {pendingFee > 0 ? (
+            <View style={[styles.plainCard, { backgroundColor: colors.warningBg }]}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                <Ionicons name="alert-circle-outline" size={20} color={colors.warning} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Title>Penalización pendiente: {euro(pendingFee)}</Title>
+                  <Caption>
+                    De un pedido que cancelaste con el conductor ya en camino. Se suma a este
+                    servicio y queda saldada.
+                  </Caption>
+                </View>
+              </View>
+            </View>
+          ) : null}
+
           <View style={styles.totalBar}>
             <View style={{ flex: 1, gap: 2 }}>
               <Caption>{offer ? "Tu oferta" : "Precio cerrado"}</Caption>
               {offer ? <Caption>cerrado {euro(quote.total)}</Caption> : null}
+              {pendingFee > 0 ? <Caption>+ {euro(pendingFee)} de penalización</Caption> : null}
             </View>
-            <Text style={styles.totalValue}>{euro(offer ?? quote.total, 2)}</Text>
+            <Text style={styles.totalValue}>{euro((offer ?? quote.total) + pendingFee, 2)}</Text>
           </View>
 
           <Pressable onPress={discard}>

@@ -68,9 +68,27 @@ por qué.
   con cambiar la hora del móvil para cancelar gratis siempre.
 - Al conductor le llega aviso al momento, que para eso ha dejado lo que estaba
   haciendo.
-- La penalización **se registra en el pedido, no se cobra sola**: cobrarla
-  automáticamente exige tarjeta guardada (Stripe customer), que es tarea aparte.
-  Mientras tanto queda anotada y la empresa decide.
+### Cómo se cobra la penalización (decisión tomada el 19/08)
+
+**No se cobra sola con la tarjeta guardada.** Cobrar fuera de sesión en Europa
+exige un mandato SCA, falla a menudo y convierte una deuda de 5 € en una
+discusión con el banco y un posible chargeback. Por 5 €, no compensa.
+
+Se hace como Uber con los saldos pendientes: **la penalización se suma al
+siguiente servicio de ese cliente**.
+
+- Al cancelar queda anotada en el pedido.
+- El asistente se la enseña **antes de publicar** el siguiente pedido, en una
+  tarjeta ámbar y sumada en el total: nadie se entera al ver la factura.
+- Al crearse ese pedido, el servidor la añade como línea del desglose
+  («Penalización por cancelación anterior») y la da por saldada apuntando al
+  pedido donde se cobró — rastro completo para Finanzas.
+- Se cobra con el mismo pago del servicio, en efectivo o con tarjeta. Sin
+  infraestructura nueva y sin cobros por sorpresa.
+
+Probado de punta a punta contra producción: cancelar pasados 10 minutos deja 5 €
+de deuda, el siguiente porte de 40 € se crea por 45 € con su línea en el
+desglose, y la deuda queda a 0 apuntando al pedido que la saldó.
 
 Probado contra producción los cinco casos, incluidos los que deben fallar:
 cancelar un pedido ajeno y cancelar con la carga ya recogida.
