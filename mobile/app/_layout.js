@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { Stack, useRouter, useSegments } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ONBOARDING_KEY } from "./onboarding";
@@ -67,6 +69,10 @@ function RootNavigation() {
     // grupo, y mandar a todo el mundo a cliente haría parpadear al conductor.
     if (!role) return;
 
+    // El chat vive fuera de las pestañas, en el stack raíz: es suyo y no hay
+    // que devolverlo a su grupo (con sesión ya iniciada, claro).
+    if (group === "chat") return;
+
     // Redirigir SIEMPRE que no se esté ya en el grupo correcto — incluido el
     // arranque en la raíz (group undefined): no redirigir ahí dejaba al usuario
     // con sesión mirando "Abriendo ClicyVoy…" para siempre (bug real, 0.1.1).
@@ -90,9 +96,57 @@ function RootNavigation() {
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(cliente)" />
       <Stack.Screen name="(conductor)" />
+      {/* El chat es pantalla completa, no una pestaña (canvas 2g). */}
+      <Stack.Screen name="chat/[id]" />
     </Stack>
   );
 }
+
+/**
+ * Si una pantalla falla al pintarse, expo-router deja el hueco EN NEGRO y no
+ * hay forma de saber qué pasó (bug real reportado el 2026-08-18 en el chat).
+ * Con esto se ve el error, se puede reintentar y se puede volver atrás.
+ */
+export function ErrorBoundary({ error, retry }) {
+  return (
+    <SafeAreaProvider>
+      <View style={errorStyles.screen}>
+        <Ionicons name="alert-circle-outline" size={44} color={colors.destructive} />
+        <Text style={errorStyles.title}>Esta pantalla no se ha podido abrir</Text>
+        <Text style={errorStyles.detail}>{error?.message || "Error desconocido"}</Text>
+        <Pressable onPress={retry} style={errorStyles.button}>
+          <Text style={errorStyles.buttonText}>Reintentar</Text>
+        </Pressable>
+        <Text style={errorStyles.hint}>
+          Si vuelve a pasar, haz una captura de esta pantalla: el texto de arriba dice qué ha
+          fallado.
+        </Text>
+      </View>
+    </SafeAreaProvider>
+  );
+}
+
+const errorStyles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    gap: 12,
+  },
+  title: { fontSize: 18, fontFamily: "Poppins_600SemiBold", color: colors.foreground, textAlign: "center" },
+  detail: { fontSize: 13, fontFamily: "DMSans_400Regular", color: colors.destructive, textAlign: "center" },
+  button: {
+    marginTop: 8,
+    borderRadius: 999,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 28,
+    paddingVertical: 12,
+  },
+  buttonText: { color: "#FFFFFF", fontSize: 14.5, fontFamily: "DMSans_700Bold" },
+  hint: { fontSize: 11.5, fontFamily: "DMSans_400Regular", color: colors.mutedForeground, textAlign: "center" },
+});
 
 export default function RootLayout() {
   // La tipografía de la marca (la landing titula con Poppins). Si tarda o

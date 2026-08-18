@@ -162,5 +162,14 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   errorText: { color: colors.destructive, fontSize: 12, fontFamily: "DMSans_400Regular" },
-  loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.sm, padding: spacing.xl },
+  // Fondo explícito: un contenedor transparente a pantalla completa se ve
+  // NEGRO sobre el fondo de la ventana de Android.
+  loading: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.sm,
+    padding: spacing.xl,
+  },
 });

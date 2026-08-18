@@ -624,7 +624,7 @@ export default function OrderDetail() {
         {/* Chat: pantalla completa (canvas 2g); desde aquí solo se entra. */}
         {order.driver_id && (
           <ChatLink
-            href={`/(cliente)/chat/${order.id}`}
+            href={`/chat/${order.id}`}
             title={`Chat con ${driverFirst}`}
             subtitle={delivered ? "La conversación queda como historial" : "Mensajes y fotos con tu conductor"}
           />

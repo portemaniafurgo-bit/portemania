@@ -12,7 +12,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { format, isToday, isYesterday } from "date-fns";
 import { es } from "date-fns/locale";
 import { Ionicons } from "@expo/vector-icons";
@@ -34,6 +34,15 @@ function dayLabel(date) {
   if (isToday(date)) return "Hoy";
   if (isYesterday(date)) return "Ayer";
   return format(date, "d 'de' MMMM", { locale: es });
+}
+
+/**
+ * Fecha de un mensaje. Si viniera vacía o corrupta, date-fns lanza y la
+ * pantalla entera se queda EN NEGRO: un mensaje raro no puede tumbar el chat.
+ */
+function messageDate(message) {
+  const date = new Date(message?.created_date ?? NaN);
+  return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export default function ChatThread({ orderId, partnerRole }) {
@@ -100,8 +109,6 @@ export default function ChatThread({ orderId, partnerRole }) {
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right", "bottom"]}>
-      <Stack.Screen options={{ headerShown: false }} />
-
       {/* Cabecera propia, como el canvas: atrás + avatar + nombre + estado */}
       <View style={styles.header}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
@@ -138,13 +145,12 @@ export default function ChatThread({ orderId, partnerRole }) {
           ) : (
             messages.map((m, i) => {
               const mine = m.sender_id === user?.id;
-              const date = new Date(m.created_date);
+              const date = messageDate(m);
               // Separador de día (canvas 2g): «Hoy · 10:24» al abrir la
               // conversación y cada vez que cambia la fecha.
-              const previous = messages[i - 1];
+              const previousDate = messageDate(messages[i - 1]);
               const newDay =
-                !previous ||
-                new Date(previous.created_date).toDateString() !== date.toDateString();
+                !!date && (!previousDate || previousDate.toDateString() !== date.toDateString());
               return (
                 <View key={m.id} style={{ gap: spacing.sm }}>
                   {newDay ? (
@@ -161,9 +167,11 @@ export default function ChatThread({ orderId, partnerRole }) {
                         {m.message}
                       </Text>
                     ) : null}
-                    <Text style={[styles.time, mine && { color: "#FFFFFFAA" }]}>
-                      {format(date, "HH:mm")}
-                    </Text>
+                    {date ? (
+                      <Text style={[styles.time, mine && { color: "#FFFFFFAA" }]}>
+                        {format(date, "HH:mm")}
+                      </Text>
+                    ) : null}
                   </View>
                 </View>
               );

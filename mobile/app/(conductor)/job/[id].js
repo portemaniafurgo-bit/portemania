@@ -192,7 +192,14 @@ export default function TrabajoActivo() {
   const pactado = order.final_price ?? order.estimated_price ?? null;
   const step = STEPS.find(s => s.from === order.status);
   const finished = ["delivered", "cancelled"].includes(order.status);
-  const canCancel = ["accepted", "in_transit"].includes(order.status);
+  // Política de cancelación, la misma que Uber, Bolt o inDrive:
+  //  - Asignado y aún sin salir: se cancela sin más, vuelve a la bolsa.
+  //  - Ya en camino: no es una cancelación normal, es un imprevisto — se pide
+  //    motivo, queda registrado con el nombre y se avisa a la empresa.
+  //  - Con la carga recogida: NO se cancela. La mercancía es del cliente y
+  //    soltarla a medias no es una opción de la app, se llama a la empresa.
+  const canCancel = order.status === "accepted";
+  const startedTrip = order.status === "in_transit";
   // Hasta recoger, el destino de la navegación es la recogida.
   const goingToPickup = ["accepted", "in_transit"].includes(order.status);
   const navTarget = goingToPickup ? order.origin_address : order.destination_address;
@@ -320,12 +327,22 @@ export default function TrabajoActivo() {
   };
 
   /** Primero el motivo, luego la confirmación: cancelar es cosa seria y la
-   *  empresa necesita saber por qué. */
+   *  empresa necesita saber por qué. Ya en camino, el aviso es más serio y el
+   *  motivo se marca como imprevisto en viaje. */
   const chooseCancelReason = () => {
-    Alert.alert("Cancelar el servicio", "¿Qué ha pasado?", [
-      ...CANCEL_REASONS.map(reason => ({ text: reason, onPress: () => cancel(reason) })),
-      { text: "Volver", style: "cancel" },
-    ]);
+    Alert.alert(
+      startedTrip ? "No puedo continuar" : "Cancelar el servicio",
+      startedTrip
+        ? "Ya has salido hacia la recogida: esto se registra como imprevisto, se avisa a la empresa y el cliente vuelve a buscar conductor. ¿Qué ha pasado?"
+        : "¿Qué ha pasado?",
+      [
+        ...CANCEL_REASONS.map(reason => ({
+          text: reason,
+          onPress: () => cancel(startedTrip ? `En viaje — ${reason}` : reason),
+        })),
+        { text: "Volver", style: "cancel" },
+      ],
+    );
   };
 
   const navigate = (app) => {
@@ -572,16 +589,42 @@ export default function TrabajoActivo() {
 
         {/* Un solo enlace discreto (canvas 1k): el motivo se elige después, en
             una lista, no con cuatro botones compitiendo con el principal. */}
-        {canCancel && (
+        {(canCancel || startedTrip) && (
           <Pressable onPress={chooseCancelReason} disabled={saving} style={{ paddingVertical: spacing.sm }}>
-            <Text style={styles.cancelLink}>Cancelar servicio</Text>
+            <Text style={styles.cancelLink}>
+              {startedTrip ? "No puedo continuar" : "Cancelar servicio"}
+            </Text>
           </Pressable>
+        )}
+
+        {/* Con la carga ya recogida no se cancela desde la app: se resuelve
+            hablando, como en cualquier plataforma seria. */}
+        {order.status === "picked_up" && (
+          <Card>
+            <Title>¿Un problema con este servicio?</Title>
+            <Caption>
+              Con la carga recogida el servicio ya no se puede cancelar desde la app. Llama a la
+              empresa y lo resolvemos contigo.
+            </Caption>
+            <Button
+              title="Avisar a la empresa"
+              variant="plain"
+              icon="mail-outline"
+              onPress={() =>
+                Linking.openURL(
+                  `mailto:portemaniafurgo@gmail.com?subject=${encodeURIComponent(
+                    `Incidencia en servicio ${order.id.slice(0, 8)}`,
+                  )}`,
+                )
+              }
+            />
+          </Card>
         )}
 
         {/* El chat es una PANTALLA COMPLETA (canvas 2g): desde aquí solo se
             entra, con el aviso de mensajes sin leer. */}
         <ChatLink
-          href={`/(conductor)/chat/${order.id}`}
+          href={`/chat/${order.id}`}
           title={`Chat con ${(order.client_name || "el cliente").split(" ")[0]}`}
           subtitle={
             finished
