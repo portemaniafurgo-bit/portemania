@@ -1,5 +1,6 @@
 import { useAuth } from "../../lib/auth";
 import DeleteAccount from "../../components/DeleteAccount";
+import NotificationPrefs from "../../components/NotificationPrefs";
 import { Body, Button, Caption, Card, Heading, Screen, Title } from "../../components/ui";
 
 /**
@@ -24,6 +25,8 @@ export default function Perfil() {
         <Body>¿Necesitas administrar pedidos o tarifas?</Body>
         <Caption>El panel de administración sigue siendo web: clicyvoy.es/admin</Caption>
       </Card>
+
+      <NotificationPrefs />
 
       <Button title="Cerrar sesión" variant="plain" onPress={signOut} />
 

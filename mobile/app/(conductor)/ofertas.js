@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
+import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
@@ -428,39 +428,6 @@ export default function Ofertas() {
                       }}
                     />
                   </View>
-                ) : counterFor === order.id ? (
-                  /* Hoja de contraoferta (canvas 1j): importe con +/− y motivo */
-                  <View style={styles.counterBox}>
-                    <Counter
-                      label="Tu contraoferta"
-                      value={counterAmount}
-                      onChange={setCounterAmount}
-                      min={5}
-                      max={500}
-                    />
-                    <Text style={styles.counterBig}>{counterAmount} €</Text>
-                    <Field
-                      value={counterMessage}
-                      onChangeText={setCounterMessage}
-                      placeholder="Motivo (opcional): distancia, plantas…"
-                    />
-                    <View style={{ flexDirection: "row", gap: spacing.sm }}>
-                      <Button
-                        title="Enviar contraoferta"
-                        loading={negotiating}
-                        disabled={counterAmount < 5}
-                        onPress={() => sendCounterOffer(order)}
-                        style={{ flex: 2 }}
-                      />
-                      <Button
-                        title="Cancelar"
-                        variant="plain"
-                        disabled={negotiating}
-                        onPress={() => setCounterFor(null)}
-                        style={{ flex: 1 }}
-                      />
-                    </View>
-                  </View>
                 ) : (
                   /* Negociación: aceptar el precio del cliente o contraofertar */
                   <View style={{ flexDirection: "row", gap: spacing.sm }}>
@@ -493,6 +460,46 @@ export default function Ofertas() {
           })
         )}
       </ScrollView>
+
+      {/* Hoja inferior de contraoferta (canvas 1j): importe grande, +/− y motivo */}
+      <Modal
+        visible={counterFor != null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => !negotiating && setCounterFor(null)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => !negotiating && setCounterFor(null)} />
+        <View style={styles.counterSheet}>
+          <View style={styles.sheetHandle} />
+          <Title>Tu contraoferta</Title>
+          {(() => {
+            const order = orders?.find(o => o.id === counterFor);
+            return order ? (
+              <Caption>
+                El cliente ofrece {Number(order.proposed_price).toFixed(0)} € · tarifa{" "}
+                {order.estimated_price} €
+              </Caption>
+            ) : null;
+          })()}
+          <Text style={styles.counterBig}>{counterAmount} €</Text>
+          <Counter label="Ajusta el importe" value={counterAmount} onChange={setCounterAmount} min={5} max={500} />
+          <Field
+            value={counterMessage}
+            onChangeText={setCounterMessage}
+            placeholder="Motivo (opcional): distancia, plantas…"
+          />
+          <Button
+            title={`Enviar contraoferta de ${counterAmount} €`}
+            loading={negotiating}
+            disabled={counterAmount < 5}
+            onPress={() => {
+              const order = orders?.find(o => o.id === counterFor);
+              if (order) sendCounterOffer(order);
+            }}
+          />
+          <Button title="Cancelar" variant="plain" disabled={negotiating} onPress={() => setCounterFor(null)} />
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -506,6 +513,21 @@ const styles = StyleSheet.create({
   tag: { backgroundColor: colors.secondary, borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 4 },
   tagText: { fontSize: 12, color: colors.mutedForeground },
   myOfferBox: { backgroundColor: colors.primarySoft, borderRadius: radius.md, padding: spacing.md, gap: 4 },
-  counterBox: { backgroundColor: colors.secondary, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
+  backdrop: { flex: 1, backgroundColor: "#00000066" },
+  counterSheet: {
+    backgroundColor: colors.card,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.lg,
+    paddingBottom: spacing.xl,
+    gap: spacing.md,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.border,
+  },
   counterBig: { fontSize: 28, fontFamily: "Poppins_700Bold", color: colors.primary, textAlign: "center" },
 });

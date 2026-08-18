@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Alert, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Dimensions, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { supabase } from "../../../lib/supabase";
@@ -40,6 +40,9 @@ export default function OrderDetail() {
   // Negociación (canvas 1g): contraofertas de conductores EN VIVO.
   const [priceOffers, setPriceOffers] = useState([]);
   const [negotiating, setNegotiating] = useState(false);
+  // Canvas 1h: en pedido activo el mapa llena la pantalla y la hoja pinta
+  // ETA/frescura por su cuenta (TrackingMap se los pasa por onInfo).
+  const [mapInfo, setMapInfo] = useState({ route: null, freshness: null });
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -188,13 +191,63 @@ export default function OrderDetail() {
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <Stack.Screen options={{ headerShown: true, title: "Tu pedido" }} />
       <ScrollView ref={scrollRef} contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-          <ServiceIcon serviceKey={service?.key} size={44} />
-          <View style={{ gap: 2, flex: 1 }}>
-            <Heading>{service?.label || "Servicio"}</Heading>
-            <Caption>{STATUS_LABELS[order.status] || order.status}</Caption>
+        {/* Canvas 1h — pedido EN CURSO: el mapa llena la parte alta a sangre
+            y la hoja monta encima con asa; ETA y frescura viven en la hoja. */}
+        {active && (
+          <View style={styles.fullMapWrap}>
+            <TrackingMap
+              driverLocation={driverLocation}
+              target={target}
+              height={Math.round(Dimensions.get("window").height * 0.44)}
+              bare
+              onInfo={setMapInfo}
+            />
           </View>
-        </View>
+        )}
+
+        {active && (
+          <Card style={styles.sheet}>
+            <View style={styles.sheetHandle} />
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+              <ServiceIcon serviceKey={service?.key} size={38} />
+              <View style={{ gap: 2, flex: 1 }}>
+                <Title>{STATUS_LABELS[order.status] || order.status}</Title>
+                {mapInfo.route ? (
+                  <Caption>
+                    Llega a {target.label} en ~{mapInfo.route.minutes} min · {mapInfo.route.km} km
+                  </Caption>
+                ) : (
+                  <Caption>Calculando ruta…</Caption>
+                )}
+              </View>
+            </View>
+            {mapInfo.freshness ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+                <View
+                  style={[
+                    styles.freshDot,
+                    { backgroundColor: mapInfo.freshness.fresh ? colors.success : colors.warning },
+                  ]}
+                />
+                <Caption style={{ color: mapInfo.freshness.fresh ? colors.success : colors.warning }}>
+                  {mapInfo.freshness.fresh
+                    ? "Posición del conductor en vivo"
+                    : `Última posición ${mapInfo.freshness.label}`}
+                </Caption>
+              </View>
+            ) : null}
+          </Card>
+        )}
+
+        {!active && (
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+            <ServiceIcon serviceKey={service?.key} size={44} />
+            <View style={{ gap: 2, flex: 1 }}>
+              <Heading>{service?.label || "Servicio"}</Heading>
+              <Caption>{STATUS_LABELS[order.status] || order.status}</Caption>
+            </View>
+          </View>
+        )}
 
         {/* Línea de estados */}
         {order.status !== "cancelled" && (
@@ -256,8 +309,6 @@ export default function OrderDetail() {
           </Card>
         )}
 
-        {/* Mapa en vivo */}
-        {active && <TrackingMap driverLocation={driverLocation} target={target} />}
 
         {/* Conductor */}
         {driver && (
@@ -483,4 +534,21 @@ const styles = StyleSheet.create({
   myOfferChipText: { fontSize: 12, fontFamily: "DMSans_700Bold", color: colors.primary },
   offerCard: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, gap: spacing.sm },
   offerAmount: { fontSize: 20, fontFamily: "Poppins_700Bold", color: colors.primary },
+  // Canvas 1h: mapa a sangre + hoja con asa montando encima.
+  fullMapWrap: { marginHorizontal: -spacing.lg, marginTop: -spacing.lg },
+  sheet: {
+    marginTop: -30,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    marginHorizontal: -4,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 44,
+    height: 4,
+    borderRadius: radius.full,
+    backgroundColor: colors.border,
+    marginBottom: 2,
+  },
+  freshDot: { width: 8, height: 8, borderRadius: radius.full },
 });

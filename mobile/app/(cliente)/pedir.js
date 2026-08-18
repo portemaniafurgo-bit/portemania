@@ -11,6 +11,7 @@ import { Body, Button, Caption, Card, ErrorText, Field, Heading, Title } from ".
 import { Counter, Option, PriceSummary, Steps, Toggle } from "../../components/wizard";
 import AddressField from "../../components/AddressField";
 import AddressMapHero from "../../components/AddressMapHero";
+import PriceSlider from "../../components/PriceSlider";
 import ServiceIcon from "../../components/ServiceIcon";
 import { colors, radius, spacing } from "../../theme";
 
@@ -465,29 +466,31 @@ export default function Pedir() {
               <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary }}>
                 <Title>¿Quieres proponer tu precio?</Title>
                 <Caption>
-                  Opcional. Los conductores podrán aceptarlo o hacerte una contraoferta. Mínimo{" "}
-                  {Math.ceil(quote.total * 0.6)} €.
+                  Opcional. Los conductores podrán aceptarlo o hacerte una contraoferta.
                 </Caption>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-                  <View style={{ width: 120 }}>
-                    <Field
-                      value={String(form.proposed_price || "")}
-                      onChangeText={v => update("proposed_price", v.replace(/[^0-9.]/g, ""))}
-                      placeholder={`${quote.total}`}
-                      keyboardType="numeric"
-                      inputMode="decimal"
-                    />
-                  </View>
-                  <Title>€</Title>
-                  {form.proposed_price ? (
+                {/* «Arrastra el importe» (canvas 1e): del suelo del 60% a 1,5×
+                    la tarifa. Sin oferta, la barra descansa en la tarifa. */}
+                <PriceSlider
+                  min={Math.ceil(quote.total * 0.6)}
+                  max={Math.ceil(quote.total * 1.5)}
+                  value={form.proposed_price ? Number(form.proposed_price) : quote.total}
+                  onChange={v => update("proposed_price", String(v))}
+                />
+                {form.proposed_price ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                    <Title style={{ color: colors.primary }}>
+                      Tu oferta: {Number(form.proposed_price)} €
+                    </Title>
                     <Button
                       title="Quitar"
                       variant="plain"
                       onPress={() => update("proposed_price", "")}
-                      style={{ minHeight: 40, paddingVertical: 8 }}
+                      style={{ minHeight: 36, paddingVertical: 6 }}
                     />
-                  ) : null}
-                </View>
+                  </View>
+                ) : (
+                  <Caption>Sin oferta: se publica a la tarifa de {quote.total} €.</Caption>
+                )}
                 {form.proposed_price && Number(form.proposed_price) < Math.ceil(quote.total * 0.6) ? (
                   <Caption style={{ color: colors.destructive }}>
                     Demasiado bajo: el mínimo para este servicio es {Math.ceil(quote.total * 0.6)} €.

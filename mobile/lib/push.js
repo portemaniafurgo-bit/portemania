@@ -5,6 +5,7 @@ import * as Device from "expo-device";
 import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import { supabase } from "./supabase";
+import { getNotificationPrefs } from "../components/NotificationPrefs";
 
 /**
  * Notificaciones push. Es lo que la web no puede dar: hoy el conductor se entera
@@ -18,12 +19,22 @@ import { supabase } from "./supabase";
 // Con la app en primer plano, Android no muestra nada por defecto: hay que
 // decirlo explícitamente o el conductor no ve la oferta que acaba de entrar.
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
+  handleNotification: async notification => {
+    // Preferencias del dispositivo (perfil → Notificaciones): el modo del
+    // aviso decide qué toggle lo gobierna.
+    const prefs = await getNotificationPrefs();
+    const mode = notification?.request?.content?.data?.mode || "";
+    const muted =
+      (mode === "chat_message" && !prefs.chat) ||
+      (["price_offer", "offer_accepted", "new_request"].includes(mode) && !prefs.offers) ||
+      (["status_changed", "driver_assigned", "driver_arriving", "driver_cancelled"].includes(mode) && !prefs.status);
+    return {
+      shouldShowBanner: !muted,
+      shouldShowList: !muted,
+      shouldPlaySound: !muted,
+      shouldSetBadge: true,
+    };
+  },
 });
 
 /** Canales de Android. "Ofertas" va aparte para que el conductor pueda dejarlo

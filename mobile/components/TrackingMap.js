@@ -28,22 +28,38 @@ const OSM_STYLE = {
   layers: [{ id: "osm", type: "raster", source: "osm" }],
 };
 
-export default function TrackingMap({ driverLocation, target, height = 260, self = false }) {
+export default function TrackingMap({
+  driverLocation,
+  target,
+  height = 260,
+  self = false,
+  // Modo canvas 1h: solo el mapa (la hoja de encima pinta ETA y frescura por
+  // su cuenta vía onInfo), sin borde ni radios.
+  bare = false,
+  onInfo,
+}) {
   const [route, setRoute] = useState(null);
 
   useEffect(() => {
     if (!driverLocation || !target?.lat) {
       setRoute(null);
+      onInfo?.({ route: null, freshness: driverLocation ? locationFreshness(driverLocation.updatedAt) : null });
       return;
     }
     let active = true;
     fetchRouteEta(driverLocation, target).then(result => {
-      if (active) setRoute(result || null);
+      if (active) {
+        setRoute(result || null);
+        onInfo?.({
+          route: result || null,
+          freshness: locationFreshness(driverLocation.updatedAt),
+        });
+      }
     });
     return () => {
       active = false;
     };
-  }, [driverLocation?.lat, driverLocation?.lng, target?.lat, target?.lng]);
+  }, [driverLocation?.lat, driverLocation?.lng, driverLocation?.updatedAt, target?.lat, target?.lng]);
 
   const center = driverLocation || target;
   if (!center?.lat) {
@@ -61,7 +77,7 @@ export default function TrackingMap({ driverLocation, target, height = 260, self
 
   return (
     <View style={{ gap: spacing.sm }}>
-      <View style={[styles.map, { height }]}>
+      <View style={[bare ? styles.mapBare : styles.map, { height }]}>
         <Map style={{ flex: 1 }} mapStyle={OSM_STYLE} logo={false}>
           <Camera center={[center.lng, center.lat]} zoom={13} />
 
@@ -98,7 +114,7 @@ export default function TrackingMap({ driverLocation, target, height = 260, self
         </Map>
       </View>
 
-      {freshness ? (
+      {freshness && !bare ? (
         <View style={styles.freshness}>
           <View style={[styles.dot, { backgroundColor: freshness.fresh ? colors.success : colors.warning }]} />
           <Caption style={{ color: freshness.fresh ? colors.success : colors.warning }}>
@@ -114,7 +130,7 @@ export default function TrackingMap({ driverLocation, target, height = 260, self
         </View>
       ) : null}
 
-      {route ? (
+      {route && !bare ? (
         <Caption>
           {route.km} km por carretera · unos {route.minutes} min
         </Caption>
@@ -125,6 +141,7 @@ export default function TrackingMap({ driverLocation, target, height = 260, self
 
 const styles = StyleSheet.create({
   map: { borderRadius: radius.lg, overflow: "hidden", borderWidth: 1, borderColor: colors.border },
+  mapBare: { overflow: "hidden" },
   placeholder: {
     borderRadius: radius.lg,
     borderWidth: 1,
