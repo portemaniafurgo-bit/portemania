@@ -19,6 +19,7 @@ import WizardChrome from "../../components/WizardChrome";
 import OfferControl from "../../components/OfferControl";
 import AddressField from "../../components/AddressField";
 import FloorPicker from "../../components/FloorPicker";
+import RecentAddresses from "../../components/RecentAddresses";
 import AddressMapHero from "../../components/AddressMapHero";
 import ServiceIcon from "../../components/ServiceIcon";
 import { colors, radius, spacing } from "../../theme";
@@ -333,6 +334,15 @@ export default function Pedir() {
               update("origin_lng", picked?.lng ?? null);
             }}
           />
+          {/* Sus direcciones de siempre, a un toque (como Uber o Cabify) */}
+          <RecentAddresses
+            field="origin"
+            onPick={item => {
+              update("origin_address", item.address);
+              update("origin_lat", item.lat);
+              update("origin_lng", item.lng);
+            }}
+          />
 
           {service.hasZones && (
             <View style={{ gap: spacing.sm }}>
@@ -361,6 +371,14 @@ export default function Pedir() {
               update("destination_address", text);
               update("destination_lat", picked?.lat ?? null);
               update("destination_lng", picked?.lng ?? null);
+            }}
+          />
+          <RecentAddresses
+            field="destination"
+            onPick={item => {
+              update("destination_address", item.address);
+              update("destination_lat", item.lat);
+              update("destination_lng", item.lng);
             }}
           />
 

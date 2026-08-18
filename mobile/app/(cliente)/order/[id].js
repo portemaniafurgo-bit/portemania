@@ -7,6 +7,7 @@ import {
   Linking,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -74,6 +75,7 @@ export default function OrderDetail() {
   const [savingReview, setSavingReview] = useState(false);
   const [actionError, setActionError] = useState("");
   const [sendingReceipt, setSendingReceipt] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [receiptSent, setReceiptSent] = useState(false);
   // Negociación (canvas 1g): contraofertas de conductores EN VIVO, con su
   // perfil (valoración, furgoneta, distancia) para decidir con datos.
@@ -201,6 +203,27 @@ export default function OrderDetail() {
     }
   };
 
+  /**
+   * Enlace de seguimiento para quien espera la carga. El token lo crea el
+   * servidor (`get_share_token`) y solo abre una vista recortada: estado,
+   * nombre de pila del conductor, su posición y a dónde va.
+   */
+  const shareTracking = async () => {
+    setSharing(true);
+    setActionError("");
+    try {
+      const { data: token, error } = await supabase.rpc("get_share_token", { p_request_id: id });
+      if (error || !token) throw error || new Error("sin token");
+      await Share.share({
+        message: `Sigue mi envío con ClicyVoy en directo: https://clicyvoy.es/seguimiento/${token}`,
+      });
+    } catch {
+      setActionError("No se pudo preparar el enlace de seguimiento.");
+    } finally {
+      setSharing(false);
+    }
+  };
+
   const submitReview = async () => {
     setSavingReview(true);
     try {
@@ -314,6 +337,15 @@ export default function OrderDetail() {
                 )}
               </View>
             </View>
+            {/* Compartir el seguimiento con quien espera la carga, como el
+                «compartir viaje» de Uber: un enlace que funciona sin cuenta. */}
+            <Pressable onPress={shareTracking} disabled={sharing} style={styles.shareRow}>
+              <Ionicons name="share-social-outline" size={17} color={colors.primary} />
+              <Text style={styles.shareText}>
+                {sharing ? "Preparando el enlace…" : "Compartir seguimiento"}
+              </Text>
+            </Pressable>
+
             {mapInfo.freshness ? (
               <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
                 <View
@@ -747,4 +779,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   freshDot: { width: 8, height: 8, borderRadius: radius.full },
+  shareRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm, paddingVertical: 2 },
+  shareText: { fontSize: 13.5, fontFamily: "DMSans_700Bold", color: colors.primary },
 });
