@@ -27,7 +27,7 @@ por qué.
 | Seguimiento | Mapa en vivo con ETA | ✅ Probado en vivo, con marca de frescura |
 | **Compartir el viaje** | Enlace para quien te espera | ✅ **corregido hoy** (`/seguimiento/<token>`) |
 | Llegada | Aviso «tu conductor está llegando» | ✅ **corregido ayer** (radio de 150 m) |
-| Cancelar ya asignado | Permitido, con penalización | ⚠️ **Pendiente de tu decisión** (ver abajo) |
+| Cancelar ya asignado | Permitido, con penalización | ✅ **hecho**: gratis 2 min, después 5 € |
 
 ## Cerrar el servicio
 
@@ -53,13 +53,31 @@ por qué.
 
 ---
 
+## Cancelación del cliente: cómo queda
+
+| Momento | Coste | Qué ve el cliente |
+|---|---|---|
+| Sin conductor todavía (pendiente o programado) | **Gratis** | «No tiene ningún coste» |
+| Con conductor, primeros **2 minutos** | **Gratis** | «Todavía estás a tiempo» |
+| Con conductor, pasados 2 minutos | **5 €** | «Cancelar ahora tiene una penalización de 5 €» **antes** de confirmar |
+| Carga ya recogida | No se puede | Se resuelve con el conductor o con la empresa |
+
+- El importe (`cancel_fee`) y el margen (`cancel_grace_minutes`) están en las
+  tarifas: se cambian desde el panel sin tocar código.
+- **Lo decide el servidor**, no la pantalla: si lo calculara la app, bastaría
+  con cambiar la hora del móvil para cancelar gratis siempre.
+- Al conductor le llega aviso al momento, que para eso ha dejado lo que estaba
+  haciendo.
+- La penalización **se registra en el pedido, no se cobra sola**: cobrarla
+  automáticamente exige tarjeta guardada (Stripe customer), que es tarea aparte.
+  Mientras tanto queda anotada y la empresa decide.
+
+Probado contra producción los cinco casos, incluidos los que deben fallar:
+cancelar un pedido ajeno y cancelar con la carga ya recogida.
+
 ## Lo que queda, y por qué no lo he hecho solo
 
-1. **Cancelación del cliente con conductor ya asignado.** Uber, Bolt y Cabify la
-   permiten cobrando una penalización a partir de X minutos. El código está
-   listo (aviso al conductor incluido), pero **el importe y el plazo son
-   decisión de negocio**: dime «5 € pasados 2 minutos» o lo que sea y lo activo.
-2. **Chat con respuestas rápidas** («voy llegando», «estoy en la puerta»). Uber
+1. **Chat con respuestas rápidas** («voy llegando», «estoy en la puerta»). Uber
    las tiene porque nadie escribe conduciendo. Es media hora de trabajo, pero
    conviene que las frases las decidáis vosotros.
 3. **Favoritas con nombre** («casa», «almacén»). Las recientes ya cubren el 80 %;
