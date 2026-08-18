@@ -362,33 +362,10 @@ export default function TrabajoActivo() {
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <Stack.Screen options={{ headerShown: true, title: "Servicio" }} />
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
-        {/* Banda de estado (canvas 1k): servicio y precio pactado arriba, qué
-            pasa ahora en grande, qué toca después debajo, y el ETA a la derecha. */}
+      <ScrollView contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg }}>
+        {/* Banda morada del canvas 1k: barras de avance en amarillo, servicio y
+            precio pactado, el estado en grande y qué toca después. */}
         <View style={styles.statusBand}>
-          <View style={styles.statusBandTop}>
-            <Text style={styles.statusBandService}>
-              {service?.label || "Servicio"}
-              {pactado != null ? ` · ${euro(pactado)} pactado` : ""}
-            </Text>
-            {eta?.route && !finished ? (
-              <View style={styles.etaChip}>
-                <Ionicons name="time-outline" size={12} color="#FFFFFF" />
-                <Text style={styles.etaText}>
-                  {eta.route.minutes} min · {String(eta.route.km).replace(".", ",")} km
-                </Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={styles.statusBandTitle}>
-            {goingToPickup && order.status === "in_transit"
-              ? "De camino a recoger"
-              : STATUS_LABELS[order.status] || order.status}
-          </Text>
-          {step && !finished ? (
-            <Text style={styles.statusBandNext}>Siguiente: {step.label.toLowerCase()}</Text>
-          ) : null}
-          {/* Stepper de estados, como el timeline que ve el cliente */}
           {!finished && order.status !== "cancelled" ? (
             <View style={styles.stepper}>
               {["accepted", "in_transit", "picked_up", "delivered"].map((s, i) => {
@@ -396,55 +373,87 @@ export default function TrabajoActivo() {
                 return (
                   <View
                     key={s}
-                    style={[styles.stepperBar, { backgroundColor: i <= currentIndex ? colors.accent : "#FFFFFF55" }]}
+                    style={[styles.stepperBar, { backgroundColor: i <= currentIndex ? colors.accent : "#9A78E0" }]}
                   />
                 );
               })}
             </View>
           ) : null}
+          <Text style={styles.statusBandService}>
+            {service?.label || "Servicio"}
+            {pactado != null ? ` · ${euro(pactado)} pactado` : ""}
+          </Text>
+          <Text style={styles.statusBandTitle}>
+            {order.status === "in_transit"
+              ? "De camino a recoger"
+              : STATUS_LABELS[order.status] || order.status}
+          </Text>
+          {step && !finished ? (
+            <Text style={styles.statusBandNext}>Siguiente: {step.label.toLowerCase()}</Text>
+          ) : null}
         </View>
 
-        {/* Mapa DENTRO de la app (petición del cliente: como Uber). Los botones
-            de Maps/Waze quedan debajo como navegación paso a paso opcional. */}
+        {/* Mapa DENTRO de la app (petición del cliente: como Uber), con la
+            tarjeta de tiempo y dirección flotando encima, como en el canvas. */}
         {!finished && (
-          <TrackingMap
-            driverLocation={myPos}
-            target={mapTarget}
-            height={230}
-            self
-            targetKind={goingToPickup ? "pickup" : "dropoff"}
-            onInfo={setEta}
-          />
+          <View style={styles.mapWrap}>
+            <TrackingMap
+              driverLocation={myPos}
+              target={mapTarget}
+              height={300}
+              self
+              bare
+              targetKind={goingToPickup ? "pickup" : "dropoff"}
+              onInfo={setEta}
+            />
+            <View style={styles.floatingEta}>
+              <View>
+                <Text style={styles.etaBig}>{eta?.route ? `${eta.route.minutes} min` : "—"}</Text>
+                <Text style={styles.etaKm}>
+                  {eta?.route ? `${String(eta.route.km).replace(".", ",")} km` : "calculando"}
+                </Text>
+              </View>
+              <View style={styles.etaDivider} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.etaAddress}>
+                  {(goingToPickup ? order.origin_address : order.destination_address) || "—"}
+                </Text>
+                <Text style={styles.etaMeta}>
+                  {[
+                    goingToPickup
+                      ? floorLabel(order.origin_floors, order.origin_has_lift)
+                      : floorLabel(order.destination_floors, order.destination_has_lift),
+                    order.needs_help ? "con ayuda" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </Text>
+              </View>
+            </View>
+            <View style={styles.floatingNav}>
+              <Pressable onPress={() => navigate("gmaps")} style={styles.navPill}>
+                <Ionicons name="navigate-outline" size={16} color={colors.primary} />
+                <Text style={styles.navPillText}>Google Maps</Text>
+              </Pressable>
+              <Pressable onPress={() => navigate("waze")} style={styles.navPill}>
+                <Ionicons name="car-outline" size={16} color={colors.primary} />
+                <Text style={styles.navPillText}>Waze</Text>
+              </Pressable>
+            </View>
+          </View>
         )}
 
-        {/* La dirección DE AHORA en grande, con su planta, y la otra debajo:
-            el conductor solo necesita saber a dónde va (canvas 1k). */}
+        {/* La otra punta del viaje, para tenerla a mano sin salir de aquí. */}
         <Card>
-          <Caption>{goingToPickup ? "Recogida" : "Entrega"}</Caption>
-          <Text style={styles.address}>
-            {(goingToPickup ? order.origin_address : order.destination_address) || "—"}
-          </Text>
-          <Caption>
-            {[
-              goingToPickup
-                ? floorLabel(order.origin_floors, order.origin_has_lift)
-                : floorLabel(order.destination_floors, order.destination_has_lift),
-              order.needs_help ? "con ayuda" : null,
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </Caption>
-
-          {!finished ? (
-            <View style={{ flexDirection: "row", gap: spacing.sm }}>
-              <Button title="Google Maps" icon="navigate-outline" variant="plain" onPress={() => navigate("gmaps")} style={{ flex: 1 }} />
-              <Button title="Waze" variant="plain" onPress={() => navigate("waze")} style={{ flex: 1 }} />
-            </View>
-          ) : null}
-
-          <View style={styles.divider} />
           <Caption>{goingToPickup ? "Después, entrega en" : "Se recogió en"}</Caption>
           <Body>{(goingToPickup ? order.destination_address : order.origin_address) || "—"}</Body>
+          {finished ? (
+            <>
+              <View style={styles.divider} />
+              <Caption>Recogida</Caption>
+              <Body>{order.origin_address || "—"}</Body>
+            </>
+          ) : null}
         </Card>
 
         {/* El cliente y su carga, como en el canvas: quién es y qué se mueve. */}
@@ -651,27 +660,66 @@ const styles = StyleSheet.create({
   },
   chipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   chipText: { fontSize: 13, color: colors.mutedForeground },
+  // Banda a sangre, como en el canvas: el morado llega hasta los bordes.
   statusBand: {
     backgroundColor: colors.primary,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    gap: spacing.sm,
+    marginHorizontal: -spacing.screen,
+    marginTop: -spacing.screen,
+    paddingHorizontal: spacing.screen,
+    paddingTop: 6,
+    paddingBottom: 20,
   },
-  statusBandTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
-  statusBandService: { fontSize: 12, fontFamily: "DMSans_700Bold", color: "#FFFFFFCC" },
-  statusBandTitle: { fontSize: 20, fontFamily: "Poppins_700Bold", color: "#FFFFFF" },
-  statusBandNext: { fontSize: 13, fontFamily: "DMSans_400Regular", color: "#FFFFFFCC" },
-  etaChip: {
+  // Canvas 1k: rótulo lila, titular blanco de 27 y la siguiente acción debajo.
+  statusBandService: { fontSize: 12.5, fontFamily: "DMSans_400Regular", color: "#C9B4F0" },
+  statusBandTitle: {
+    fontSize: 27,
+    lineHeight: 32,
+    fontFamily: "Poppins_600SemiBold",
+    color: "#FFFFFF",
+    letterSpacing: -0.3,
+    marginTop: 6,
+  },
+  statusBandNext: { fontSize: 13, fontFamily: "DMSans_400Regular", color: "#E4D8FA", marginTop: 8 },
+  mapWrap: { marginHorizontal: -spacing.screen, position: "relative" },
+  floatingEta: {
+    position: "absolute",
+    left: spacing.screen,
+    right: spacing.screen,
+    top: 16,
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: "#FFFFFF2E",
-    borderRadius: radius.full,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
+    gap: 14,
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    elevation: 3,
   },
-  etaText: { fontSize: 11.5, fontFamily: "DMSans_700Bold", color: "#FFFFFF" },
-  address: { fontSize: 17, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
+  etaBig: { fontSize: 20, lineHeight: 22, fontFamily: "Poppins_700Bold", color: colors.foreground },
+  etaKm: { fontSize: 11, fontFamily: "DMSans_400Regular", color: colors.subtle, marginTop: 3 },
+  etaDivider: { width: 1, height: 32, backgroundColor: colors.hairline },
+  etaAddress: { fontSize: 13.5, lineHeight: 19, fontFamily: "DMSans_500Medium", color: colors.foreground },
+  etaMeta: { fontSize: 11.5, fontFamily: "DMSans_400Regular", color: colors.subtle, marginTop: 2 },
+  floatingNav: {
+    position: "absolute",
+    left: spacing.screen,
+    right: spacing.screen,
+    bottom: 16,
+    flexDirection: "row",
+    gap: 10,
+  },
+  navPill: {
+    flex: 1,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: colors.card,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    elevation: 3,
+  },
+  navPillText: { fontSize: 13.5, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
   divider: { height: 1, backgroundColor: colors.border },
   clientRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   clientAvatar: {

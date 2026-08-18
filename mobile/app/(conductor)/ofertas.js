@@ -11,9 +11,8 @@ import { serviceOf } from "../../lib/services";
 import { distanceKm } from "../../lib/eta";
 import { euro } from "../../lib/money";
 import { stopTracking } from "../../lib/tracking";
-import TrackingMap from "../../components/TrackingMap";
 import EmptyState from "../../components/EmptyState";
-import { SERVICE_ICONS } from "../../components/ServiceIcon";
+import OfferCard from "../../components/OfferCard";
 import { Body, Button, Caption, Card, ErrorText, Heading, Loading, Title } from "../../components/ui";
 import { colors, radius, spacing } from "../../theme";
 
@@ -39,12 +38,6 @@ function publishedAgo(date, now) {
   return `Publicado hace ${Math.floor(hours / 24)} días`;
 }
 
-/** «3ª con ascensor» / «2ª sin ascensor», como el canvas rotula las direcciones. */
-function floorLabel(floors, hasLift) {
-  if (!floors) return null;
-  return `${floors}ª ${hasLift ? "con" : "sin"} ascensor`;
-}
-
 // Motivos de contraoferta del canvas 1j: se tocan, no se escriben.
 const COUNTER_REASONS = ["Sin ascensor", "Carga voluminosa", "Hora punta"];
 
@@ -58,9 +51,7 @@ export default function Ofertas() {
   const [saving, setSaving] = useState(false);
   const [accepting, setAccepting] = useState(null);
   const [error, setError] = useState("");
-  // Oferta expandida (mapa + distancia, estilo Uber: ver DÓNDE está el trabajo
-  // antes de aceptarlo) y mi posición para calcular "a X km de ti".
-  const [expandedId, setExpandedId] = useState(null);
+  // Mi posición, para calcular "a X km de ti" en cada oferta.
   const [myPos, setMyPos] = useState(null);
   // Negociación (canvas 1i/1j): mis contraofertas vivas y la hoja de contraofertar.
   const [myOffers, setMyOffers] = useState([]);
@@ -304,12 +295,54 @@ export default function Ofertas() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right"]}>
+      {/* Cabecera blanca fija del canvas 1i: título, avatar y disponibilidad */}
+      <View style={styles.headerBlock}>
+        <View style={styles.headerTop}>
+          <Heading>Ofertas</Heading>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarInitial}>
+              {(profile?.full_name || user?.email || "C").slice(0, 1).toUpperCase()}
+            </Text>
+          </View>
+        </View>
+
+        {profile && (
+          <View style={[styles.availability, !profile.is_available && styles.availabilityOff]}>
+            <View
+              style={[
+                styles.availabilityDot,
+                { backgroundColor: profile.is_available ? colors.success : colors.subtle },
+              ]}
+            />
+            <View style={{ flex: 1 }}>
+              <Text
+                style={[styles.availabilityTitle, !profile.is_available && { color: colors.mutedForeground }]}
+              >
+                {profile.is_available ? "Disponible" : "No disponible"}
+              </Text>
+              <Text
+                style={[styles.availabilityHint, !profile.is_available && { color: colors.subtle }]}
+              >
+                {profile.is_available
+                  ? "Recibes avisos de nuevos portes"
+                  : "No te llegarán ofertas mientras esté apagado"}
+              </Text>
+            </View>
+            <Switch
+              value={!!profile.is_available}
+              onValueChange={toggleAvailable}
+              disabled={saving || profile.status !== "verified"}
+              trackColor={{ true: colors.success, false: colors.hairline }}
+              thumbColor="#FFFFFF"
+            />
+          </View>
+        )}
+      </View>
+
       <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
+        contentContainerStyle={{ padding: 16, paddingHorizontal: spacing.screen, gap: 12, paddingBottom: spacing.xl }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
-        <Heading>Ofertas</Heading>
-
         {activeJob && (
           <Card style={{ borderColor: colors.primary, borderWidth: 2 }}>
             <Title>Tienes un servicio en curso</Title>
@@ -322,38 +355,6 @@ export default function Ofertas() {
         )}
 
         <ErrorText>{error}</ErrorText>
-
-        {/* Disponibilidad (canvas 1i): lo primero de la pantalla del conductor */}
-        {profile && (
-          <Card>
-            <View style={styles.header}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
-                  <View
-                    style={[
-                      styles.availableDot,
-                      { backgroundColor: profile.is_available ? colors.success : colors.subtle },
-                    ]}
-                  />
-                  <Title style={profile.is_available ? { color: colors.success } : null}>
-                    {profile.is_available ? "Disponible" : "No disponible"}
-                  </Title>
-                </View>
-                <Caption>
-                  {profile.is_available
-                    ? "Recibes avisos de nuevos portes"
-                    : "No te llegarán ofertas mientras esté apagado"}
-                </Caption>
-              </View>
-              <Switch
-                value={!!profile.is_available}
-                onValueChange={toggleAvailable}
-                disabled={saving || profile.status !== "verified"}
-                trackColor={{ true: colors.primary }}
-              />
-            </View>
-          </Card>
-        )}
 
         {!profile && (
           <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
@@ -408,7 +409,6 @@ export default function Ofertas() {
         ) : (
           orders.map(order => {
             const service = serviceOf(order);
-            const expanded = expandedId === order.id;
             const pickup =
               order.origin_lat && order.origin_lng
                 ? { lat: order.origin_lat, lng: order.origin_lng }
@@ -416,137 +416,36 @@ export default function Ofertas() {
             const km = myPos && pickup ? distanceKm(myPos, pickup) : null;
             const negotiable = order.proposed_price != null;
             const mine = myOfferFor(order.id);
-            const originFloor = floorLabel(order.origin_floors, order.origin_has_lift);
-            const destFloor = floorLabel(order.destination_floors, order.destination_has_lift);
             return (
-              <Pressable key={order.id} onPress={() => setExpandedId(expanded ? null : order.id)}>
-                <Card style={expanded ? { borderColor: colors.primary } : null}>
-                  {/* Servicio + cuándo se publicó · precio y de quién es */}
-                  <View style={styles.header}>
-                    <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm, flex: 1 }}>
-                      <View style={styles.serviceIcon}>
-                        <Ionicons
-                          name={SERVICE_ICONS[service?.key] || "cube-outline"}
-                          size={17}
-                          color={colors.primary}
-                        />
-                      </View>
-                      <View style={{ gap: 2, flex: 1 }}>
-                        <Title>{service?.label || "Servicio"}</Title>
-                        <Caption>{publishedAgo(order.created_date, now)}</Caption>
-                      </View>
-                    </View>
-                    <View style={{ alignItems: "flex-end", gap: 2 }}>
-                      <Text style={styles.price}>
-                        {euro(Number(negotiable ? order.proposed_price : order.estimated_price), 2)}
-                      </Text>
-                      <Caption>{negotiable ? "propone el cliente" : "precio cerrado"}</Caption>
-                    </View>
-                  </View>
-
-                  {/* Direcciones con planta, como las rotula el canvas */}
-                  <View style={{ gap: 6 }}>
-                    <View style={styles.addressRow}>
-                      <View style={[styles.addressDot, { backgroundColor: colors.primary }]} />
-                      <Body style={{ flex: 1 }}>
-                        {order.origin_address || "—"}
-                        {originFloor ? <Caption> · {originFloor}</Caption> : null}
-                      </Body>
-                    </View>
-                    <View style={styles.addressRow}>
-                      <View style={[styles.addressDot, { backgroundColor: colors.foreground }]} />
-                      <Body style={{ flex: 1 }}>
-                        {order.destination_address || "—"}
-                        {destFloor ? <Caption> · {destFloor}</Caption> : null}
-                      </Body>
-                    </View>
-                  </View>
-
-                  {/* Metadatos en una línea: a X km de ti · con ayuda · ruta */}
-                  <View style={styles.metaRow}>
-                    {km != null ? (
-                      <Text style={[styles.meta, { color: colors.primary, fontFamily: "DMSans_700Bold" }]}>
-                        a {km.toFixed(1).replace(".", ",")} km de ti
-                      </Text>
-                    ) : null}
-                    {order.needs_help ? <Text style={styles.meta}>· con ayuda</Text> : null}
-                    {order.package_weight ? <Text style={styles.meta}>· {order.package_weight} kg</Text> : null}
-                    {order.distance_km ? (
-                      <Text style={styles.meta}>
-                        · {Number(order.distance_km).toFixed(1).replace(".", ",")} km de ruta
-                      </Text>
-                    ) : null}
-                    {order.vehicle_type === "large" ? (
-                      <Text style={styles.meta}>· furgoneta grande</Text>
-                    ) : null}
-                  </View>
-
-                  {/* Al tocar la tarjeta: DÓNDE está la recogida, antes de aceptar */}
-                  {expanded && pickup ? (
-                    <TrackingMap driverLocation={null} target={pickup} height={170} />
-                  ) : null}
-                  {expanded && !pickup ? (
-                    <Caption>Este pedido no tiene coordenadas de recogida (dirección manual).</Caption>
-                  ) : null}
-
-                  {!negotiable ? (
-                    /* Sin negociación: flujo clásico intacto */
-                    <Button
-                      title="Aceptar servicio"
-                      loading={accepting === order.id}
-                      disabled={blocked}
-                      onPress={() => accept(order)}
-                    />
-                  ) : mine ? (
-                    <View style={styles.myOfferBox}>
-                      <Body style={{ fontFamily: "DMSans_700Bold" }}>
-                        Tu contraoferta: {euro(Number(mine.amount), 2)}
-                      </Body>
-                      <Caption>Esperando al cliente.</Caption>
-                      <Button
-                        title="Cambiar contraoferta"
-                        variant="plain"
-                        onPress={() => {
-                          setCounterFor(order.id);
-                          setCounterAmount(Math.round(mine.amount));
-                          setCounterMessage("");
-                        }}
-                      />
-                    </View>
-                  ) : (
-                    <View style={{ gap: spacing.sm }}>
-                      <Button
-                        title={`Aceptar por ${euro(Number(order.proposed_price))}`}
-                        loading={negotiating}
-                        disabled={blocked}
-                        onPress={() => acceptAtClientPrice(order)}
-                      />
-                      <Button
-                        title="Contraofertar"
-                        variant="plain"
-                        disabled={blocked}
-                        onPress={() => {
-                          setCounterFor(order.id);
-                          // Se abre en la tarifa calculada: es el precio que la
-                          // empresa considera justo para ese servicio.
-                          setCounterAmount(
-                            Math.round(order.estimated_price || order.proposed_price || 40),
-                          );
-                          setCounterMessage("");
-                        }}
-                      />
-                    </View>
-                  )}
-                  {activeJob ? (
-                    <Caption>Termina el servicio en curso antes de aceptar otro.</Caption>
-                  ) : null}
-                </Card>
-              </Pressable>
+              <OfferCard
+                key={order.id}
+                order={order}
+                service={service}
+                publishedLabel={publishedAgo(order.created_date, now)}
+                distanceLabel={km != null ? `a ${km.toFixed(1).replace(".", ",")} km de ti` : null}
+                pickup={pickup}
+                negotiable={negotiable}
+                myOffer={mine}
+                blocked={blocked}
+                busy={accepting === order.id || negotiating}
+                onAccept={() => (negotiable ? acceptAtClientPrice(order) : accept(order))}
+                onCounter={() => {
+                  setCounterFor(order.id);
+                  // Se abre en la tarifa calculada: es el precio que la empresa
+                  // considera justo para ese servicio.
+                  setCounterAmount(Math.round(order.estimated_price || order.proposed_price || 40));
+                  setCounterMessage("");
+                }}
+                onChangeCounter={() => {
+                  setCounterFor(order.id);
+                  setCounterAmount(Math.round(mine.amount));
+                  setCounterMessage("");
+                }}
+              />
             );
           })
         )}
       </ScrollView>
-
       {/* Hoja de contraoferta (canvas 1j): importe grande con +/−, atajos y motivo */}
       <Modal
         visible={counterFor != null}
@@ -669,31 +568,42 @@ export default function Ofertas() {
 
 const styles = StyleSheet.create({
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.sm },
-  price: { fontSize: 20, fontFamily: "Poppins_700Bold", color: colors.foreground },
-  serviceIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: radius.full,
+  // Cabecera blanca del canvas 1i
+  headerBlock: {
+    backgroundColor: colors.card,
+    paddingHorizontal: spacing.screen,
+    paddingTop: 10,
+    paddingBottom: 18,
+    gap: 16,
+  },
+  headerTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.primarySoft,
     alignItems: "center",
     justifyContent: "center",
   },
-  availableDot: { width: 8, height: 8, borderRadius: radius.full },
-  addressRow: { flexDirection: "row", alignItems: "flex-start", gap: spacing.sm },
-  addressDot: { width: 7, height: 7, borderRadius: radius.full, marginTop: 7 },
-  metaRow: { flexDirection: "row", flexWrap: "wrap", gap: 5, alignItems: "center" },
-  meta: { fontSize: 11.5, fontFamily: "DMSans_400Regular", color: colors.mutedForeground },
-  sectionHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  overline: {
-    fontSize: 11.5,
-    fontFamily: "DMSans_700Bold",
-    color: colors.mutedForeground,
-    letterSpacing: 0.8,
-    textTransform: "uppercase",
+  avatarInitial: { fontSize: 15, fontFamily: "Poppins_600SemiBold", color: colors.primary },
+  availability: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: colors.successBg,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
+  availabilityOff: { backgroundColor: colors.background },
+  availabilityDot: { width: 10, height: 10, borderRadius: 5 },
+  availabilityTitle: { fontSize: 15, fontFamily: "Poppins_600SemiBold", color: "#0B6E4F" },
+  availabilityHint: { fontSize: 12, fontFamily: "DMSans_400Regular", color: "#0B8C63", marginTop: 2 },
+  sectionHeader: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
+  overline: { fontSize: 12, fontFamily: "DMSans_500Medium", color: colors.subtle, textTransform: "uppercase" },
   liveBadge: { flexDirection: "row", alignItems: "center", gap: 5 },
   liveDot: { width: 7, height: 7, borderRadius: radius.full, backgroundColor: colors.success },
-  liveText: { fontSize: 11.5, fontFamily: "DMSans_500Medium", color: colors.success },
+  liveText: { fontSize: 11.5, fontFamily: "DMSans_500Medium", color: "#0B8C63" },
   myOfferBox: { backgroundColor: colors.primarySoft, borderRadius: radius.md, padding: spacing.md, gap: 4 },
   backdrop: { flex: 1, backgroundColor: "#00000066" },
   counterSheet: {
