@@ -89,7 +89,9 @@ export function Button({ title, icon, onPress, loading, disabled, variant = "pri
 export function Field({ label, error, ...props }) {
   return (
     <View style={{ gap: spacing.xs }}>
-      {label ? <Caption>{label}</Caption> : null}
+      {/* Etiqueta en versalitas, como rotula el canvas los campos (EMAIL,
+          CONTRASEÑA, DESCRIPCIÓN…). */}
+      {label ? <Text style={styles.fieldLabel}>{label}</Text> : null}
       <TextInput
         style={[styles.input, error && { borderColor: colors.destructive }]}
         placeholderTextColor={colors.mutedForeground}
@@ -151,6 +153,13 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     fontFamily: "DMSans_400Regular",
     color: colors.foreground,
+  },
+  fieldLabel: {
+    fontSize: 11.5,
+    fontFamily: "DMSans_700Bold",
+    color: colors.mutedForeground,
+    letterSpacing: 0.8,
+    textTransform: "uppercase",
   },
   errorText: { color: colors.destructive, fontSize: 12, fontFamily: "DMSans_400Regular" },
   loading: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.sm, padding: spacing.xl },
