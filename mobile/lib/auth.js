@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { AppState } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { supabase } from "./supabase";
 import { unregisterPushToken } from "./push";
 import { stopTracking } from "./tracking";
@@ -28,6 +29,8 @@ AppState.addEventListener("change", (state) => {
   else supabase.auth.stopAutoRefresh();
 });
 
+const ROLE_CACHE_KEY = "cached_role_v1";
+
 async function fetchRole(userId) {
   if (!userId) return null;
   try {
@@ -37,9 +40,23 @@ async function fetchRole(userId) {
     const query = supabase.from("profiles").select("role").eq("id", userId).maybeSingle();
     const timeout = new Promise(resolve => setTimeout(() => resolve({ data: null }), 8000));
     const { data } = await Promise.race([query, timeout]);
-    return data?.role || "client";
+    const role = data?.role || "client";
+    AsyncStorage.setItem(ROLE_CACHE_KEY, role).catch(() => {});
+    return role;
   } catch {
     return "client";
+  }
+}
+
+/** Rol cacheado del último arranque: la app abre AL INSTANTE con él y lo
+ *  revalida en segundo plano. El rol de una cuenta no cambia en la práctica
+ *  (cliente ↔ conductor lo decide el negocio), así que el caché casi nunca
+ *  miente — y si mintiera, la revalidación corrige en segundos. */
+async function getCachedRole() {
+  try {
+    return await AsyncStorage.getItem(ROLE_CACHE_KEY);
+  } catch {
+    return null;
   }
 }
 
@@ -65,6 +82,22 @@ export function AuthProvider({ children }) {
       }
       if (!active) return;
       setSession(session);
+
+      if (session?.user?.id) {
+        // Arranque INSTANTÁNEO: con rol cacheado no se espera a la red — la
+        // pantalla "Abriendo…" de 8 s con cobertura floja era inaceptable.
+        const cached = await getCachedRole();
+        if (active && cached) {
+          setRole(cached);
+          setLoading(false);
+          // Revalidar en segundo plano; si el negocio cambió el rol, corrige.
+          fetchRole(session.user.id).then(fresh => {
+            if (active && fresh && fresh !== cached) setRole(fresh);
+          });
+          return;
+        }
+      }
+
       try {
         setRole(await fetchRole(session?.user?.id));
       } finally {
