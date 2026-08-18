@@ -4,6 +4,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import { useAuth } from "../lib/auth";
 import { Button, Caption } from "../components/ui";
 import { colors, radius, spacing } from "../theme";
 
@@ -36,11 +37,18 @@ const { width } = Dimensions.get("window");
 
 export default function Onboarding() {
   const router = useRouter();
+  const { session, role } = useAuth();
   const scrollRef = useRef(null);
   const [page, setPage] = useState(0);
 
   const finish = async () => {
     await AsyncStorage.setItem(ONBOARDING_KEY, "1").catch(() => {});
+    // Al verla desde Perfil ya hay sesión: devolver al login sería echar a
+    // alguien que estaba dentro.
+    if (session) {
+      router.replace(role === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir");
+      return;
+    }
     router.replace("/(auth)/login");
   };
 

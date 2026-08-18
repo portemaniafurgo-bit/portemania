@@ -2,6 +2,8 @@ import { useCallback, useState } from "react";
 import { Linking, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ONBOARDING_KEY } from "../onboarding";
 import { useAuth } from "../../lib/auth";
 import { getDefaultPayment, PAYMENT_LABELS } from "../../lib/payment";
 import DeleteAccount from "../../components/DeleteAccount";
@@ -29,6 +31,12 @@ export default function Perfil() {
       };
     }, []),
   );
+
+  /** Volver a ver la introducción: baja el flag y abre las tres pantallas. */
+  const replayOnboarding = async () => {
+    await AsyncStorage.removeItem(ONBOARDING_KEY).catch(() => {});
+    router.push("/onboarding");
+  };
 
   const name = user?.user_metadata?.full_name || "Sin nombre";
   const phone = user?.user_metadata?.phone;
@@ -68,6 +76,12 @@ export default function Perfil() {
           icon="help-buoy-outline"
           label="Ayuda y contacto"
           onPress={() => router.push("/(cliente)/ayuda")}
+        />
+        <SettingsRow
+          icon="sparkles-outline"
+          label="Ver la introducción"
+          hint="Las tres pantallas del primer arranque"
+          onPress={replayOnboarding}
           last
         />
       </SettingsGroup>

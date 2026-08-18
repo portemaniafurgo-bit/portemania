@@ -48,6 +48,11 @@ function RootNavigation() {
 
     const group = segments[0];
 
+    // De la introducción se sale con «Saltar» o «Empezar», nunca a empujones.
+    // Sin esto, abrirla a propósito desde Perfil rebotaba al instante: el
+    // guardia corría antes de que se releyera el flag y veía "ya vista".
+    if (group === "onboarding") return;
+
     if (!session) {
       // Primer arranque: la introducción, una sola vez (canvas 2b).
       if (!onboardingSeen) {

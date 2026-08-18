@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
 import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ONBOARDING_KEY } from "../onboarding";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import {
@@ -50,12 +53,19 @@ function ExpiryField({ initial, onSave }) {
 
 export default function PerfilConductor() {
   const { user, signOut } = useAuth();
+  const router = useRouter();
   const [profile, setProfile] = useState(undefined);
   const [jobCount, setJobCount] = useState(null);
   const [uploading, setUploading] = useState(null);
   const [error, setError] = useState("");
 
   const load = useCallback(() => fetchMyDriverProfile(user).then(setProfile), [user]);
+
+  /** Volver a ver la introducción: baja el flag y abre las tres pantallas. */
+  const replayOnboarding = async () => {
+    await AsyncStorage.removeItem(ONBOARDING_KEY).catch(() => {});
+    router.push("/onboarding");
+  };
 
   useEffect(() => {
     load();
@@ -286,6 +296,12 @@ export default function PerfilConductor() {
       )}
 
       <SettingsGroup>
+        <SettingsRow
+          icon="sparkles-outline"
+          label="Ver la introducción"
+          hint="Las tres pantallas del primer arranque"
+          onPress={replayOnboarding}
+        />
         <SettingsRow icon="log-out-outline" label="Cerrar sesión" onPress={signOut} last />
       </SettingsGroup>
 
