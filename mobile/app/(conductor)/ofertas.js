@@ -167,7 +167,7 @@ export default function Ofertas() {
 
     const { data } = await supabase
       .from("transport_requests")
-      .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, origin_floors, origin_has_lift, destination_floors, destination_has_lift, estimated_price, proposed_price, needs_help, package_weight, distance_km, created_date")
+      .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, origin_floors, origin_has_lift, destination_floors, destination_has_lift, estimated_price, proposed_price, needs_help, package_weight, distance_km, payment_method, created_date")
       .eq("status", "pending")
       .order("created_date", { ascending: false })
       .limit(50);

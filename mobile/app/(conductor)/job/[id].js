@@ -11,7 +11,7 @@ import { STATUS_LABELS, useOrder } from "../../../lib/orders";
 import { serviceOf } from "../../../lib/services";
 import { euro } from "../../../lib/money";
 import { geocodeAlbacete } from "../../../lib/eta";
-import { startTracking, stopTracking } from "../../../lib/tracking";
+import { setArrivalTarget, startTracking, stopTracking } from "../../../lib/tracking";
 import TrackingMap from "../../../components/TrackingMap";
 import ChatLink from "../../../components/ChatLink";
 import { uploadProofPhoto, uploadSignature } from "../../../lib/deliveryProof";
@@ -175,6 +175,21 @@ export default function TrabajoActivo() {
       if (!result.ok) setError(result.reason);
     });
   }, [order?.status, profile?.id]);
+
+  // Destino de la fase actual, para que el seguimiento avise al cliente cuando
+  // el conductor esté llegando (a la recogida primero, a la entrega después).
+  useEffect(() => {
+    if (!order) return;
+    const active = ["accepted", "in_transit", "picked_up"].includes(order.status);
+    const toPickup = ["accepted", "in_transit"].includes(order.status);
+    const lat = toPickup ? order.origin_lat : order.destination_lat;
+    const lng = toPickup ? order.origin_lng : order.destination_lng;
+    if (!active || !lat || !lng) {
+      setArrivalTarget(null);
+      return;
+    }
+    setArrivalTarget(order.id, { lat, lng }, toPickup ? "pickup" : "dropoff");
+  }, [order?.id, order?.status, order?.origin_lat, order?.destination_lat]);
 
   if (loading) return <Loading label="Cargando el servicio…" />;
   if (!order) {
@@ -456,6 +471,49 @@ export default function TrabajoActivo() {
           ) : null}
         </Card>
 
+        {/* CÓMO SE COBRA. Sin esto, el conductor podía pedir en efectivo un
+            servicio ya pagado con tarjeta, o marcharse sin cobrar. */}
+        {!finished && pactado != null && (
+          <View
+            style={[
+              styles.paymentBox,
+              order.payment_method === "cash"
+                ? { backgroundColor: colors.warningBg, borderColor: colors.warning }
+                : order.payment_status === "paid"
+                  ? { backgroundColor: colors.successBg, borderColor: colors.success }
+                  : { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+            ]}
+          >
+            <Ionicons
+              name={order.payment_method === "cash" ? "cash-outline" : "card-outline"}
+              size={20}
+              color={
+                order.payment_method === "cash"
+                  ? "#B27700"
+                  : order.payment_status === "paid"
+                    ? colors.success
+                    : colors.primary
+              }
+            />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={styles.paymentTitle}>
+                {order.payment_method === "cash"
+                  ? `Cobra ${euro(pactado, 2)} en efectivo`
+                  : order.payment_status === "paid"
+                    ? "Ya pagado con tarjeta"
+                    : "Pago con tarjeta pendiente"}
+              </Text>
+              <Caption>
+                {order.payment_method === "cash"
+                  ? "Al terminar el servicio, en mano."
+                  : order.payment_status === "paid"
+                    ? "No le cobres nada al cliente."
+                    : "Lo paga desde su app; no aceptes efectivo."}
+              </Caption>
+            </View>
+          </View>
+        )}
+
         {/* El cliente y su carga, como en el canvas: quién es y qué se mueve. */}
         <Card>
           <View style={styles.clientRow}>
@@ -721,6 +779,15 @@ const styles = StyleSheet.create({
   },
   navPillText: { fontSize: 13.5, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
   divider: { height: 1, backgroundColor: colors.border },
+  paymentBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: 16,
+  },
+  paymentTitle: { fontSize: 15, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
   clientRow: { flexDirection: "row", alignItems: "center", gap: spacing.md },
   clientAvatar: {
     width: 42,

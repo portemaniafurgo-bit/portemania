@@ -115,13 +115,69 @@ Deno.serve(async (req: Request) => {
   }
 
   const mode = body.mode;
-  if (!mode || !body.order_id) return json({ error: "mode y order_id son obligatorios" }, 400);
+  if (!mode) return json({ error: "mode es obligatorio" }, 400);
 
   const admin = serviceClient();
+
+  // ---------- Documentación a punto de caducar → conductor ----------
+  // Único aviso que NO va ligado a un pedido: lo dispara el job diario. Sin él,
+  // el conductor se enteraba de que había caducado el seguro cuando dejaban de
+  // entrarle ofertas, sin saber por qué.
+  if (mode === "docs_expiring") {
+    const DOCS: Array<[string, string]> = [
+      ["license_expires_at", "el carnet de conducir"],
+      ["id_document_expires_at", "el DNI/NIE"],
+      ["insurance_expires_at", "el seguro del vehículo"],
+      ["autonomo_receipt_expires_at", "el recibo de autónomo"],
+      ["censal_document_expires_at", "la situación censal"],
+    ];
+
+    const { data: drivers } = await admin
+      .from("driver_profiles")
+      .select(
+        "email, license_expires_at, id_document_expires_at, insurance_expires_at, autonomo_receipt_expires_at, censal_document_expires_at",
+      )
+      .eq("status", "verified");
+
+    const today = new Date();
+    let sent = 0;
+    for (const driver of drivers || []) {
+      const avisos: string[] = [];
+      for (const [field, label] of DOCS) {
+        const value = (driver as Record<string, string | null>)[field];
+        if (!value) continue;
+        const days = Math.floor((new Date(value).getTime() - today.getTime()) / 86_400_000);
+        // Se avisa a 15, 7, 3 y 1 día, y el día que caduca. Ni cada día (se
+        // vuelve ruido y se ignora) ni una sola vez (se olvida).
+        if ([15, 7, 3, 1, 0].includes(days)) avisos.push(`${label} caduca ${days === 0 ? "hoy" : `en ${days} día${days === 1 ? "" : "s"}`}`);
+        else if (days < 0) avisos.push(`${label} está CADUCADO`);
+      }
+      if (!avisos.length || !driver.email) continue;
+
+      const { data: profs } = await admin
+        .from("profiles")
+        .select("id")
+        .ilike("email", driver.email)
+        .limit(1);
+      const tokens = await tokensFor(admin, (profs || []).map((p: { id: string }) => p.id));
+      const result = await push(
+        admin,
+        tokens,
+        "Revisa tu documentación",
+        `${avisos[0][0].toUpperCase()}${avisos[0].slice(1)}. Súbela renovada para seguir recibiendo ofertas.`,
+        { mode: "docs_expiring" },
+        CHANNEL_STATUS,
+      );
+      sent += result.sent;
+    }
+    return json({ sent });
+  }
+
+  if (!body.order_id) return json({ error: "order_id es obligatorio" }, 400);
   const { data: order } = await admin
     .from("transport_requests")
     .select(
-      "id, status, created_by_id, driver_id, client_name, service_type, vehicle_type, origin_address, destination_address, estimated_price",
+      "id, status, created_by_id, driver_id, client_name, service_type, vehicle_type, origin_address, destination_address, estimated_price, proposed_price",
     )
     .eq("id", body.order_id)
     .single();
@@ -314,6 +370,153 @@ Deno.serve(async (req: Request) => {
           tokens,
           "Buscando otro conductor",
           "El conductor asignado ha cancelado. Ya estamos buscando sustituto.",
+          data,
+          CHANNEL_STATUS,
+        ),
+      );
+    }
+
+    // ---------- El CLIENTE cancela → conductor asignado ----------
+    // Sin esto, un conductor podía conducir hasta una recogida cancelada.
+    case "client_cancelled": {
+      if (!order.driver_id) return json({ sent: 0, skipped: "el pedido no tenía conductor" });
+      const tokens = await tokensFor(admin, [order.driver_id]);
+      return json(
+        await push(
+          admin,
+          tokens,
+          "Servicio cancelado por el cliente",
+          `Ya no hace falta ir a ${order.origin_address || "la recogida"}.`,
+          data,
+          CHANNEL_STATUS,
+        ),
+      );
+    }
+
+    // ---------- Negociación: el cliente descarta una contraoferta → ese conductor ----------
+    case "offer_rejected": {
+      if (!body.offer_id) return json({ error: "offer_id requerido" }, 400);
+      const { data: offer } = await admin
+        .from("price_offers")
+        .select("id, request_id, driver_id, amount, status")
+        .eq("id", body.offer_id)
+        .single();
+      if (!offer || offer.request_id !== order.id) return json({ error: "Contraoferta no encontrada" }, 404);
+
+      const tokens = await tokensFor(admin, [offer.driver_id]);
+      return json(
+        await push(
+          admin,
+          tokens,
+          "Contraoferta descartada",
+          // Sin dramatismo y con salida: el pedido puede seguir vivo.
+          order.status === "pending"
+            ? `El cliente no aceptó tus ${Number(offer.amount).toFixed(2)} €. Puedes proponer otro precio.`
+            : "El cliente ya ha cerrado el servicio con otro conductor.",
+          data,
+          CHANNEL_OFFERS,
+        ),
+      );
+    }
+
+    // ---------- El cliente sube su oferta → conductores interesados ----------
+    // Los que ya contraofertaron (o los que están mirando) tienen que saber
+    // que el precio ha mejorado: si no, la subida no sirve de nada.
+    case "offer_raised": {
+      if (order.status !== "pending" || order.proposed_price == null) {
+        return json({ sent: 0, skipped: "el pedido ya no admite ofertas" });
+      }
+
+      const { data: offers } = await admin
+        .from("price_offers")
+        .select("driver_id")
+        .eq("request_id", order.id)
+        .in("status", ["pending", "superseded", "rejected"]);
+
+      const driverIds = [...new Set((offers || []).map((o: { driver_id: string }) => o.driver_id))];
+      if (!driverIds.length) return json({ sent: 0, total: 0 });
+
+      const tokens = await tokensFor(admin, driverIds);
+      return json(
+        await push(
+          admin,
+          tokens,
+          "El cliente ha subido su oferta",
+          `Ahora ofrece ${Number(order.proposed_price).toFixed(2)} € por ${order.origin_address || "la recogida"}.`,
+          data,
+          CHANNEL_OFFERS,
+        ),
+      );
+    }
+
+    // ---------- Propina cobrada → conductor ----------
+    case "tip_received": {
+      if (!order.driver_id) return json({ sent: 0, skipped: "el pedido no tiene conductor" });
+      // El importe se lee de la BD, no del llamante: es dinero.
+      const { data: paid } = await admin
+        .from("transport_requests")
+        .select("tip_amount, client_name")
+        .eq("id", order.id)
+        .single();
+      if (!paid?.tip_amount) return json({ sent: 0, skipped: "sin propina anotada" });
+
+      const tokens = await tokensFor(admin, [order.driver_id]);
+      return json(
+        await push(
+          admin,
+          tokens,
+          "¡Te han dejado propina!",
+          `${paid.client_name || "El cliente"} te ha dejado ${Number(paid.tip_amount).toFixed(2)} €, íntegros para ti.`,
+          data,
+          CHANNEL_STATUS,
+        ),
+      );
+    }
+
+    // ---------- Valoración del cliente → conductor ----------
+    case "rating_received": {
+      if (!order.driver_id) return json({ sent: 0, skipped: "el pedido no tiene conductor" });
+      const { data: rated } = await admin
+        .from("transport_requests")
+        .select("client_rating, client_review")
+        .eq("id", order.id)
+        .single();
+      if (!rated?.client_rating) return json({ sent: 0, skipped: "sin valoración" });
+
+      const stars = "★".repeat(rated.client_rating);
+      const tokens = await tokensFor(admin, [order.driver_id]);
+      return json(
+        await push(
+          admin,
+          tokens,
+          `Nueva valoración: ${stars}`,
+          rated.client_review
+            ? String(rated.client_review).slice(0, 140)
+            : "El cliente ha valorado tu servicio.",
+          data,
+          CHANNEL_STATUS,
+        ),
+      );
+    }
+
+    // ---------- Pago con tarjeta confirmado → conductor ----------
+    case "payment_received": {
+      if (!order.driver_id) return json({ sent: 0, skipped: "el pedido no tiene conductor" });
+      const { data: paid } = await admin
+        .from("transport_requests")
+        .select("payment_status, final_price, estimated_price")
+        .eq("id", order.id)
+        .single();
+      if (paid?.payment_status !== "paid") return json({ sent: 0, skipped: "el pago no está confirmado" });
+
+      const amount = Number(paid.final_price ?? paid.estimated_price ?? 0).toFixed(2);
+      const tokens = await tokensFor(admin, [order.driver_id]);
+      return json(
+        await push(
+          admin,
+          tokens,
+          "Servicio cobrado",
+          `El cliente ha pagado ${amount} € con tarjeta: no cobres en efectivo.`,
           data,
           CHANNEL_STATUS,
         ),

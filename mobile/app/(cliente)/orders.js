@@ -187,6 +187,20 @@ export default function MisPedidos() {
                 </View>
                 {/* Cuándo se pidió (canvas 2f: cada tarjeta lleva su fecha) */}
                 <Caption>{whenLabel(order)}</Caption>
+                {/* Que el pedido guarda foto y/o firma de la entrega: es lo que
+                    respalda una reclamación, y hasta ahora no se veía. */}
+                {order.status === "delivered" && (order.proof_photo_url || order.proof_signature_url) ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Ionicons name="shield-checkmark-outline" size={13} color={colors.success} />
+                    <Text style={styles.proofTag}>
+                      {order.proof_photo_url && order.proof_signature_url
+                        ? "Con foto y firma de entrega"
+                        : order.proof_signature_url
+                          ? "Con firma de entrega"
+                          : "Con foto de entrega"}
+                    </Text>
+                  </View>
+                ) : null}
                 <Caption>{order.origin_address || "—"}</Caption>
                 <Caption>→ {order.destination_address || "—"}</Caption>
                 {(order.final_price ?? order.estimated_price) != null && (
@@ -224,4 +238,5 @@ const styles = StyleSheet.create({
   filterActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   filterText: { fontSize: 13, fontFamily: "DMSans_500Medium", color: colors.mutedForeground },
   unread: { fontSize: 13, fontFamily: "DMSans_700Bold", color: colors.primary },
+  proofTag: { fontSize: 11.5, fontFamily: "DMSans_500Medium", color: colors.success },
 });

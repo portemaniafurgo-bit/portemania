@@ -88,6 +88,12 @@ export default function OfferCard({
             </Text>
           </View>
         ) : null}
+        {/* Cómo se cobra, antes de aceptar: cambia si hay que llevar cambio. */}
+        <View style={styles.tag}>
+          <Text style={styles.tagText}>
+            {order.payment_method === "cash" ? "cobro en efectivo" : "pago con tarjeta"}
+          </Text>
+        </View>
       </View>
 
       {/* El mapa de la recogida va SIEMPRE: el conductor decide por dónde está */}

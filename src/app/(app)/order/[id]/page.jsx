@@ -32,6 +32,7 @@ import { format, addMinutes } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState, useEffect, useRef } from "react";
 import DriverTrackingMap from "@/components/common/DriverTrackingMap";
+import DeliveryProofCard from "@/components/order/DeliveryProofCard";
 import { fetchRouteEta, geocodeAlbacete, distanceKm } from "@/lib/eta";
 import { serviceOf } from "@/lib/services";
 
@@ -702,6 +703,9 @@ export default function OrderDetail() {
       )}
 
       {/* Chat — moved to bottom, rendered after driver section */}
+
+      {/* Prueba de entrega: lo que el conductor dejó al cerrar el servicio */}
+      {order.status === "delivered" && isOwner && <DeliveryProofCard order={order} />}
 
       {/* Rating */}
       {canRate && (

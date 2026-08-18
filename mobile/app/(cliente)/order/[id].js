@@ -26,6 +26,7 @@ import { Ionicons } from "@expo/vector-icons";
 import ReportIncident from "../../../components/ReportIncident";
 import PayButton from "../../../components/PayButton";
 import TipCard from "../../../components/TipCard";
+import DeliveryProof from "../../../components/DeliveryProof";
 import ChatLink from "../../../components/ChatLink";
 import { downloadReceipt } from "../../../lib/receipt";
 import { colors, radius, spacing } from "../../../theme";
@@ -161,6 +162,11 @@ export default function OrderDetail() {
     try {
       const { error } = await supabase.rpc("reject_price_offer", { p_offer_id: offerId });
       if (error) throw error;
+      // Avisar al conductor de que su contraoferta no valió: si no, se queda
+      // esperando una respuesta que no llega.
+      supabase.functions
+        .invoke("send-push", { body: { mode: "offer_rejected", order_id: id, offer_id: offerId } })
+        .catch(() => {});
       setPriceOffers(prev => prev.filter(o => o.id !== offerId));
     } catch (err) {
       setActionError(err.message || "No se pudo descartar.");
@@ -183,6 +189,11 @@ export default function OrderDetail() {
         .single();
       if (error) throw error;
       patchOrder(data);
+      // Sin este aviso, subir la oferta no sirve de nada: los conductores que
+      // ya la habían visto no vuelven a mirar el pedido por su cuenta.
+      supabase.functions
+        .invoke("send-push", { body: { mode: "offer_raised", order_id: id } })
+        .catch(() => {});
     } catch (err) {
       setActionError(err.message || "No se pudo subir la oferta.");
     } finally {
@@ -200,6 +211,10 @@ export default function OrderDetail() {
         .update({ client_rating: rating, client_review: review.trim() || null })
         .eq("id", id);
       patchOrder({ client_rating: rating, client_review: review.trim() || null });
+      // Al conductor le importa: es su reputación y su siguiente servicio.
+      supabase.functions
+        .invoke("send-push", { body: { mode: "rating_received", order_id: id } })
+        .catch(() => {});
     } finally {
       setSavingReview(false);
     }
@@ -214,6 +229,13 @@ export default function OrderDetail() {
         onPress: async () => {
           await supabase.from("transport_requests").update({ status: "cancelled" }).eq("id", id);
           patchOrder({ status: "cancelled" });
+          // Si ya había conductor asignado, hay que decírselo: puede estar
+          // conduciendo hacia la recogida.
+          if (order.driver_id) {
+            supabase.functions
+              .invoke("send-push", { body: { mode: "client_cancelled", order_id: id } })
+              .catch(() => {});
+          }
         },
       },
     ]);
@@ -533,6 +555,9 @@ export default function OrderDetail() {
             {order.client_review ? <Caption>{order.client_review}</Caption> : null}
           </Card>
         ) : null}
+
+        {/* Lo que el conductor dejó como prueba de que entregó */}
+        {delivered && <DeliveryProof order={order} />}
 
         {/* Propina: cargo Stripe aparte, 100 % para el conductor */}
         {delivered && <TipCard order={order} driverName={driverFirst} />}

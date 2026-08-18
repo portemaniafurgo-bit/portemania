@@ -30,6 +30,9 @@ export const DEFAULT_TARIFFS = {
   // Comunes
   insurance: 12,
   commission_pct: 15,
+  // IVA de las facturas. El precio que ve el cliente ya lo incluye: aquí solo
+  // sirve para desglosar base e impuesto en el documento.
+  vat_rate: 21,
 };
 
 /** Horas incluidas en el precio base de la mini mudanza. */

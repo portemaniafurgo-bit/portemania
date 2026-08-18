@@ -79,6 +79,11 @@ export default function TipCard({ order, driverName }) {
         return;
       }
       setDone(true);
+      // Que el conductor se entere en el momento: una propina que nadie ve no
+      // motiva a nadie.
+      supabase.functions
+        .invoke("send-push", { body: { mode: "tip_received", order_id: order.id } })
+        .catch(() => {});
     } catch (err) {
       setError("No se pudo procesar la propina: " + (err.message || "inténtalo de nuevo"));
     } finally {

@@ -5,6 +5,7 @@ import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ONBOARDING_KEY } from "../onboarding";
 import { useAuth } from "../../lib/auth";
+import { supabase } from "../../lib/supabase";
 import { getDefaultPayment, PAYMENT_LABELS } from "../../lib/payment";
 import DeleteAccount from "../../components/DeleteAccount";
 import NotificationPrefs from "../../components/NotificationPrefs";
@@ -21,15 +22,32 @@ export default function Perfil() {
   const { user, role, signOut } = useAuth();
   const router = useRouter();
   const [payment, setPayment] = useState("cash");
+  // Resumen de los datos fiscales, para que se vea de un vistazo si hay factura.
+  const [billing, setBilling] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
       let active = true;
       getDefaultPayment().then(value => active && setPayment(value));
+      if (user?.id) {
+        supabase
+          .from("profiles")
+          .select("billing_name, billing_tax_id")
+          .eq("id", user.id)
+          .maybeSingle()
+          .then(({ data }) => {
+            if (!active) return;
+            setBilling(
+              data?.billing_tax_id
+                ? `${data.billing_name || "A tu nombre"} · ${data.billing_tax_id}`
+                : null,
+            );
+          });
+      }
       return () => {
         active = false;
       };
-    }, []),
+    }, [user?.id]),
   );
 
   /** Volver a ver la introducción: baja el flag y abre las tres pantallas. */
@@ -68,8 +86,14 @@ export default function Perfil() {
           onPress={() => router.push("/(cliente)/pagos")}
         />
         <SettingsRow
+          icon="document-text-outline"
+          label="Datos de facturación"
+          hint={billing ? billing : "Sin NIF: recibirás recibo, no factura"}
+          onPress={() => router.push("/(cliente)/facturacion")}
+        />
+        <SettingsRow
           icon="receipt-outline"
-          label="Mis recibos"
+          label="Mis facturas y recibos"
           onPress={() => router.push("/(cliente)/orders?filter=delivered")}
         />
         <SettingsRow

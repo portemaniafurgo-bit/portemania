@@ -14,6 +14,66 @@ import { supabase } from "./supabase";
  */
 const TASK = "clicyvoy-driver-location";
 const PROFILE_KEY = "driver_profile_id";
+// Aviso de llegada: destino de la fase actual y radio a partir del cual se
+// considera "está llegando". 150 m es una manzana: da tiempo a bajar.
+const ARRIVAL_KEY = "driver_arrival_target";
+const ARRIVAL_RADIUS_M = 150;
+
+/** Metros entre dos coordenadas (fórmula del semiverseno). */
+function metersBetween(a, b) {
+  const rad = x => (x * Math.PI) / 180;
+  const h =
+    Math.sin(rad(b.lat - a.lat) / 2) ** 2 +
+    Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(rad(b.lng - a.lng) / 2) ** 2;
+  return 6371000 * 2 * Math.asin(Math.sqrt(h));
+}
+
+/**
+ * Avisa al cliente cuando el conductor entra en el radio de llegada, UNA sola
+ * vez por pedido y fase. La marca vive en el dispositivo porque esta tarea
+ * corre sin interfaz y no puede consultar estado de React.
+ */
+async function maybeNotifyArrival(position) {
+  const orderRaw = await AsyncStorage.getItem(ARRIVAL_KEY);
+  if (!orderRaw) return;
+  const arrival = JSON.parse(orderRaw); // { orderId, lat, lng, phase }
+
+  const distance = metersBetween(position, { lat: arrival.lat, lng: arrival.lng });
+  if (distance > ARRIVAL_RADIUS_M) return;
+
+  // Marcar ANTES de llamar: si el push falla, no se reintenta en bucle cada
+  // 10 segundos mientras el conductor espera en el portal.
+  await AsyncStorage.removeItem(ARRIVAL_KEY);
+  await supabase.functions
+    .invoke("send-push", { body: { mode: "driver_arriving", order_id: arrival.orderId } })
+    .catch(() => {});
+}
+
+/**
+ * Fija a qué punto se está yendo, para el aviso de llegada. Lo llama la
+ * pantalla del servicio cada vez que cambia la fase (a recoger / a entregar).
+ */
+export async function setArrivalTarget(orderId, target, phase) {
+  if (!orderId || !target?.lat) {
+    await AsyncStorage.removeItem(ARRIVAL_KEY).catch(() => {});
+    return;
+  }
+  const current = await AsyncStorage.getItem(ARRIVAL_KEY).catch(() => null);
+  // Si ya está fijado ESTE destino, no se toca: reescribirlo reactivaría un
+  // aviso ya enviado en la misma fase.
+  if (current) {
+    try {
+      const parsed = JSON.parse(current);
+      if (parsed.orderId === orderId && parsed.phase === phase) return;
+    } catch {
+      /* marca ilegible: se reescribe */
+    }
+  }
+  await AsyncStorage.setItem(
+    ARRIVAL_KEY,
+    JSON.stringify({ orderId, lat: target.lat, lng: target.lng, phase }),
+  ).catch(() => {});
+}
 
 TaskManager.defineTask(TASK, async ({ data, error }) => {
   if (error || !data?.locations?.length) return;
@@ -42,6 +102,8 @@ TaskManager.defineTask(TASK, async ({ data, error }) => {
       location_updated_at: new Date().toISOString(),
     })
     .eq("id", profileId);
+
+  await maybeNotifyArrival({ lat: latitude, lng: longitude });
 });
 
 /**

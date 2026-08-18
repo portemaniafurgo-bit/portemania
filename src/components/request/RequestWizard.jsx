@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
+import { acceptanceOf } from "@/lib/acceptance";
 import {
   AlertCircle,
   ArrowLeft,
@@ -682,6 +683,21 @@ export default function RequestWizard({ authenticated = false, user = null }) {
                     </button>
                   ) : null}
                 </div>
+
+                {/* Aviso de aceptación: cuanto más baja la oferta, más difícil
+                    que un conductor la coja. Mismo criterio que la app. */}
+                {form.proposed_price ? (
+                  (() => {
+                    const chance = acceptanceOf(Number(form.proposed_price), quote.total);
+                    return (
+                      <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ${chance.bg}`}>
+                        <span className={`h-2 w-2 rounded-full ${chance.dot}`} />
+                        <span className={`text-xs font-semibold ${chance.text}`}>{chance.label}</span>
+                        <span className="text-xs text-muted-foreground">{chance.hint}</span>
+                      </div>
+                    );
+                  })()
+                ) : null}
               </div>
             )}
 

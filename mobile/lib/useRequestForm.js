@@ -403,6 +403,9 @@ export function useRequestForm({ user } = {}) {
         .invoke("send-email", { body: { mode: "new_request", order_id: data.id } })
         .catch(() => {});
       supabase.functions
+        // Nota: con la migración 0015 aplicada, este aviso lo dispara además un
+        // trigger de la BD (para cubrir web, invitados y programados). La
+        // función descarta el duplicado si el pedido ya no está pendiente.
         .invoke("send-push", { body: { mode: "new_request", order_id: data.id } })
         .catch(() => {});
     }

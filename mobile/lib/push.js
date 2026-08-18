@@ -54,6 +54,13 @@ async function ensureChannels() {
     importance: Notifications.AndroidImportance.HIGH,
     lightColor: "#7145d6",
   });
+  // Novedades y promociones: por separado y en bajo, para que quien las apague
+  // no se quede sin los avisos del servicio.
+  await Notifications.setNotificationChannelAsync("novedades", {
+    name: "Novedades de ClicyVoy",
+    importance: Notifications.AndroidImportance.LOW,
+    lightColor: "#7145d6",
+  });
 }
 
 /**
@@ -126,15 +133,38 @@ export function usePushNotifications({ userId, role }) {
   const coldStartHandled = useRef(false);
 
   useEffect(() => {
-    const open = orderId => {
+    /**
+     * A dónde lleva cada aviso al tocarlo. Llevarlo TODO al detalle del pedido
+     * hacía que un mensaje de chat abriera una pantalla desde la que había que
+     * buscar el chat, y que una oferta nueva abriera un pedido que el conductor
+     * todavía no tiene.
+     */
+    const open = (orderId, mode) => {
+      if (mode === "docs_expiring") {
+        router.push("/(conductor)/profile");
+        return;
+      }
+      if (mode === "new_request" && role === "driver") {
+        router.push("/(conductor)/ofertas");
+        return;
+      }
       if (!orderId) return;
+      if (mode === "chat_message") {
+        router.push(`/chat/${orderId}`);
+        return;
+      }
+      if (mode === "offer_rejected" && role === "driver") {
+        router.push("/(conductor)/ofertas");
+        return;
+      }
       router.push(
         role === "driver" ? `/(conductor)/job/${orderId}` : `/(cliente)/order/${orderId}`,
       );
     };
 
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-      open(response.notification.request.content.data?.order_id);
+      const payload = response.notification.request.content.data || {};
+      open(payload.order_id, payload.mode);
     });
 
     // Arranque en frío: si la app se abrió TOCANDO una notificación, el
@@ -143,7 +173,9 @@ export function usePushNotifications({ userId, role }) {
     if (!coldStartHandled.current && role) {
       coldStartHandled.current = true;
       Notifications.getLastNotificationResponseAsync().then(response => {
-        if (response) open(response.notification.request.content.data?.order_id);
+        if (!response) return;
+        const payload = response.notification.request.content.data || {};
+        open(payload.order_id, payload.mode);
       });
     }
 

@@ -13,7 +13,55 @@ import { colors, radius, spacing } from "../theme";
  * El suelo (60 % de la tarifa) lo valida también el servidor; aquí solo evita
  * que se pueda arrastrar por debajo.
  */
+/**
+ * Probabilidad de que un conductor acepte, según lo que se aleje el importe de
+ * la tarifa (idea de Renato, 18/08/2026): cuanto más baja la oferta más
+ * difícil, y cuanto más sube, más fácil. Se pinta con color porque es lo que se
+ * entiende sin leer: rojo cuesta, ámbar tardará, morado es lo normal, verde va
+ * rápido.
+ *
+ * Los MISMOS tramos que la web (src/lib/acceptance.js): si se tocan aquí, hay
+ * que tocarlos allí.
+ */
+export function acceptanceOf(value, closed) {
+  const ratio = closed > 0 ? value / closed : 1;
+  if (ratio < 0.75) {
+    return {
+      color: colors.destructive,
+      label: "Difícil de aceptar",
+      hint: "Muy por debajo de la tarifa: puede que ningún conductor lo coja.",
+    };
+  }
+  if (ratio < 0.92) {
+    return {
+      color: colors.warning,
+      label: "Puede tardar",
+      hint: "Por debajo de la tarifa: alguno lo aceptará, pero esperarás más.",
+    };
+  }
+  if (ratio < 1) {
+    return {
+      color: colors.primary,
+      label: "Probable",
+      hint: "Cerca de la tarifa: lo normal es que te lo acepten.",
+    };
+  }
+  if (ratio === 1) {
+    return {
+      color: colors.primary,
+      label: "Lo habitual",
+      hint: "Justo la tarifa de ClicyVoy: se acepta casi siempre a la primera.",
+    };
+  }
+  return {
+    color: colors.success,
+    label: "Muy fácil",
+    hint: "Por encima de la tarifa: tendrás conductor enseguida.",
+  };
+}
+
 export default function OfferControl({ value, min, max, closed, enabled, onToggle, onChange }) {
+  const acceptance = acceptanceOf(value, closed);
   const width = useRef(0);
   const pct = max > min ? Math.min(1, Math.max(0, (value - min) / (max - min))) : 0;
 
@@ -55,7 +103,15 @@ export default function OfferControl({ value, min, max, closed, enabled, onToggl
             >
               <Ionicons name="remove" size={22} color={colors.primary} />
             </Pressable>
-            <Text style={styles.amount}>{euro(value)}</Text>
+            <View style={{ alignItems: "center", minWidth: 130 }}>
+              <Text style={[styles.amount, { color: acceptance.color }]}>{euro(value)}</Text>
+              <View style={[styles.badge, { backgroundColor: acceptance.color + "1A" }]}>
+                <View style={[styles.badgeDot, { backgroundColor: acceptance.color }]} />
+                <Text style={[styles.badgeText, { color: acceptance.color }]}>
+                  {acceptance.label}
+                </Text>
+              </View>
+            </View>
             <Pressable
               onPress={() => onChange(Math.min(max, value + 1))}
               style={styles.round}
@@ -73,8 +129,9 @@ export default function OfferControl({ value, min, max, closed, enabled, onToggl
             }}
             {...pan.panHandlers}
           >
-            <View style={[styles.fill, { width: `${pct * 100}%` }]} />
-            <View style={[styles.thumb, { left: `${pct * 100}%` }]} />
+            {/* La barra se tiñe según lo fácil que sea que lo acepten */}
+            <View style={[styles.fill, { width: `${pct * 100}%`, backgroundColor: acceptance.color }]} />
+            <View style={[styles.thumb, { left: `${pct * 100}%`, backgroundColor: acceptance.color }]} />
           </View>
 
           <View style={styles.limits}>
@@ -82,13 +139,14 @@ export default function OfferControl({ value, min, max, closed, enabled, onToggl
             <Caption style={{ fontSize: 11.5 }}>precio cerrado {euro(closed)}</Caption>
           </View>
 
-          <View style={styles.hint}>
+          <View style={[styles.hint, { backgroundColor: acceptance.color + "14" }]}>
             <Text style={styles.hintText}>
-              {value < closed
-                ? `Estás pidiendo ${euro(closed - value)} menos que la tarifa: puede tardar más en encontrar conductor.`
-                : value > closed
-                  ? `Ofreces ${euro(value - closed)} más que la tarifa: tendrás respuesta enseguida.`
-                  : "Justo la tarifa de ClicyVoy: lo normal es que lo acepten a la primera."}
+              {acceptance.hint}
+              {value !== closed
+                ? ` ${value < closed ? "Pides" : "Ofreces"} ${euro(Math.abs(closed - value))} ${
+                    value < closed ? "menos" : "más"
+                  } que la tarifa.`
+                : ""}
             </Text>
           </View>
         </>
@@ -149,6 +207,17 @@ const styles = StyleSheet.create({
     marginLeft: -9,
   },
   limits: { flexDirection: "row", justifyContent: "space-between", paddingHorizontal: 4 },
-  hint: { backgroundColor: colors.primarySoft, borderRadius: 14, padding: 12, paddingHorizontal: 14 },
-  hintText: { fontSize: 12.5, lineHeight: 19, fontFamily: "DMSans_400Regular", color: "#4A3D66" },
+  hint: { borderRadius: 14, padding: 12, paddingHorizontal: 14 },
+  hintText: { fontSize: 12.5, lineHeight: 19, fontFamily: "DMSans_400Regular", color: colors.ink },
+  badge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderRadius: radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginTop: 6,
+  },
+  badgeDot: { width: 6, height: 6, borderRadius: 3 },
+  badgeText: { fontSize: 11.5, fontFamily: "DMSans_700Bold" },
 });

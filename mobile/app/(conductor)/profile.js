@@ -17,7 +17,7 @@ import { rating1 } from "../../lib/money";
 import { pickPhotos, takePhoto, uploadPhoto } from "../../lib/photos";
 import DeleteAccount from "../../components/DeleteAccount";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRow";
-import { Body, Caption, Card, ErrorText, Heading, Loading, Screen, Title } from "../../components/ui";
+import { Body, Button, Caption, Card, ErrorText, Field, Heading, Loading, Screen, Title } from "../../components/ui";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -58,6 +58,10 @@ export default function PerfilConductor() {
   const [jobCount, setJobCount] = useState(null);
   const [uploading, setUploading] = useState(null);
   const [error, setError] = useState("");
+  // Datos fiscales del autónomo (emisor de la factura).
+  const [fiscal, setFiscal] = useState({ tax_id: "", fiscal_name: "", fiscal_address: "" });
+  const [savingFiscal, setSavingFiscal] = useState(false);
+  const [fiscalSaved, setFiscalSaved] = useState(false);
 
   const load = useCallback(() => fetchMyDriverProfile(user).then(setProfile), [user]);
 
@@ -70,6 +74,39 @@ export default function PerfilConductor() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!profile) return;
+    setFiscal({
+      tax_id: profile.tax_id || "",
+      fiscal_name: profile.fiscal_name || profile.full_name || "",
+      fiscal_address: profile.fiscal_address || "",
+    });
+  }, [profile?.id]);
+
+  const saveFiscal = async () => {
+    setSavingFiscal(true);
+    setError("");
+    try {
+      const payload = {
+        // Sin espacios y en mayúsculas: es como lo espera Hacienda.
+        tax_id: fiscal.tax_id.replace(/\s+/g, "").toUpperCase() || null,
+        fiscal_name: fiscal.fiscal_name.trim() || null,
+        fiscal_address: fiscal.fiscal_address.trim() || null,
+      };
+      const { error: err } = await supabase
+        .from("driver_profiles")
+        .update(payload)
+        .eq("id", profile.id);
+      if (err) throw err;
+      setProfile(prev => ({ ...prev, ...payload }));
+      setFiscalSaved(true);
+    } catch (err) {
+      setError("No se pudieron guardar los datos fiscales: " + (err.message || "error de conexión"));
+    } finally {
+      setSavingFiscal(false);
+    }
+  };
 
   // «4,9 · 212 servicios»: el número sale de sus entregas, no de una columna
   // inventada — count exacto sin traerse las filas.
@@ -229,8 +266,47 @@ export default function PerfilConductor() {
         </Card>
       )}
 
+      {/* Datos fiscales: sin ellos, el cliente solo recibe un recibo simple y
+          la factura del servicio no existe. Es dinero y es Hacienda. */}
       {profile && (
         <>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.overline}>Datos de facturación</Text>
+            {!profile.tax_id ? (
+              <Caption style={{ color: colors.warning }}>Falta el NIF</Caption>
+            ) : null}
+          </View>
+          <Card>
+            <Caption>
+              Eres tú quien factura al cliente: el servicio lo prestas tú como autónomo y ClicyVoy
+              solo pone en contacto y gestiona el cobro.
+            </Caption>
+            <Field
+              label="NIF / NIE"
+              value={fiscal.tax_id}
+              onChangeText={v => setFiscal(f => ({ ...f, tax_id: v }))}
+              placeholder="02123456X"
+              autoCapitalize="characters"
+            />
+            <Field
+              label="Nombre fiscal"
+              value={fiscal.fiscal_name}
+              onChangeText={v => setFiscal(f => ({ ...f, fiscal_name: v }))}
+              placeholder="Como aparece en tu alta de autónomo"
+            />
+            <Field
+              label="Dirección fiscal"
+              value={fiscal.fiscal_address}
+              onChangeText={v => setFiscal(f => ({ ...f, fiscal_address: v }))}
+              placeholder="Calle, número, CP y población"
+            />
+            <Button
+              title={fiscalSaved ? "Datos guardados" : "Guardar datos fiscales"}
+              loading={savingFiscal}
+              onPress={saveFiscal}
+            />
+          </Card>
+
           <View style={styles.sectionHeader}>
             <Text style={styles.overline}>Documentación</Text>
             <Caption>

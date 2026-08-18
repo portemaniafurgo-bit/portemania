@@ -53,6 +53,7 @@ export default function ClienteLayout() {
       <Tabs.Screen name="order/[id]" options={{ href: null }} />
       {/* Ajustes del perfil (canvas 2i): se entra desde Perfil. */}
       <Tabs.Screen name="pagos" options={{ href: null }} />
+      <Tabs.Screen name="facturacion" options={{ href: null }} />
       <Tabs.Screen name="ayuda" options={{ href: null }} />
     </Tabs>
   );

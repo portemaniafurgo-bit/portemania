@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useStripe } from "@stripe/stripe-react-native";
 import { confirmPayment, createPaymentIntent } from "../lib/payments";
+import { supabase } from "../lib/supabase";
 import { Body, Button, Caption, Card, ErrorText } from "./ui";
 import { colors } from "../theme";
 
@@ -57,6 +58,11 @@ export default function PayButton({ order, onPaid }) {
 
       setPaid(true);
       onPaid?.();
+      // Avisar al conductor de que ya está cobrado: si no, puede pedir el
+      // importe en efectivo al llegar.
+      supabase.functions
+        .invoke("send-push", { body: { mode: "payment_received", order_id: order.id } })
+        .catch(() => {});
     } catch (err) {
       setError("Error al procesar el pago: " + (err.message || "inténtalo de nuevo"));
     } finally {
