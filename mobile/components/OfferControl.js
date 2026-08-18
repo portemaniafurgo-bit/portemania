@@ -5,6 +5,9 @@ import { euro } from "../lib/money";
 import { Caption, Overline } from "./ui";
 import { colors, radius, spacing } from "../theme";
 
+/** Cuánto hay que ofrecer por encima de la tarifa para que salga en verde. */
+export const GREEN_BONUS = 5;
+
 /**
  * «Proponer mi precio» del canvas (1e): interruptor para activarlo, importe
  * enorme en morado entre dos botones redondos de −/+, barra arrastrable con
@@ -25,6 +28,16 @@ import { colors, radius, spacing } from "../theme";
  */
 export function acceptanceOf(value, closed) {
   const ratio = closed > 0 ? value / closed : 1;
+
+  // Verde en cuanto ofrece 5 € más que la tarifa: a ese precio el servicio
+  // vuela y conviene que el cliente lo vea (decisión del negocio, 18/08).
+  if (value >= closed + GREEN_BONUS) {
+    return {
+      color: colors.success,
+      label: "Muy fácil",
+      hint: "Ofreces más que la tarifa: tendrás conductor enseguida.",
+    };
+  }
   if (ratio < 0.75) {
     return {
       color: colors.destructive,
@@ -54,9 +67,9 @@ export function acceptanceOf(value, closed) {
     };
   }
   return {
-    color: colors.success,
-    label: "Muy fácil",
-    hint: "Por encima de la tarifa: tendrás conductor enseguida.",
+    color: colors.primary,
+    label: "Buena oferta",
+    hint: `Por encima de la tarifa. Con ${euro(GREEN_BONUS)} más, respuesta casi segura.`,
   };
 }
 

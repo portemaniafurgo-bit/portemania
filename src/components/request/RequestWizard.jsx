@@ -631,21 +631,6 @@ export default function RequestWizard({ authenticated = false, user = null }) {
               )}
             </div>
 
-            {service.hasInsurance && (
-              <div className="bg-card rounded-2xl border border-border p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">Seguro de mercancía (+{tariffs.insurance}€)</span>
-                  </div>
-                  <Switch
-                    checked={form.insurance_selected}
-                    onCheckedChange={(v) => f.update("insurance_selected", v)}
-                  />
-                </div>
-              </div>
-            )}
-
             <PriceSummary quote={quote} />
 
             {/* Negociación (opcional, solo con cuenta): el cliente propone su

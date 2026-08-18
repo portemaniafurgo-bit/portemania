@@ -242,12 +242,6 @@ export default function Payment() {
           </div>
           <p className="text-xl font-display font-bold text-foreground">{(order.estimated_price || 0).toFixed(2)}€</p>
         </div>
-        {order.insurance_selected && (
-          <div className="flex items-center gap-2 text-xs text-emerald-700 bg-emerald-50 rounded-lg px-3 py-2">
-            <Shield className="w-3.5 h-3.5" />
-            <span>Seguro de mercancía incluido</span>
-          </div>
-        )}
       </div>
 
       {/* Payment form */}

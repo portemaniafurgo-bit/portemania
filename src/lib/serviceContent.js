@@ -49,7 +49,6 @@ export const SERVICE_CONTENT = {
     ],
     prices: (t) => [
       { label: "Porte en Albacete capital", value: `${t.porte_base}€`, hint: "Precio cerrado, a pie de calle" },
-      { label: "Seguro de mercancía (opcional)", value: `+${t.insurance}€`, hint: "Se añade al reservar" },
     ],
     faq: [
       {
@@ -107,7 +106,6 @@ export const SERVICE_CONTENT = {
       { label: "Hora adicional", value: `${t.mudanza_extra_hour}€`, hint: "Se añade al reservar" },
       { label: "Ayuda del conductor", value: `${t.mudanza_help}€`, hint: "Para cargar y descargar" },
       { label: "Parada intermedia", value: `${t.mudanza_stop}€`, hint: "Por cada parada extra" },
-      { label: "Seguro de mercancía (opcional)", value: `+${t.insurance}€`, hint: "Se añade al reservar" },
     ],
     faq: [
       {
@@ -167,7 +165,6 @@ export const SERVICE_CONTENT = {
         value: `${t.tienda_base}€`,
         hint: "Por servicio, con subida si hay ascensor",
       },
-      { label: "Seguro de mercancía (opcional)", value: `+${t.insurance}€`, hint: "Se añade al reservar" },
     ],
     faq: [
       {

@@ -10,7 +10,7 @@ import { es } from "date-fns/locale";
 import { useAuth } from "../../lib/auth";
 import { parseScheduledAt, useRequestForm } from "../../lib/useRequestForm";
 import { SERVICE_KEYS, SERVICES } from "../../lib/services";
-import { servicePriceFrom } from "../../lib/tariffs";
+import { INCLUDED_HOURS, offerFloor, servicePriceFrom } from "../../lib/tariffs";
 import { pickPhotos, takePhoto } from "../../lib/photos";
 import { euro } from "../../lib/money";
 import { Body, Button, Caption, ErrorText, Field, Heading, Overline, Title } from "../../components/ui";
@@ -18,6 +18,7 @@ import { Counter, Option, Toggle } from "../../components/wizard";
 import WizardChrome from "../../components/WizardChrome";
 import OfferControl from "../../components/OfferControl";
 import AddressField from "../../components/AddressField";
+import FloorPicker from "../../components/FloorPicker";
 import AddressMapHero from "../../components/AddressMapHero";
 import ServiceIcon from "../../components/ServiceIcon";
 import { colors, radius, spacing } from "../../theme";
@@ -83,8 +84,15 @@ export default function Pedir() {
   const [wantSchedule, setWantSchedule] = useState(false);
   const scheduling = wantSchedule || !!form.scheduled_date;
 
-  const floor = Math.ceil(quote.total * 0.6);
+  // Suelo de la oferta: nunca por debajo de 30 €, ni del 60 % de la tarifa.
+  const floor = offerFloor(quote.total);
   const offer = form.proposed_price ? Number(form.proposed_price) : null;
+
+  // Avisos en rojo de lo que falta, mientras se escribe y no solo al pulsar.
+  const minDescription = service.key === "paquete" ? 5 : 10;
+  const description = (form.cargo_description || "").trim();
+  const descriptionShort = description.length > 0 && description.length < minDescription;
+  const photosMissing = service.needsPhotos && photos.length === 0;
 
   const next = () => {
     // El paso 3 reúne carga y detalles del servicio (peso, objetos, horas,
@@ -418,29 +426,51 @@ export default function Pedir() {
         <>
           <View style={styles.plainCard}>
             <View style={styles.rowBetween}>
-              <Overline>DESCRIPCIÓN</Overline>
-              <Text style={styles.counterText}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                <Overline>DESCRIPCIÓN</Overline>
+                <Text style={styles.required}>obligatorio</Text>
+              </View>
+              <Text style={[styles.counterText, descriptionShort && { color: colors.destructive }]}>
                 {(form.cargo_description || "").length} / {MAX_DESCRIPTION}
               </Text>
             </View>
             <Field
               value={form.cargo_description}
               onChangeText={v => update("cargo_description", v.slice(0, MAX_DESCRIPTION))}
-              placeholder="Ej.: un sofá de 2 plazas y dos cajas medianas"
+              placeholder={
+                service.key === "mini_mudanza"
+                  ? "Ej.: sofá de 3 plazas, mesa de comedor con 4 sillas, armario de 2 puertas y 6 cajas medianas"
+                  : "Ej.: un sofá de 2 plazas y dos cajas medianas"
+              }
               multiline
               numberOfLines={3}
               style={{ minHeight: 90, textAlignVertical: "top" }}
+              error={descriptionShort ? `Escribe al menos ${minDescription} caracteres` : ""}
             />
+            <Caption>
+              {service.key === "mini_mudanza"
+                ? "Cuanto más detallada, mejor: el conductor necesita saber qué hay que mover para llevar la furgoneta y el tiempo adecuados."
+                : "Di qué hay que mover y cuántas piezas son."}
+            </Caption>
           </View>
 
           <View style={styles.plainCard}>
             <View style={styles.rowBetween}>
-              <Overline>FOTOS DE LA CARGA</Overline>
-              <Caption>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                <Overline>FOTOS DE LA CARGA</Overline>
+                {service.needsPhotos ? <Text style={styles.required}>obligatorio</Text> : null}
+              </View>
+              <Caption style={photosMissing ? { color: colors.destructive } : null}>
                 {photos.length} de {MAX_PHOTOS}
-                {service.needsPhotos && photos.length === 0 ? " · al menos 1" : ""}
+                {photosMissing ? " · falta al menos 1" : ""}
               </Caption>
             </View>
+            {service.key === "mini_mudanza" ? (
+              <Caption>
+                Sube fotos de <Caption style={{ fontFamily: "DMSans_700Bold", color: colors.foreground }}>todo lo que
+                hay que transportar</Caption>: así el conductor sabe si le cabe y no hay sorpresas al llegar.
+              </Caption>
+            ) : null}
             <View style={styles.photos}>
               {photos.map((url, i) => (
                 <Pressable key={url} onPress={() => removePhoto(i)}>
@@ -481,36 +511,29 @@ export default function Pedir() {
                   />
                   {service.hasAccess && (
                     <>
-                      <Overline>PLANTA RECOGIDA</Overline>
-                      <Toggle
-                        label="Hay ascensor"
-                        value={form.origin_has_lift === true}
-                        onValueChange={v => update("origin_has_lift", v)}
+                      {/* Ascensor y plantas juntos: elegir la planta ya
+                          significa "no hay ascensor". Antes había que marcar y
+                          desmarcar un interruptor para poder tocar el número. */}
+                      <FloorPicker
+                        label="PLANTA RECOGIDA"
+                        hasLift={form.origin_has_lift}
+                        floors={form.origin_floors}
+                        onChange={(hasLift, floors) => {
+                          update("origin_has_lift", hasLift);
+                          update("origin_floors", floors);
+                        }}
+                        pricePerFloor={tariffs.mudanza_floor}
                       />
-                      {form.origin_has_lift === false && (
-                        <Counter
-                          label="Planta"
-                          value={form.origin_floors}
-                          onChange={v => update("origin_floors", v)}
-                          min={0}
-                          max={12}
-                        />
-                      )}
-                      <Overline>PLANTA ENTREGA</Overline>
-                      <Toggle
-                        label="Hay ascensor"
-                        value={form.destination_has_lift === true}
-                        onValueChange={v => update("destination_has_lift", v)}
+                      <FloorPicker
+                        label="PLANTA ENTREGA"
+                        hasLift={form.destination_has_lift}
+                        floors={form.destination_floors}
+                        onChange={(hasLift, floors) => {
+                          update("destination_has_lift", hasLift);
+                          update("destination_floors", floors);
+                        }}
+                        pricePerFloor={tariffs.mudanza_floor}
                       />
-                      {form.destination_has_lift === false && (
-                        <Counter
-                          label="Planta"
-                          value={form.destination_floors}
-                          onChange={v => update("destination_floors", v)}
-                          min={0}
-                          max={12}
-                        />
-                      )}
                     </>
                   )}
                 </>
@@ -524,7 +547,7 @@ export default function Pedir() {
               <View style={[styles.plainCard, { backgroundColor: colors.warningBg }]}>
                 <Toggle
                   label="La carga está a pie de calle"
-                  description="Sin ayuda contratada, el conductor no sube a domicilio: la mercancía tiene que estar preparada abajo."
+                  description="Confirmo que la recogida se hace a pie de calle"
                   value={acceptPortal}
                   onValueChange={setAcceptPortal}
                 />
@@ -555,32 +578,42 @@ export default function Pedir() {
               )}
 
               {service.hasItemsLimit && (
-                <Counter
-                  label={`Objetos a transportar (máx. ${service.maxItems})`}
-                  value={form.items_count}
-                  onChange={v => update("items_count", v)}
-                  min={1}
-                  max={service.maxItems}
-                />
+                <>
+                  <Counter
+                    label={`Objetos a transportar (máx. ${service.maxItems})`}
+                    value={form.items_count}
+                    onChange={v => update("items_count", v)}
+                    min={1}
+                    max={service.maxItems}
+                  />
+                  <Caption>
+                    El primero va incluido; cada objeto de más suma{" "}
+                    {euro(tariffs.porte_item ?? 3)}.
+                    {Number(form.items_count) > 1
+                      ? ` Llevas ${Number(form.items_count) - 1} adicional${Number(form.items_count) > 2 ? "es" : ""}: +${euro((Number(form.items_count) - 1) * (tariffs.porte_item ?? 3))}.`
+                      : ""}
+                  </Caption>
+                </>
               )}
 
               {service.hasExtraHours && (
-                <Counter
-                  label={`Horas extra (+${tariffs.mudanza_extra_hour} €/h)`}
-                  value={form.extra_hours}
-                  onChange={v => update("extra_hours", v)}
-                  min={0}
-                  max={8}
-                />
-              )}
-
-              {service.hasInsurance && (
-                <Toggle
-                  label="Seguro de mercancía"
-                  description={`Cobertura adicional por ${euro(tariffs.insurance)}`}
-                  value={form.insurance_selected}
-                  onValueChange={v => update("insurance_selected", v)}
-                />
+                <>
+                  <View style={styles.includedBox}>
+                    <Ionicons name="time-outline" size={18} color={colors.primary} />
+                    <Caption style={{ flex: 1 }}>
+                      El precio incluye <Caption style={{ fontFamily: "DMSans_700Bold", color: colors.foreground }}>{INCLUDED_HOURS} horas</Caption> de
+                      servicio. Si crees que va a llevar más, añade horas ahora: sale más barato que
+                      ajustarlo después.
+                    </Caption>
+                  </View>
+                  <Counter
+                    label={`Horas extra (+${tariffs.mudanza_extra_hour} €/h)`}
+                    value={form.extra_hours}
+                    onChange={v => update("extra_hours", v)}
+                    min={0}
+                    max={8}
+                  />
+                </>
               )}
 
               {service.needsRecipient && (
@@ -863,6 +896,16 @@ const styles = StyleSheet.create({
 
   // Paso 3
   counterText: { fontSize: 11.5, fontFamily: "DMSans_400Regular", color: "#B5B4BE" },
+  required: { fontSize: 10.5, fontFamily: "DMSans_700Bold", color: colors.destructive, textTransform: "uppercase" },
+  includedBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    backgroundColor: colors.primarySoft,
+    borderRadius: 14,
+    padding: 12,
+    paddingHorizontal: 14,
+  },
   photos: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   photo: { width: 84, height: 84, borderRadius: radius.md, backgroundColor: colors.secondary },
   photoAdd: {

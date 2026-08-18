@@ -95,7 +95,6 @@ export default function MisPedidos() {
       destination_floors: order.destination_floors,
       package_weight: order.package_weight,
       extra_hours: order.extra_hours,
-      insurance_selected: order.insurance_selected,
       recipient_name: order.recipient_name,
       recipient_phone: order.recipient_phone,
       payment_method: order.payment_method,

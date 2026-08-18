@@ -14,6 +14,7 @@ import { SERVICES, resolveServiceKey, serviceOf } from "./services";
 export const DEFAULT_TARIFFS = {
   // Porte — precio cerrado, recogida y entrega a pie de calle
   porte_base: 40,
+  porte_item: 3, // por cada objeto a partir del primero
   // Mini mudanza — furgoneta grande, 2 h incluidas
   mudanza_base: 99,
   mudanza_extra_hour: 25,
@@ -28,8 +29,11 @@ export const DEFAULT_TARIFFS = {
   pkg_heavy: 9.99, // 20–30 kg
   pkg_villarrobledo: 19.99, // hasta 10 kg, entrega en 24 h
   // Comunes
-  insurance: 12,
   commission_pct: 15,
+  // Descuento por pagar con tarjeta: empuja el pago por la app, que deja
+  // rastro y evita el "te lo dejo en X si me lo pagas en mano".
+  card_discount_porte: 2,
+  card_discount_mudanza_pct: 3,
   // IVA de las facturas. El precio que ve el cliente ya lo incluye: aquí solo
   // sirve para desglosar base e impuesto en el documento.
   vat_rate: 21,
@@ -37,6 +41,14 @@ export const DEFAULT_TARIFFS = {
 
 /** Horas incluidas en el precio base de la mini mudanza. */
 export const INCLUDED_HOURS = 2;
+
+/** Nadie puede ofrecer menos de esto, por barato que salga el cálculo. */
+export const MIN_OFFER = 30;
+
+/** Suelo real de la oferta del cliente: el mayor entre 30 € y el 60 % de la tarifa. */
+export function offerFloor(total) {
+  return Math.max(MIN_OFFER, Math.ceil((Number(total) || 0) * 0.6));
+}
 
 /** Paradas intermedias que se permiten añadir en una mini mudanza. */
 export const MAX_STOPS = 3;
@@ -127,6 +139,12 @@ export function quoteRequest(tariffs, form = {}) {
 
   add("base", baseLabel(service), num(tariffs, service.priceKey));
 
+  // Porte: el primer objeto va en el precio base; los demás se cobran aparte.
+  if (service.key === "porte" && service.hasItemsLimit) {
+    const extra = Math.max(0, (Number(form.items_count) || 1) - 1);
+    add("items", `${plural(extra, "objeto")} adicional${extra === 1 ? "" : "es"}`, extra * num(tariffs, "porte_item"));
+  }
+
   if (service.hasExtraHours) {
     const hours = Math.max(0, Number(form.extra_hours) || 0);
     add("extra_hours", `${hours} h extra`, hours * num(tariffs, "mudanza_extra_hour"));
@@ -151,8 +169,17 @@ export function quoteRequest(tariffs, form = {}) {
     add("stops", `${plural(stops, "parada")} adicional${stops === 1 ? "" : "es"}`, stops * num(tariffs, "mudanza_stop"));
   }
 
-  if (service.hasInsurance && form.insurance_selected) {
-    add("insurance", "Seguro de mercancía", num(tariffs, "insurance"));
+  // Descuento por pagar con tarjeta, como línea visible del desglose: 2 € en el
+  // porte y 3 % en la mini mudanza.
+  const beforeDiscount = sum(lines);
+  if (form.payment_method === "card" && beforeDiscount > 0) {
+    const discount =
+      service.key === "mini_mudanza"
+        ? round2((beforeDiscount * num(tariffs, "card_discount_mudanza_pct")) / 100)
+        : service.key === "porte"
+          ? Math.min(num(tariffs, "card_discount_porte"), beforeDiscount)
+          : 0;
+    if (discount > 0) lines.push({ key: "card_discount", label: "Descuento por pago con tarjeta", amount: -discount });
   }
 
   return { total: round2(sum(lines)), lines };
