@@ -47,7 +47,7 @@ export default function DriverProfilePage() {
   // Lookup ROBUSTO (created_by_id + email): si se buscara solo por created_by_id,
   // un conductor dado de alta por el admin vería el perfil vacío y se le pediría
   // toda la documentación otra vez (bug histórico). Ver src/lib/driverProfile.js.
-  const { data: existingProfile } = useQuery({
+  const { data: existingProfile, isLoading: cargandoPerfil } = useQuery({
     queryKey: ["driver-profile", user?.id],
     queryFn: () => fetchMyDriverProfile(user),
     enabled: !!user?.id,
@@ -235,6 +235,17 @@ export default function DriverProfilePage() {
         <div className="flex items-center gap-2 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl text-emerald-700 text-sm font-medium">
           <CheckCircle2 className="w-5 h-5" />
           ¡Perfil completado con éxito! Tu solicitud está en revisión.
+        </div>
+      )}
+
+      {!cargandoPerfil && !existingProfile && !saveSuccess && (
+        <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl text-sm space-y-1">
+          <p className="font-medium text-foreground">Ya casi eres conductor de ClicyVoy</p>
+          <p className="text-muted-foreground">
+            Tu cuenta está creada; ahora necesitamos tus datos y tu documentación
+            (furgoneta, carnet, seguro, autónomo). Cuando lo envíes, el equipo lo
+            revisa y te activa: recibirás un aviso y empezarás a ver pedidos de tu zona.
+          </p>
         </div>
       )}
 

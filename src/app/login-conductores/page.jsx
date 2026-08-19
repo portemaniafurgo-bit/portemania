@@ -8,12 +8,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Truck, Mail, Lock, Loader2 } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
+import GoogleIcon from "@/components/GoogleIcon";
 
 export default function LoginConductores() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+
+  const handleGoogle = () => {
+    base44.auth.loginWithProvider("google", "/driver/profile");
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -42,9 +47,14 @@ export default function LoginConductores() {
     <AuthLayout
       icon={Truck}
       title="Acceso conductores"
-      subtitle="Usa las credenciales facilitadas por el administrador"
+      subtitle="Entra con tu cuenta o crea una nueva"
       footer={
         <>
+          ¿Aún no conduces con nosotros?{" "}
+          <Link href="/register?role=driver" className="text-primary font-medium hover:underline">
+            Hazte conductor
+          </Link>
+          <span className="mx-1.5 text-muted-foreground">·</span>
           ¿Olvidaste tu contraseña?{" "}
           <Link href="/forgot-password" className="text-primary font-medium hover:underline">
             Restablecerla
@@ -52,6 +62,23 @@ export default function LoginConductores() {
         </>
       }
     >
+      <Button
+        variant="outline"
+        className="w-full h-12 text-sm font-medium mb-6"
+        onClick={handleGoogle}>
+        <GoogleIcon className="w-5 h-5 mr-2" />
+        Continuar con Google
+      </Button>
+
+      <div className="relative mb-6">
+        <div className="absolute inset-0 flex items-center">
+          <div className="w-full border-t border-border" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-card px-3 text-muted-foreground">o</span>
+        </div>
+      </div>
+
       {error && (
         <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">{error}</div>
       )}

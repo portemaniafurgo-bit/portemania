@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useState } from "react";
-import { Phone, Mail, Save, Loader2, LogOut, Lock, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { Phone, Mail, Save, Loader2, LogOut, Lock, CheckCircle2, Truck, ChevronRight } from "lucide-react";
 
 const ROLE_LABELS = {
   client: "Cliente",
@@ -115,6 +116,48 @@ export default function Profile() {
           Guardar cambios
         </Button>
       </div>
+
+      {/* Un cliente puede pasarse a conductor sin crear otra cuenta: rellena
+          sus datos y el equipo revisa. Si ya conduce, el enlace lleva a su
+          perfil de conductor en lugar de repetirle el formulario. */}
+      {user?.role === "client" && (
+        <Link
+          href="/driver/profile"
+          className="block bg-card rounded-2xl border border-border p-5 hover:border-primary/50 transition-colors"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Truck className="w-6 h-6 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-heading font-semibold text-foreground">¿Tienes furgoneta? Hazte conductor</p>
+              <p className="text-sm text-muted-foreground">
+                Rellena tus datos y tu documentación; cuando el equipo los revise
+                empezarás a recibir pedidos y a ganar dinero con tu furgoneta.
+              </p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+          </div>
+        </Link>
+      )}
+
+      {user?.role === "driver" && (
+        <Link
+          href="/driver"
+          className="block bg-card rounded-2xl border border-border p-5 hover:border-primary/50 transition-colors"
+        >
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Truck className="w-6 h-6 text-primary" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-heading font-semibold text-foreground">Tu panel de conductor</p>
+              <p className="text-sm text-muted-foreground">Pedidos, trabajo activo y ganancias.</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" />
+          </div>
+        </Link>
+      )}
 
       {/* Cambio de contraseña sin pasar por el email (el login de conductores
           lo promete; antes no existía en ninguna página) */}

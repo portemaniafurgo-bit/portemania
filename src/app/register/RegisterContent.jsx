@@ -7,7 +7,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UserPlus, Mail, Lock, Loader2 } from "lucide-react";
+import { UserPlus, Mail, Lock, Loader2, Package, Truck } from "lucide-react";
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
@@ -24,7 +24,10 @@ export default function RegisterContent() {
   const [otpCode, setOtpCode] = useState("");
 
   const searchParams = useSearchParams();
-  const isDriver = searchParams.get("role") === "driver";
+  // El rol se ELIGE aquí: la URL (?role=driver) solo preselecciona. Quien
+  // llega desde "Hazte conductor" ya lo trae marcado; quien entra por el
+  // registro normal puede cambiarlo sin buscar otra página.
+  const [isDriver, setIsDriver] = useState(searchParams.get("role") === "driver");
   const redirectUrl = isDriver
     ? "/driver/profile"
     : hasRequestDraft(searchParams)
@@ -162,6 +165,39 @@ export default function RegisterContent() {
           </Link>
         </>
       }>
+
+      {/* Qué vas a ser: la decisión se toma AQUÍ, no en una URL escondida */}
+      <div className="grid grid-cols-2 gap-3 mb-6" role="radiogroup" aria-label="Tipo de cuenta">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={!isDriver}
+          onClick={() => setIsDriver(false)}
+          className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-3 text-sm font-medium transition-colors ${
+            !isDriver ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+          }`}>
+          <Package className="w-5 h-5" />
+          Necesito un porte
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={isDriver}
+          onClick={() => setIsDriver(true)}
+          className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-3 text-sm font-medium transition-colors ${
+            isDriver ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
+          }`}>
+          <Truck className="w-5 h-5" />
+          Quiero conducir
+        </button>
+      </div>
+
+      {isDriver && (
+        <p className="mb-6 rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-muted-foreground">
+          Después de crear la cuenta te pediremos tus datos de conductor (furgoneta,
+          documentación) y el equipo revisará tu solicitud antes de activarte.
+        </p>
+      )}
 
       <Button
         variant="outline"
