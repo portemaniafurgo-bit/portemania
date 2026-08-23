@@ -12,6 +12,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { Caption, Card, Heading, Loading, Title } from "../../components/ui";
 import EmptyState from "../../components/EmptyState";
 import ServiceIcon from "../../components/ServiceIcon";
+import { useBottomPadding } from "../../lib/layout";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -20,6 +21,8 @@ import { colors, radius, spacing } from "../../theme";
  * estado terminado muestra el chat como historial y la prueba de entrega).
  */
 export default function HistorialConductor() {
+  // Aire al final para que ningun boton quede bajo la barra del sistema.
+  const bottomPad = useBottomPadding();
   const { user } = useAuth();
   const router = useRouter();
   const [jobs, setJobs] = useState(null);
@@ -51,7 +54,7 @@ export default function HistorialConductor() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right"]}>
       <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
+        contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg, paddingBottom: bottomPad }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

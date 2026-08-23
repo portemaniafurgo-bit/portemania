@@ -19,6 +19,7 @@ import { countUnread } from "../../../lib/unread";
 import { takePhoto } from "../../../lib/photos";
 import SignaturePad from "../../../components/SignaturePad";
 import { Body, Button, Caption, Card, ErrorText, Field, Loading, Title } from "../../../components/ui";
+import { useBottomPadding } from "../../../lib/layout";
 import { colors, radius, spacing } from "../../../theme";
 
 /**
@@ -51,6 +52,8 @@ const CANCEL_REASONS = [
 ];
 
 export default function TrabajoActivo() {
+  // Aire al final para que ningun boton quede bajo la barra del sistema.
+  const bottomPad = useBottomPadding();
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { user } = useAuth();
@@ -377,7 +380,7 @@ export default function TrabajoActivo() {
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <Stack.Screen options={{ headerShown: true, title: "Servicio" }} />
-      <ScrollView contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg, paddingBottom: bottomPad }}>
         {/* Banda morada del canvas 1k: barras de avance en amarillo, servicio y
             precio pactado, el estado en grande y qué toca después. */}
         <View style={styles.statusBand}>

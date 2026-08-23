@@ -1,5 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { Button, Caption, Display, Heading } from "./ui";
 import { colors, spacing } from "../theme";
@@ -28,6 +28,7 @@ export default function WizardChrome({
   children,
   footerExtra,
 }) {
+  const insets = useSafeAreaInsets();
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <View style={styles.header}>
@@ -66,7 +67,9 @@ export default function WizardChrome({
         {children}
       </ScrollView>
 
-      <View style={styles.footer}>
+      {/* El pie se separa del borde inferior lo que pida el móvil: en los que
+          tienen barra de gestos, el botón quedaba justo debajo de ella. */}
+      <View style={[styles.footer, { paddingBottom: 16 + insets.bottom }]}>
         {footerExtra}
         <Button title={cta} iconAfter={ctaIcon} loading={ctaLoading} onPress={onCta} />
       </View>

@@ -11,6 +11,7 @@ import { DEFAULT_TARIFFS, fetchTariffs } from "../../lib/tariffs";
 import { serviceOf } from "../../lib/services";
 import { euro, rating1 } from "../../lib/money";
 import { Caption, Card, Loading, Title } from "../../components/ui";
+import { useBottomPadding } from "../../lib/layout";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -26,6 +27,8 @@ import { colors, radius, spacing } from "../../theme";
 const DAY_LETTERS = ["L", "M", "X", "J", "V", "S", "D"];
 
 export default function Ganancias() {
+  // Aire al final para que ningun boton quede bajo la barra del sistema.
+  const bottomPad = useBottomPadding();
   const { user } = useAuth();
   const router = useRouter();
   const [jobs, setJobs] = useState(null);
@@ -102,7 +105,7 @@ export default function Ganancias() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right"]}>
       <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
+        contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg, paddingBottom: bottomPad }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

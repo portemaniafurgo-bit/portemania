@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
@@ -309,7 +309,11 @@ export default function Pedir() {
           </View>
         </View>
 
-        <View style={styles.addressSheet}>
+        <ScrollView
+          style={styles.addressSheet}
+          contentContainerStyle={{ gap: spacing.md, paddingBottom: bottomPad }}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.sheetHandle} />
           <View style={styles.bars}>
             {Array.from({ length: TOTAL_STEPS }, (_, i) => (
@@ -392,7 +396,7 @@ export default function Pedir() {
 
           <ErrorText>{error}</ErrorText>
           <Button title="Siguiente" onPress={next} />
-        </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -919,13 +923,16 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   floatingPillText: { fontSize: 12.5, fontFamily: "DMSans_500Medium", color: colors.foreground },
+  // La hoja RUEDA: con el teclado abierto y varios campos, antes el botón
+  // «Siguiente» quedaba fuera de la pantalla y no había forma de llegar a él.
   addressSheet: {
+    flexGrow: 0,
+    maxHeight: "72%",
     backgroundColor: colors.card,
     borderTopLeftRadius: radius.sheet,
     borderTopRightRadius: radius.sheet,
     padding: spacing.screen,
     paddingTop: 10,
-    gap: spacing.md,
   },
   sheetHandle: {
     alignSelf: "center",

@@ -14,6 +14,7 @@ import { stopTracking } from "../../lib/tracking";
 import EmptyState from "../../components/EmptyState";
 import OfferCard from "../../components/OfferCard";
 import { Body, Button, Caption, Card, ErrorText, Heading, Loading, Title } from "../../components/ui";
+import { useBottomPadding } from "../../lib/layout";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -42,6 +43,8 @@ function publishedAgo(date, now) {
 const COUNTER_REASONS = ["Sin ascensor", "Carga voluminosa", "Hora punta"];
 
 export default function Ofertas() {
+  // Aire al final para que ningun boton quede bajo la barra del sistema.
+  const bottomPad = useBottomPadding();
   const { user } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState(null);
@@ -340,7 +343,7 @@ export default function Ofertas() {
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: 16, paddingHorizontal: spacing.screen, gap: 12, paddingBottom: spacing.xl }}
+        contentContainerStyle={{ padding: 16, paddingHorizontal: spacing.screen, gap: 12, paddingBottom: bottomPad }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         {activeJob && (

@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { useBottomPadding } from "../lib/layout";
 import { button, colors, radius, spacing, typography } from "../theme";
 
 /**
@@ -19,11 +20,14 @@ import { button, colors, radius, spacing, typography } from "../theme";
 
 export function Screen({ children, scroll = true, style }) {
   const Body = scroll ? ScrollView : View;
+  // Aire al final: sin esto el último botón queda pegado al borde y la barra
+  // de gestos del móvil se lo come.
+  const bottomPad = useBottomPadding();
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <Body
         style={{ flex: 1 }}
-        contentContainerStyle={scroll ? [styles.screenContent, style] : undefined}
+        contentContainerStyle={scroll ? [styles.screenContent, { paddingBottom: bottomPad }, style] : undefined}
         keyboardShouldPersistTaps="handled"
       >
         {!scroll ? <View style={[styles.screenContent, { flex: 1 }, style]}>{children}</View> : children}

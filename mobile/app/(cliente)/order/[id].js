@@ -30,6 +30,7 @@ import TipCard from "../../../components/TipCard";
 import DeliveryProof from "../../../components/DeliveryProof";
 import ChatLink from "../../../components/ChatLink";
 import { downloadReceipt } from "../../../lib/receipt";
+import { useBottomPadding } from "../../../lib/layout";
 import { colors, radius, spacing } from "../../../theme";
 
 /**
@@ -66,6 +67,8 @@ const distanceKm = (aLat, aLng, bLat, bLng) => {
 };
 
 export default function OrderDetail() {
+  // Aire al final para que ningun boton quede bajo la barra del sistema.
+  const bottomPad = useBottomPadding();
   const { id } = useLocalSearchParams();
   const { user } = useAuth();
   const { order, driver, loading, patchOrder } = useOrder(id);
@@ -338,7 +341,7 @@ export default function OrderDetail() {
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <Stack.Screen options={{ headerShown: true, title: "Tu pedido" }} />
-      <ScrollView contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}>
+      <ScrollView contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg, paddingBottom: bottomPad }}>
         {/* Canvas 1h — pedido EN CURSO: el mapa llena la parte alta a sangre
             y la hoja monta encima con asa; ETA y frescura viven en la hoja. */}
         {active && (

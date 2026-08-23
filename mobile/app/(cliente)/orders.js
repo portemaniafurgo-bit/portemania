@@ -14,6 +14,7 @@ import { Button, Caption, Card, Heading, Loading, Title } from "../../components
 import EmptyState from "../../components/EmptyState";
 import ServiceIcon from "../../components/ServiceIcon";
 import { Ionicons } from "@expo/vector-icons";
+import { useBottomPadding } from "../../lib/layout";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -48,6 +49,8 @@ function whenLabel(order) {
 }
 
 export default function MisPedidos() {
+  // Aire al final para que ningun boton quede bajo la barra del sistema.
+  const bottomPad = useBottomPadding();
   const { user } = useAuth();
   const router = useRouter();
   const [orders, setOrders] = useState(null);
@@ -136,7 +139,7 @@ export default function MisPedidos() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right"]}>
       <ScrollView
-        contentContainerStyle={{ padding: spacing.lg, gap: spacing.lg }}
+        contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg, paddingBottom: bottomPad }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} />}
       >
         <Heading>Mis pedidos</Heading>

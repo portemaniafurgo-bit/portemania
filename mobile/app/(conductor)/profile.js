@@ -373,6 +373,18 @@ export default function PerfilConductor() {
 
       <SettingsGroup>
         <SettingsRow
+          icon="receipt-outline"
+          label="Mis facturas"
+          hint="Las que emites tú, por meses"
+          onPress={() => router.push("/(conductor)/facturas")}
+        />
+        <SettingsRow
+          icon="help-buoy-outline"
+          label="Ayuda y ajustes del móvil"
+          hint="Ubicación y batería: sin esto tu posición se congela"
+          onPress={() => router.push("/(conductor)/ayuda")}
+        />
+        <SettingsRow
           icon="sparkles-outline"
           label="Ver la introducción"
           hint="Las tres pantallas del primer arranque"

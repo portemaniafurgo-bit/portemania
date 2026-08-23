@@ -59,6 +59,9 @@ export default function ConductorLayout() {
       {/* El trabajo activo no es una pestaña: se entra al aceptar una oferta o
           desde el aviso de "servicio en curso". */}
       <Tabs.Screen name="job/[id]" options={{ href: null }} />
+      {/* Se entra desde el perfil, no son pestañas. */}
+      <Tabs.Screen name="facturas" options={{ href: null }} />
+      <Tabs.Screen name="ayuda" options={{ href: null }} />
     </Tabs>
   );
 }
