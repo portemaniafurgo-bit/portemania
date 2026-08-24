@@ -86,10 +86,15 @@ Pasos, en orden:
 4. Subirla a Expo: `eas credentials` → Android → *Google Service Account Key for
    Push Notifications (FCM V1)*.
 5. **Recompilar el APK** (el `google-services.json` es nativo, no viaja por OTA).
-6. Crear los dos secretos en Supabase → Vault:
-   - `project_url` = `https://dnehzwrqphqpkcdjwqfi.supabase.co`
-   - `service_role_key` = la clave *service_role* del proyecto
-7. Aplicar `supabase/migrations/0015_avisos_push.sql` y desplegar `send-push`.
+6. ~~Crear los dos secretos en Vault~~ **HECHO** (25/08/2026): `project_url` y
+   `service_role_key` ya están guardados.
+7. ~~Aplicar `0015_avisos_push.sql`~~ **HECHO**: los triggers y el cron están
+   activos y **probados** — al crear un pedido, la base de datos llama sola a
+   `send-push` y responde 200. Devuelve `sent: 0` únicamente porque todavía no
+   hay ningún móvil registrado, y eso es lo que desbloquea Firebase.
+
+**Solo quedan los pasos 1 a 5**: crear el proyecto de Firebase, subir la clave a
+Expo y recompilar el APK. Todo lo demás está montado y funcionando.
 
 ### Comprobación después de configurarlo
 
