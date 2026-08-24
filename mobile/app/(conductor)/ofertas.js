@@ -11,6 +11,7 @@ import { serviceOf } from "../../lib/services";
 import { distanceKm } from "../../lib/eta";
 import { euro } from "../../lib/money";
 import { stopTracking } from "../../lib/tracking";
+import { alertNewOffer } from "../../lib/sound";
 import EmptyState from "../../components/EmptyState";
 import OfferCard from "../../components/OfferCard";
 import { Body, Button, Caption, Card, ErrorText, Heading, Loading, Title } from "../../components/ui";
@@ -175,9 +176,19 @@ export default function Ofertas() {
       .order("created_date", { ascending: false })
       .limit(50);
 
-    setOrders(
-      (data || []).filter(o => prof.vehicle_type === "large" || o.vehicle_type !== "large"),
+    const visibles = (data || []).filter(
+      o => prof.vehicle_type === "large" || o.vehicle_type !== "large",
     );
+
+    // Si entra una oferta que no estaba y el conductor está disponible, se le
+    // avisa con vibración: es lo que pidió el negocio para no perder pedidos
+    // por no estar mirando el móvil.
+    setOrders(prev => {
+      const conocidas = new Set((prev || []).map(o => o.id));
+      const hayNuevas = prev != null && prof.is_available && visibles.some(o => !conocidas.has(o.id));
+      if (hayNuevas) alertNewOffer();
+      return visibles;
+    });
   }, [user]);
 
   useEffect(() => {

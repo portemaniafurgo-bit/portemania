@@ -27,8 +27,16 @@ function formatFeature(feature, served) {
 
   // "Calle Mayor 3, 02001 Albacete" — el CP va incluido porque es lo que valida
   // el servidor al crear el pedido.
-  const street = [p.name, p.housenumber].filter(Boolean).join(" ");
+  //
+  // OJO con el nombre de la calle: cuando el resultado es un PORTAL, Photon
+  // manda la calle en `street` y deja en `name` solo el número. Mirando solo a
+  // `name` salían sugerencias como «1, 02002, Albacete», sin calle (bug real,
+  // 24/08/2026).
+  const streetName = p.street || p.name;
+  const street = [streetName, p.housenumber].filter(Boolean).join(" ");
   const label = [street, p.postcode, p.city || p.county].filter(Boolean).join(", ");
+  // Sin calle no hay sugerencia que valga: mejor no ofrecerla que ofrecer "1".
+  if (!streetName) return null;
 
   return {
     id: `${lat},${lng},${label}`,

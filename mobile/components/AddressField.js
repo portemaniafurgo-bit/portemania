@@ -19,6 +19,22 @@ import { colors, radius, spacing } from "../theme";
  * y el servidor lo valida igual.
  */
 export default function AddressField({ label, value, onChange, zone = "albacete", error, placeholder }) {
+  /**
+   * El texto se escribe en un estado LOCAL y sube al formulario con retardo.
+   *
+   * Antes cada tecla iba directa al estado del asistente, que recalcula el
+   * precio y guarda el borrador en disco: en un móvil normal eso se traga
+   * pulsaciones y el campo parecía no dejar escribir (bug real, 24/08/2026).
+   */
+  const [text, setText] = useState(value || "");
+  const typing = useRef(false);
+
+  // Si el valor cambia desde fuera (elegir sugerencia, «mi ubicación», mapa o
+  // un borrador recuperado) hay que reflejarlo; mientras se teclea, no.
+  useEffect(() => {
+    if (!typing.current) setText(value || "");
+  }, [value]);
+
   const [suggestions, setSuggestions] = useState([]);
   const [searching, setSearching] = useState(false);
   const [locating, setLocating] = useState(false);
@@ -35,7 +51,7 @@ export default function AddressField({ label, value, onChange, zone = "albacete"
       skipNextSearch.current = false;
       return;
     }
-    const query = (value || "").trim();
+    const query = (text || "").trim();
     if (query.length < 3) {
       setSuggestions([]);
       return;
@@ -43,23 +59,27 @@ export default function AddressField({ label, value, onChange, zone = "albacete"
 
     let active = true;
     setSearching(true);
-    // Pequeña espera para no lanzar una petición por cada tecla.
+    // Una sola espera para dos cosas: buscar sugerencias y subir el texto al
+    // formulario. Así el asistente no recalcula ni guarda en cada tecla.
     const timer = setTimeout(async () => {
+      if (query !== (value || "").trim()) onChange(query, null);
       const results = await suggestAddresses(query, { zone });
       if (!active) return;
       setSuggestions(results);
       setSearching(false);
-    }, 350);
+    }, 400);
 
     return () => {
       active = false;
       clearTimeout(timer);
       setSearching(false);
     };
-  }, [value, zone]);
+  }, [text, zone]);
 
   const choose = (item) => {
     skipNextSearch.current = true;
+    typing.current = false;
+    setText(item.label);
     setSuggestions([]);
     setHint(item.served ? "" : "Esa dirección está fuera de nuestra zona de servicio.");
     lastPicked.current = item;
@@ -91,8 +111,18 @@ export default function AddressField({ label, value, onChange, zone = "albacete"
     <View style={{ gap: spacing.xs }}>
       <Field
         label={label}
-        value={value}
-        onChangeText={text => onChange(text, null)}
+        value={text}
+        onChangeText={next => {
+          typing.current = true;
+          setText(next);
+        }}
+        // Al salir del campo, lo escrito sube ya: si el cliente pulsa
+        // «Siguiente» sin esperar, no se pierde lo último que tecleó.
+        onBlur={() => {
+          typing.current = false;
+          const clean = (text || "").trim();
+          if (clean !== (value || "").trim()) onChange(clean, null);
+        }}
         placeholder={placeholder || "Calle, número y ciudad"}
         error={error}
         autoCorrect={false}

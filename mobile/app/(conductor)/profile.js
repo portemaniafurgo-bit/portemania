@@ -217,10 +217,16 @@ export default function PerfilConductor() {
             {profile?.rating ? (
               <>
                 <Ionicons name="star" size={12} color={colors.accent} />
-                <Caption>{rating1(profile.rating)}</Caption>
-                <Caption>·</Caption>
+                <Caption style={{ fontFamily: "DMSans_700Bold", color: colors.foreground }}>
+                  {rating1(profile.rating)}
+                </Caption>
+                <Caption>
+                  ({profile.rating_count} valoración{profile.rating_count === 1 ? "" : "es"}) ·
+                </Caption>
               </>
-            ) : null}
+            ) : (
+              <Caption>Sin valoraciones todavía · </Caption>
+            )}
             <Caption>
               {jobCount === null ? "" : `${jobCount} servicio${jobCount === 1 ? "" : "s"}`}
             </Caption>

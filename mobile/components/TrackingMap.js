@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { fetchRouteEta } from "../lib/eta";
@@ -42,6 +42,9 @@ export default function TrackingMap({
   onInfo,
 }) {
   const [route, setRoute] = useState(null);
+  // Cada pulsación de «centrar» remonta la cámara; entre medias el mapa es del
+  // usuario, que puede arrastrar y hacer zoom con los dedos.
+  const [recenter, setRecenter] = useState(0);
 
   useEffect(() => {
     if (!driverLocation || !target?.lat) {
@@ -76,13 +79,35 @@ export default function TrackingMap({
   const freshness = driverLocation ? locationFreshness(driverLocation.updatedAt) : null;
   // `eta.js` devuelve las coordenadas en orden [lat, lng] porque la web usa
   // Leaflet; GeoJSON (y por tanto MapLibre) las quiere al revés.
-  const routeLine = (route?.coords || []).map(([lat, lng]) => [lng, lat]);
+  // Si el servicio de rutas no responde (o aún no ha contestado), se une la
+  // furgoneta con el destino en línea recta: ver solo el vehículo suelto no
+  // dice nada, y una línea aproximada ya orienta.
+  const routed = (route?.coords || []).map(([lat, lng]) => [lng, lat]);
+  const routeLine =
+    routed.length > 1
+      ? routed
+      : driverLocation && target?.lat
+        ? [
+            [driverLocation.lng, driverLocation.lat],
+            [target.lng, target.lat],
+          ]
+        : [];
+  const approximate = routed.length <= 1;
 
   return (
     <View style={{ gap: spacing.sm }}>
       <View style={[bare ? styles.mapBare : styles.map, { height }]}>
         <Map style={{ flex: 1 }} mapStyle={OSM_STYLE} logo={false}>
-          <Camera center={[center.lng, center.lat]} zoom={13} />
+          {/* La cámara solo manda cuando se pulsa «centrar»: si se recolocara
+              en cada posición nueva, no habría forma de mover el mapa con los
+              dedos ni de hacer zoom (el gesto se perdía al segundo). */}
+          <Camera
+            key={recenter}
+            defaultSettings={{ centerCoordinate: [center.lng, center.lat], zoomLevel: 13 }}
+            centerCoordinate={recenter ? [center.lng, center.lat] : undefined}
+            zoomLevel={recenter ? 14 : undefined}
+            animationDuration={recenter ? 600 : 0}
+          />
 
           {routeLine.length > 1 ? (
             <GeoJSONSource
@@ -96,7 +121,13 @@ export default function TrackingMap({
               <Layer
                 id="routeLine"
                 type="line"
-                paint={{ "line-color": colors.primary, "line-width": 4, "line-opacity": 0.8 }}
+                paint={{
+                  "line-color": colors.primary,
+                  "line-width": approximate ? 3 : 5,
+                  "line-opacity": approximate ? 0.55 : 0.9,
+                  // La recta va a trazos para que se vea que es aproximada.
+                  ...(approximate ? { "line-dasharray": [2, 2] } : {}),
+                }}
               />
             </GeoJSONSource>
           ) : null}
@@ -122,6 +153,26 @@ export default function TrackingMap({
             </Marker>
           ) : null}
         </Map>
+
+        {/* Centrar: el mapa se mueve y se hace zoom con los dedos, así que
+            hace falta una forma de volver a lo importante. */}
+        <Pressable
+          onPress={() => setRecenter(n => n + 1)}
+          style={styles.recenterButton}
+          hitSlop={8}
+        >
+          <Ionicons name="locate" size={18} color={colors.primary} />
+        </Pressable>
+
+        {/* Cuánto queda: lo primero que se mira. */}
+        {route ? (
+          <View style={styles.etaBadge}>
+            <Ionicons name="time-outline" size={13} color={colors.foreground} />
+            <Text style={styles.etaBadgeText}>
+              {route.minutes} min · {String(route.km).replace(".", ",")} km
+            </Text>
+          </View>
+        ) : null}
       </View>
 
       {freshness && !bare ? (
@@ -150,6 +201,32 @@ export default function TrackingMap({
 }
 
 const styles = StyleSheet.create({
+  recenterButton: {
+    position: "absolute",
+    right: 12,
+    bottom: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.card,
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 3,
+  },
+  etaBadge: {
+    position: "absolute",
+    left: 12,
+    top: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: colors.card,
+    borderRadius: radius.full,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    elevation: 3,
+  },
+  etaBadgeText: { fontSize: 12.5, fontFamily: "DMSans_700Bold", color: colors.foreground },
   map: { borderRadius: radius.lg, overflow: "hidden", borderWidth: 1, borderColor: colors.border },
   mapBare: { overflow: "hidden" },
   placeholder: {

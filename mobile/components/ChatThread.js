@@ -18,6 +18,7 @@ import { es } from "date-fns/locale";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../lib/auth";
 import { useChat, useOrder } from "../lib/orders";
+import { useTyping } from "../lib/typing";
 import { markChatRead } from "../lib/unread";
 import { pickPhotos, takePhoto } from "../lib/photos";
 import { Caption, Loading } from "./ui";
@@ -50,6 +51,7 @@ export default function ChatThread({ orderId, partnerRole }) {
   const { user, role } = useAuth();
   const { order, driver, loading } = useOrder(orderId);
   const { messages, send, sending } = useChat(orderId, { user, role });
+  const { partnerTyping, notifyTyping } = useTyping(orderId, { user });
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");
   // Texto del último mensaje que no se pudo enviar, para reintentarlo.
@@ -123,7 +125,14 @@ export default function ChatThread({ orderId, partnerRole }) {
         )}
         <View style={{ flex: 1 }}>
           <Text style={styles.name}>{partnerName}</Text>
-          <Caption>{finished ? "Servicio terminado · historial" : "Servicio en curso"}</Caption>
+          {/* Lo que está pasando ahora manda sobre el estado del servicio */}
+          <Caption style={partnerTyping ? { color: colors.primary } : null}>
+            {partnerTyping
+              ? "Escribiendo…"
+              : finished
+                ? "Servicio terminado · historial"
+                : "Servicio en curso"}
+          </Caption>
         </View>
       </View>
 
@@ -209,7 +218,11 @@ export default function ChatThread({ orderId, partnerRole }) {
             </Pressable>
             <TextInput
               value={draft}
-              onChangeText={setDraft}
+              onChangeText={next => {
+                setDraft(next);
+                // Que el otro vea «escribiendo…» mientras se teclea.
+                notifyTyping();
+              }}
               placeholder="Escribe un mensaje…"
               placeholderTextColor={colors.subtle}
               style={styles.input}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "../../../lib/supabase";
@@ -13,7 +13,7 @@ import { euro } from "../../../lib/money";
 import { geocodeAlbacete } from "../../../lib/eta";
 import { setArrivalTarget, startTracking, stopTracking } from "../../../lib/tracking";
 import TrackingMap from "../../../components/TrackingMap";
-import ChatLink from "../../../components/ChatLink";
+import ChatBubbleButton from "../../../components/ChatBubbleButton";
 import { uploadProofPhoto, uploadSignature } from "../../../lib/deliveryProof";
 import { countUnread } from "../../../lib/unread";
 import { takePhoto } from "../../../lib/photos";
@@ -29,11 +29,57 @@ import { colors, radius, spacing } from "../../../theme";
  * Los pasos son los mismos que en la web, sin atajos: aceptado → en camino →
  * recogido → entregado, y la cancelación solo antes de recoger.
  */
+/**
+ * Las seis fases del servicio, tal y como se trabaja de verdad.
+ *
+ * Las intermedias («he llegado», «iniciar viaje a destino») no cambian el
+ * estado del pedido: son marcas de tiempo. Así el cliente y el panel siguen
+ * viendo el ciclo de siempre y el conductor tiene el detalle que necesita.
+ *
+ * `phase` es lo que se manda al servidor; él decide si toca y si ha pasado el
+ * margen de 2 minutos.
+ */
 const STEPS = [
-  { from: "accepted", to: "in_transit", label: "Iniciar viaje" },
-  { from: "in_transit", to: "picked_up", label: "He llegado y he recogido" },
-  { from: "picked_up", to: "delivered", label: "Trabajo finalizado" },
+  { phase: "start_to_pickup", label: "Iniciar viaje", is: o => o.status === "accepted" },
+  {
+    phase: "arrived_pickup",
+    label: "He llegado",
+    is: o => o.status === "in_transit" && !o.arrived_pickup_at,
+  },
+  {
+    phase: "picked_up",
+    label: "Carga recogida",
+    is: o => o.status === "in_transit" && !!o.arrived_pickup_at,
+  },
+  {
+    phase: "start_to_destination",
+    label: "Iniciar viaje a destino",
+    is: o => o.status === "picked_up" && !o.to_destination_at,
+  },
+  {
+    phase: "arrived_dropoff",
+    label: "He llegado",
+    is: o => o.status === "picked_up" && !!o.to_destination_at && !o.arrived_dropoff_at,
+  },
+  {
+    phase: "finish",
+    label: "Trabajo finalizado",
+    is: o => o.status === "picked_up" && !!o.arrived_dropoff_at,
+  },
 ];
+
+/** Qué está haciendo ahora mismo, para la banda de estado. */
+function phaseTitle(order) {
+  if (order.status === "accepted") return "Servicio aceptado";
+  if (order.status === "in_transit") {
+    return order.arrived_pickup_at ? "En el punto de recogida" : "De camino a recoger";
+  }
+  if (order.status === "picked_up") {
+    if (order.arrived_dropoff_at) return "En el punto de entrega";
+    return order.to_destination_at ? "De camino a la entrega" : "Carga recogida";
+  }
+  return null;
+}
 
 // Mismas etiquetas que la web: el admin ya las tiene tabuladas.
 const FEEDBACK_TAGS = ["Precio justo", "Precio injusto", "Mucho tiempo de espera"];
@@ -51,6 +97,16 @@ const CANCEL_REASONS = [
   "Motivo personal",
 ];
 
+/** Dato suelto de la ficha de carga: etiqueta arriba, valor debajo. */
+function Detail({ label, value }) {
+  return (
+    <View style={styles.detailItem}>
+      <Caption>{label}</Caption>
+      <Text style={styles.detailValue}>{value}</Text>
+    </View>
+  );
+}
+
 export default function TrabajoActivo() {
   // Aire al final para que ningun boton quede bajo la barra del sistema.
   const bottomPad = useBottomPadding();
@@ -64,6 +120,11 @@ export default function TrabajoActivo() {
   const [error, setError] = useState("");
   // ETA hacia el destino de ahora, que pinta la banda de estado (canvas 1k).
   const [eta, setEta] = useState({ route: null, freshness: null });
+  // Segundos que faltan para poder cambiar de fase. Los dice el servidor: con
+  // el reloj del móvil bastaría cambiar la hora para saltarse la espera.
+  const [waitSeconds, setWaitSeconds] = useState(0);
+  // Foto de la carga ampliada: en miniatura no se distingue un sofá de dos plazas.
+  const [zoomPhoto, setZoomPhoto] = useState(null);
   const [saving, setSaving] = useState(false);
   const [feedbackTags, setFeedbackTags] = useState([]);
   const [feedbackText, setFeedbackText] = useState("");
@@ -128,6 +189,21 @@ export default function TrabajoActivo() {
   useEffect(() => {
     fetchMyDriverProfile(user).then(setProfile);
   }, [user]);
+
+  // Cuánto falta para la siguiente fase: se pregunta al servidor al entrar y
+  // tras cada cambio, y de ahí baja sola cada segundo.
+  useEffect(() => {
+    if (!id) return;
+    supabase
+      .rpc("phase_wait_seconds", { p_request_id: id })
+      .then(({ data }) => setWaitSeconds(Number(data) || 0));
+  }, [id, order?.status, order?.phase_changed_at]);
+
+  useEffect(() => {
+    if (waitSeconds <= 0) return;
+    const timer = setTimeout(() => setWaitSeconds(s => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [waitSeconds]);
 
   // Aviso de mensajes sin leer en la fila del chat. Se recalcula al volver de
   // la pantalla de chat (que es donde se marcan como leídos).
@@ -208,7 +284,7 @@ export default function TrabajoActivo() {
   const service = serviceOf(order);
   // Lo pactado manda sobre lo calculado: es lo que va a cobrar.
   const pactado = order.final_price ?? order.estimated_price ?? null;
-  const step = STEPS.find(s => s.from === order.status);
+  const step = STEPS.find(s => s.is(order));
   const finished = ["delivered", "cancelled"].includes(order.status);
   // Política de cancelación, la misma que Uber, Bolt o inDrive:
   //  - Asignado y aún sin salir: se cancela sin más, vuelve a la bolsa.
@@ -234,24 +310,21 @@ export default function TrabajoActivo() {
     // Finalizar pasa SIEMPRE por la prueba de entrega (foto + firma). En los
     // servicios sin firma obligatoria se puede omitir, pero se ofrece: es lo
     // que protege al conductor y a la empresa ante una disputa.
-    if (step.to === "delivered") {
+    if (step.phase === "finish") {
       setShowProof(true);
       return;
     }
     setSaving(true);
     setError("");
     try {
-      const extra = {};
-      if (step.to === "picked_up") extra.pickup_time = new Date().toISOString();
-
-      const { data, error: err } = await supabase
-        .from("transport_requests")
-        .update({ status: step.to, ...extra })
-        .eq("id", id)
-        .select()
-        .single();
+      // El servidor decide si toca esta fase y si han pasado los 2 minutos.
+      const { data, error: err } = await supabase.rpc("advance_job_phase", {
+        p_request_id: id,
+        p_phase: step.phase,
+      });
       if (err) throw err;
       patchOrder(data); // sin esperar a Realtime: la pantalla avanza YA
+      setWaitSeconds(PHASE_GAP_SECONDS);
 
       supabase.functions
         .invoke("send-push", { body: { mode: "status_changed", order_id: id } })
@@ -402,9 +475,7 @@ export default function TrabajoActivo() {
             {pactado != null ? ` · ${euro(pactado)} pactado` : ""}
           </Text>
           <Text style={styles.statusBandTitle}>
-            {order.status === "in_transit"
-              ? "De camino a recoger"
-              : STATUS_LABELS[order.status] || order.status}
+            {phaseTitle(order) || STATUS_LABELS[order.status] || order.status}
           </Text>
           {step && !finished ? (
             <Text style={styles.statusBandNext}>Siguiente: {step.label.toLowerCase()}</Text>
@@ -517,6 +588,82 @@ export default function TrabajoActivo() {
           </View>
         )}
 
+        {/* TODO lo que el cliente rellenó: es lo que el conductor necesita para
+            saber si le cabe, si hay que subir y qué se lleva. */}
+        <Card>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.sm }}>
+            <Ionicons name="cube-outline" size={18} color={colors.primary} />
+            <Title style={{ flex: 1 }}>Qué hay que mover</Title>
+          </View>
+
+          {order.cargo_description ? (
+            <Body>{order.cargo_description}</Body>
+          ) : (
+            <Caption>El cliente no ha descrito la carga.</Caption>
+          )}
+
+          {/* Fotos de la carga, a tamaño mirable y ampliables */}
+          {order.cargo_photos?.length ? (
+            <>
+              <Caption>
+                {order.cargo_photos.length} foto{order.cargo_photos.length === 1 ? "" : "s"} · toca
+                para ampliar
+              </Caption>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <View style={{ flexDirection: "row", gap: spacing.sm }}>
+                  {order.cargo_photos.map(url => (
+                    <Pressable key={url} onPress={() => setZoomPhoto(url)}>
+                      <Image source={{ uri: url }} style={styles.cargoPhoto} />
+                    </Pressable>
+                  ))}
+                </View>
+              </ScrollView>
+            </>
+          ) : null}
+
+          <View style={styles.detailGrid}>
+            {order.items_count ? (
+              <Detail label="Objetos" value={String(order.items_count)} />
+            ) : null}
+            {order.package_weight ? <Detail label="Peso" value={`${order.package_weight} kg`} /> : null}
+            {order.extra_hours ? <Detail label="Horas extra" value={`${order.extra_hours} h`} /> : null}
+            <Detail
+              label="Recogida"
+              value={floorLabel(order.origin_floors, order.origin_has_lift) || "A pie de calle"}
+            />
+            <Detail
+              label="Entrega"
+              value={floorLabel(order.destination_floors, order.destination_has_lift) || "A pie de calle"}
+            />
+            <Detail label="Ayuda" value={order.needs_help ? "Sí, contratada" : "No"} />
+          </View>
+
+          {order.needs_help && order.help_description ? (
+            <View style={styles.helpBox}>
+              <Caption style={{ fontFamily: "DMSans_700Bold", color: colors.foreground }}>
+                Con qué necesita ayuda
+              </Caption>
+              <Body>{order.help_description}</Body>
+            </View>
+          ) : null}
+
+          {order.notes ? (
+            <View style={styles.helpBox}>
+              <Caption style={{ fontFamily: "DMSans_700Bold", color: colors.foreground }}>
+                Notas del cliente
+              </Caption>
+              <Body>{order.notes}</Body>
+            </View>
+          ) : null}
+
+          {order.recipient_name ? (
+            <Caption>
+              Recibe: {order.recipient_name}
+              {order.recipient_phone ? ` · ${order.recipient_phone}` : ""}
+            </Caption>
+          ) : null}
+        </Card>
+
         {/* El cliente y su carga, como en el canvas: quién es y qué se mueve. */}
         <Card>
           <View style={styles.clientRow}>
@@ -557,7 +704,24 @@ export default function TrabajoActivo() {
         <ErrorText>{error}</ErrorText>
 
         {step && !showProof && (
-          <Button title={step.label} onPress={advance} loading={saving} />
+          <View style={{ gap: spacing.sm }}>
+            <Button
+              title={
+                waitSeconds > 0
+                  ? `${step.label} · en ${Math.floor(waitSeconds / 60)}:${String(waitSeconds % 60).padStart(2, "0")}`
+                  : step.label
+              }
+              onPress={advance}
+              loading={saving}
+              disabled={waitSeconds > 0}
+            />
+            {waitSeconds > 0 ? (
+              <Caption style={{ textAlign: "center" }}>
+                Entre fase y fase pasan 2 minutos: así el historial del servicio se sostiene si
+                alguien reclama.
+              </Caption>
+            ) : null}
+          </View>
         )}
 
         {/* Prueba de entrega: foto de lo entregado + firma del receptor.
@@ -691,20 +855,20 @@ export default function TrabajoActivo() {
           </Card>
         )}
 
-        {/* El chat es una PANTALLA COMPLETA (canvas 2g): desde aquí solo se
-            entra, con el aviso de mensajes sin leer. */}
-        <ChatLink
-          href={`/chat/${order.id}`}
-          title={`Chat con ${(order.client_name || "el cliente").split(" ")[0]}`}
-          subtitle={
-            finished
-              ? "La conversación queda como historial"
-              : unreadCount > 0
-                ? `${unreadCount} mensaje${unreadCount > 1 ? "s" : ""} sin leer`
-                : "Mensajes y fotos con el cliente"
-          }
-        />
-      </ScrollView>
+              </ScrollView>
+
+      {/* Chat flotante con el cliente */}
+      <Modal visible={!!zoomPhoto} transparent animationType="fade" onRequestClose={() => setZoomPhoto(null)}>
+        <Pressable style={styles.zoomBackdrop} onPress={() => setZoomPhoto(null)}>
+          <Image source={{ uri: zoomPhoto }} style={styles.zoomImage} resizeMode="contain" />
+        </Pressable>
+      </Modal>
+
+      <ChatBubbleButton
+        orderId={order.id}
+        partnerName={(order.client_name || "").split(" ")[0]}
+        bottom={24}
+      />
     </SafeAreaView>
   );
 }
@@ -782,6 +946,13 @@ const styles = StyleSheet.create({
   },
   navPillText: { fontSize: 13.5, fontFamily: "Poppins_600SemiBold", color: colors.foreground },
   divider: { height: 1, backgroundColor: colors.border },
+  zoomBackdrop: { flex: 1, backgroundColor: "#000000E6", alignItems: "center", justifyContent: "center" },
+  zoomImage: { width: "100%", height: "80%" },
+  cargoPhoto: { width: 130, height: 110, borderRadius: 12, backgroundColor: colors.secondary },
+  detailGrid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  detailItem: { minWidth: 96, gap: 2 },
+  detailValue: { fontSize: 14, fontFamily: "DMSans_700Bold", color: colors.foreground },
+  helpBox: { backgroundColor: colors.background, borderRadius: 12, padding: 12, gap: 2 },
   paymentBox: {
     flexDirection: "row",
     alignItems: "center",

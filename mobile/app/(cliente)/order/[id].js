@@ -23,12 +23,13 @@ import { euro, rating1 } from "../../../lib/money";
 import { Body, Button, Caption, Card, Field, Heading, Loading, Title } from "../../../components/ui";
 import TrackingMap from "../../../components/TrackingMap";
 import ServiceIcon from "../../../components/ServiceIcon";
+import DriverCard from "../../../components/DriverCard";
 import { Ionicons } from "@expo/vector-icons";
 import ReportIncident from "../../../components/ReportIncident";
 import PayButton from "../../../components/PayButton";
 import TipCard from "../../../components/TipCard";
 import DeliveryProof from "../../../components/DeliveryProof";
-import ChatLink from "../../../components/ChatLink";
+import ChatBubbleButton from "../../../components/ChatBubbleButton";
 import { downloadReceipt } from "../../../lib/receipt";
 import { useBottomPadding } from "../../../lib/layout";
 import { colors, radius, spacing } from "../../../theme";
@@ -110,7 +111,7 @@ export default function OrderDetail() {
       if (!ids.length) return;
       const { data: profiles } = await supabase
         .from("driver_profiles")
-        .select("created_by_id, full_name, photo_url, rating, vehicle_brand, vehicle_plate, current_lat, current_lng")
+        .select("created_by_id, full_name, photo_url, rating, rating_count, vehicle_brand, vehicle_plate, current_lat, current_lng")
         .in("created_by_id", ids)
         .order("created_date", { ascending: true });
       if (!active || !profiles) return;
@@ -683,42 +684,8 @@ export default function OrderDetail() {
           </Card>
         )}
 
-        {/* Conductor */}
-        {driver && !delivered && (
-          <Card>
-            <View style={styles.driverRow}>
-              {driver.photo_url ? (
-                <Image source={{ uri: driver.photo_url }} style={styles.avatar} />
-              ) : (
-                <View style={[styles.avatar, styles.avatarEmpty]} />
-              )}
-              <View style={{ flex: 1, gap: 2 }}>
-                <Title>{driver.full_name || "Tu conductor"}</Title>
-                <Caption>
-                  {driver.vehicle_brand || "Furgoneta"}
-                  {driver.vehicle_plate ? ` · ${driver.vehicle_plate}` : ""}
-                  {driver.rating ? ` · ★ ${rating1(driver.rating)}` : ""}
-                </Caption>
-              </View>
-            </View>
-            {driver.phone ? (
-              <Button
-                title="Llamar al conductor"
-                variant="plain"
-                onPress={() => Linking.openURL(`tel:${driver.phone}`)}
-              />
-            ) : null}
-          </Card>
-        )}
-
-        {/* Chat: pantalla completa (canvas 2g); desde aquí solo se entra. */}
-        {order.driver_id && (
-          <ChatLink
-            href={`/chat/${order.id}`}
-            title={`Chat con ${driverFirst}`}
-            subtitle={delivered ? "La conversación queda como historial" : "Mensajes y fotos con tu conductor"}
-          />
-        )}
+        {/* Quién va a venir: foto, valoración, servicios y la furgoneta */}
+        {driver && !delivered && <DriverCard driver={driver} driverId={order.driver_id} />}
 
         {/* Direcciones y precio */}
         <Card>
@@ -764,6 +731,11 @@ export default function OrderDetail() {
 
         <ReportIncident orderId={order.id} user={user} />
       </ScrollView>
+
+      {/* Chat flotante: siempre a la vista, con no leidos y "escribiendo" */}
+      {order.driver_id ? (
+        <ChatBubbleButton orderId={order.id} partnerName={driverFirst} bottom={24} />
+      ) : null}
     </SafeAreaView>
   );
 }
