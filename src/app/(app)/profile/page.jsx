@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useState } from "react";
 import Link from "next/link";
 import { Phone, Mail, Save, Loader2, LogOut, Lock, CheckCircle2, Truck, ChevronRight } from "lucide-react";
+import BillingCard from "@/components/profile/BillingCard";
 
 const ROLE_LABELS = {
   client: "Cliente",
@@ -116,6 +117,9 @@ export default function Profile() {
           Guardar cambios
         </Button>
       </div>
+
+      {/* Datos fiscales: los mismos que pide la app */}
+      <BillingCard userId={user?.id} />
 
       {/* Un cliente puede pasarse a conductor sin crear otra cuenta: rellena
           sus datos y el equipo revisa. Si ya conduce, el enlace lleva a su

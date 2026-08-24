@@ -203,7 +203,7 @@ export default function Ofertas() {
     if (!user) return;
     let timer = null;
     const channel = supabase
-      .channel("ofertas-conductor")
+      .channel(`ofertas-conductor-${Math.random().toString(36).slice(2, 10)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "transport_requests" },

@@ -23,6 +23,19 @@ export function locationFreshness(updatedAt) {
   return { fresh: false, label: `hace ${Math.floor(minutes / 60)} h` };
 }
 
+/**
+ * Nombre ÚNICO de canal por suscripción.
+ *
+ * Supabase reutiliza el canal por su nombre: si dos pantallas vivas se
+ * suscriben al mismo (el detalle del pedido y el chat abierto encima, que usan
+ * los dos `useOrder`), la segunda llama a `.on()` sobre un canal ya suscrito y
+ * revienta con «cannot add postgres_changes callbacks after subscribe()».
+ * Bug real, 24/08/2026.
+ */
+function uniqueChannel(prefix) {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 export const STATUS_FLOW = ["pending", "accepted", "in_transit", "picked_up", "delivered"];
 
 export const STATUS_LABELS = {
@@ -70,7 +83,7 @@ export function useOrder(orderId) {
       });
 
     const channel = supabase
-      .channel(`order-${orderId}`)
+      .channel(uniqueChannel(`order-${orderId}`))
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "transport_requests", filter: `id=eq.${orderId}` },
@@ -120,7 +133,7 @@ export function useDriverLocation(driver) {
     }
 
     const channel = supabase
-      .channel(`driver-${driver.id}`)
+      .channel(uniqueChannel(`driver-${driver.id}`))
       .on(
         "postgres_changes",
         { event: "UPDATE", schema: "public", table: "driver_profiles", filter: `id=eq.${driver.id}` },
@@ -164,7 +177,7 @@ export function useChat(orderId, { user, role }) {
       });
 
     const channel = supabase
-      .channel(`chat-${orderId}`)
+      .channel(uniqueChannel(`chat-${orderId}`))
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "chat_messages", filter: `request_id=eq.${orderId}` },

@@ -355,6 +355,37 @@ export default function ActiveJob() {
         );
       })()}
 
+      {/* CÓMO SE COBRA. Igual que en la app: sin esto, el conductor podía pedir
+          en efectivo un servicio ya pagado con tarjeta, o irse sin cobrar. */}
+      {!["delivered", "cancelled"].includes(job.status) && (
+        <div
+          className={`rounded-2xl border p-5 flex items-center gap-3 ${
+            job.payment_method === "cash"
+              ? "bg-amber-50 border-amber-200"
+              : job.payment_status === "paid"
+                ? "bg-emerald-50 border-emerald-200"
+                : "bg-primary/5 border-primary/20"
+          }`}
+        >
+          <div className="flex-1">
+            <p className="font-heading font-semibold text-foreground">
+              {job.payment_method === "cash"
+                ? `Cobra ${Number(job.final_price || job.estimated_price || 0).toFixed(2)} € en efectivo`
+                : job.payment_status === "paid"
+                  ? "Ya pagado con tarjeta"
+                  : "Pago con tarjeta pendiente"}
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {job.payment_method === "cash"
+                ? "Al terminar el servicio, en mano."
+                : job.payment_status === "paid"
+                  ? "No le cobres nada al cliente."
+                  : "Lo paga desde su app; no aceptes efectivo."}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Route */}
       <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
         <div className="flex items-start gap-3">

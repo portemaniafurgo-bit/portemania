@@ -121,7 +121,7 @@ export default function OrderDetail() {
     loadOffers();
 
     const channel = supabase
-      .channel(`offers-${id}`)
+      .channel(`offers-${id}-${Math.random().toString(36).slice(2, 10)}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "price_offers", filter: `request_id=eq.${id}` },

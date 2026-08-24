@@ -14,6 +14,7 @@ import { SERVICE_KEYS, SERVICES } from "../../lib/services";
 import { INCLUDED_HOURS, offerFloor, servicePriceFrom } from "../../lib/tariffs";
 import { pickPhotos, takePhoto } from "../../lib/photos";
 import { euro } from "../../lib/money";
+import { useBottomPadding } from "../../lib/layout";
 import { Body, Button, Caption, ErrorText, Field, Heading, Overline, Title } from "../../components/ui";
 import { Counter, Option, Toggle } from "../../components/wizard";
 import WizardChrome from "../../components/WizardChrome";
@@ -85,6 +86,9 @@ export default function Pedir() {
   // borrador recuperado con fecha también lo activa.
   const [wantSchedule, setWantSchedule] = useState(false);
   const scheduling = wantSchedule || !!form.scheduled_date;
+  // Aire al final de la hoja de direcciones, para que el botón no quede bajo
+  // la barra de gestos del móvil.
+  const bottomPad = useBottomPadding();
   // Penalización de una cancelación anterior sin saldar: la suma el servidor al
   // crear el pedido, pero el cliente tiene que verla antes de publicar.
   const [pendingFee, setPendingFee] = useState(0);

@@ -33,6 +33,7 @@ import { es } from "date-fns/locale";
 import { useState, useEffect, useRef } from "react";
 import DriverTrackingMap from "@/components/common/DriverTrackingMap";
 import DeliveryProofCard from "@/components/order/DeliveryProofCard";
+import OrderExtras, { InvoiceNote } from "@/components/order/OrderExtras";
 import { fetchRouteEta, geocodeAlbacete, distanceKm } from "@/lib/eta";
 import { serviceOf } from "@/lib/services";
 
@@ -295,11 +296,41 @@ export default function OrderDetail() {
     },
   });
 
+  // Cuánto costaría cancelar AHORA. Lo dice el servidor, y se enseña antes de
+  // preguntar: nadie debe descubrir una penalización después de aceptarla.
+  const [cancelFee, setCancelFee] = useState(0);
+  useEffect(() => {
+    if (!id || !isOwner) return;
+    supabase.rpc("cancellation_fee_now", { p_request_id: id }).then(({ data }) => {
+      setCancelFee(Number(data) || 0);
+    });
+  }, [id, isOwner, order?.status]);
+
   const cancelMutation = useMutation({
-    mutationFn: () => base44.entities.TransportRequest.update(id, { status: "cancelled" }),
-    onSuccess: () => {
-      setOrder(prev => ({ ...prev, status: "cancelled" }));
+    // Misma regla que la app: la penalización la calcula y aplica el servidor.
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("cancel_order_as_client", {
+        p_request_id: id,
+        p_reason: null,
+      });
+      if (error) throw error;
+      // Al conductor hay que decírselo: puede estar conduciendo hacia la recogida.
+      if (data?.driver_id) {
+        supabase.functions
+          .invoke("send-push", { body: { mode: "client_cancelled", order_id: id } })
+          .catch(() => {});
+      }
+      return data;
+    },
+    onSuccess: (data) => {
+      setOrder(prev => ({ ...prev, ...(data || { status: "cancelled" }) }));
       queryClient.invalidateQueries({ queryKey: ["my-orders"] });
+      if (data?.cancellation_fee) {
+        toast({
+          title: "Pedido cancelado",
+          description: `Queda anotada la penalización de ${Number(data.cancellation_fee).toFixed(2)} €: se aplicará en tu próximo servicio.`,
+        });
+      }
     },
     onError: () => {
       toast({
@@ -704,8 +735,14 @@ export default function OrderDetail() {
 
       {/* Chat — moved to bottom, rendered after driver section */}
 
+      {/* Compartir el seguimiento con quien espera la carga */}
+      {isOwner && <OrderExtras order={order} />}
+
       {/* Prueba de entrega: lo que el conductor dejó al cerrar el servicio */}
       {order.status === "delivered" && isOwner && <DeliveryProofCard order={order} />}
+
+      {/* La factura la emite el conductor autónomo */}
+      {isOwner && <InvoiceNote order={order} />}
 
       {/* Rating */}
       {canRate && (
@@ -733,8 +770,8 @@ export default function OrderDetail() {
         <ReportIncidentButton order={order} user={user} />
       )}
 
-      {/* Cancel */}
-      {order.status === "pending" && (
+      {/* Cancel — hasta que la carga esté recogida, como en la app */}
+      {isOwner && ["pending", "scheduled", "accepted", "in_transit"].includes(order.status) && (
         <AlertDialog>
           <AlertDialogTrigger asChild>
             <Button
@@ -748,6 +785,16 @@ export default function OrderDetail() {
             <AlertDialogHeader>
               <AlertDialogTitle>¿Seguro que quieres cancelar?</AlertDialogTitle>
               <AlertDialogDescription>
+                {cancelFee > 0 ? (
+                  <span className="block mb-2 font-medium text-foreground">
+                    El conductor ya ha salido hacia la recogida, así que cancelar ahora tiene una
+                    penalización de {cancelFee.toFixed(2)} €. Se aplicará en tu próximo servicio.
+                  </span>
+                ) : order.driver_id ? (
+                  <span className="block mb-2 font-medium text-foreground">
+                    Todavía estás a tiempo: cancelar ahora no tiene ningún coste.
+                  </span>
+                ) : null}
                 Esta acción no se puede deshacer.
                 {order.payment_status === "paid" && (
                   <span className="block mt-2 font-medium text-destructive">
@@ -762,7 +809,7 @@ export default function OrderDetail() {
                 className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={() => cancelMutation.mutate()}
               >
-                Sí, cancelar pedido
+                {cancelFee > 0 ? `Cancelar y pagar ${cancelFee.toFixed(2)} €` : "Sí, cancelar pedido"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
