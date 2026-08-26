@@ -25,6 +25,7 @@ export default function OfferCard({
   onAccept,
   onCounter,
   onChangeCounter,
+  onDetails,
 }) {
   const originFloor = floorLabel(order.origin_floors, order.origin_has_lift);
   const destFloor = floorLabel(order.destination_floors, order.destination_has_lift);
@@ -111,7 +112,21 @@ export default function OfferCard({
           </Pressable>
         </View>
       ) : (
-        <View style={styles.actions}>
+        <View style={{ gap: spacing.sm }}>
+          {/* Ver TODO antes de decidir: fotos, descripción, plantas y notas.
+              Aceptar un precio sin saber qué se mueve es aceptar a ciegas. */}
+          <Pressable onPress={onDetails} style={styles.detailsRow}>
+            <Ionicons name="document-text-outline" size={17} color={colors.primary} />
+            <Text style={styles.detailsText}>
+              Ver detalles
+              {order.cargo_photos?.length
+                ? ` · ${order.cargo_photos.length} foto${order.cargo_photos.length === 1 ? "" : "s"}`
+                : ""}
+            </Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.subtle} />
+          </Pressable>
+
+          <View style={styles.actions}>
           <Button
             title={negotiable ? `Aceptar por ${euro(Number(price))}` : "Aceptar servicio"}
             loading={busy}
@@ -128,6 +143,7 @@ export default function OfferCard({
               style={styles.counter}
             />
           ) : null}
+          </View>
         </View>
       )}
     </View>
@@ -167,6 +183,16 @@ const styles = StyleSheet.create({
   tag: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 16, backgroundColor: colors.background },
   tagText: { fontSize: 12, fontFamily: "DMSans_500Medium", color: colors.ink },
   map: { height: 112, borderRadius: 16, overflow: "hidden" },
+  detailsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: colors.background,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  detailsText: { flex: 1, fontSize: 13.5, fontFamily: "DMSans_700Bold", color: colors.primary },
   actions: { flexDirection: "row", gap: 9 },
   accept: { flex: 1, height: 50, borderRadius: 25 },
   counter: { height: 50, borderRadius: 25, borderWidth: 1.5, borderColor: colors.primary, paddingHorizontal: 18 },

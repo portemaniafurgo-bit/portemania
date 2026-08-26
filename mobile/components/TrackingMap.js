@@ -42,9 +42,9 @@ export default function TrackingMap({
   onInfo,
 }) {
   const [route, setRoute] = useState(null);
-  // Cada pulsación de «centrar» remonta la cámara; entre medias el mapa es del
-  // usuario, que puede arrastrar y hacer zoom con los dedos.
-  const [recenter, setRecenter] = useState(0);
+  // Dónde mira la cámara. Solo se toca al recibir la primera posición y al
+  // pulsar «centrar»: el resto del tiempo el mapa es del usuario.
+  const [camera, setCamera] = useState(null);
 
   useEffect(() => {
     if (!driverLocation || !target?.lat) {
@@ -68,6 +68,14 @@ export default function TrackingMap({
   }, [driverLocation?.lat, driverLocation?.lng, driverLocation?.updatedAt, target?.lat, target?.lng]);
 
   const center = driverLocation || target;
+
+  // Primera colocación: en cuanto hay una posición, la cámara va ahí. Sin esto
+  // el mapa arrancaba en el mundo entero y había que buscar la furgoneta.
+  useEffect(() => {
+    if (camera || !center?.lat) return;
+    setCamera({ center: [center.lng, center.lat], zoom: 14, animate: false });
+  }, [camera, center?.lat, center?.lng]);
+
   if (!center?.lat) {
     return (
       <View style={[styles.placeholder, { height }]}>
@@ -97,16 +105,18 @@ export default function TrackingMap({
   return (
     <View style={{ gap: spacing.sm }}>
       <View style={[bare ? styles.mapBare : styles.map, { height }]}>
+        {/* Sin cámara todavía no se pinta: montar el mapa sin coordenadas es
+            justo lo que enseñaba el planisferio. */}
+        {!camera ? null : (
         <Map style={{ flex: 1 }} mapStyle={OSM_STYLE} logo={false}>
-          {/* La cámara solo manda cuando se pulsa «centrar»: si se recolocara
-              en cada posición nueva, no habría forma de mover el mapa con los
-              dedos ni de hacer zoom (el gesto se perdía al segundo). */}
+          {/* La cámara SIEMPRE lleva coordenadas: al dejarlas en blanco entre
+              recentrados, el mapa se iba al mundo entero (bug real,
+              25/08/2026). Solo cambian al entrar y al pulsar «centrar», así que
+              entre medias se puede arrastrar y hacer zoom con los dedos. */}
           <Camera
-            key={recenter}
-            defaultSettings={{ centerCoordinate: [center.lng, center.lat], zoomLevel: 13 }}
-            centerCoordinate={recenter ? [center.lng, center.lat] : undefined}
-            zoomLevel={recenter ? 14 : undefined}
-            animationDuration={recenter ? 600 : 0}
+            centerCoordinate={camera.center}
+            zoomLevel={camera.zoom}
+            animationDuration={camera.animate ? 600 : 0}
           />
 
           {routeLine.length > 1 ? (
@@ -153,11 +163,12 @@ export default function TrackingMap({
             </Marker>
           ) : null}
         </Map>
+        )}
 
         {/* Centrar: el mapa se mueve y se hace zoom con los dedos, así que
             hace falta una forma de volver a lo importante. */}
         <Pressable
-          onPress={() => setRecenter(n => n + 1)}
+          onPress={() => setCamera({ center: [center.lng, center.lat], zoom: 15, animate: true })}
           style={styles.recenterButton}
           hitSlop={8}
         >

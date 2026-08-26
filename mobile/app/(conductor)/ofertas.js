@@ -14,6 +14,7 @@ import { stopTracking } from "../../lib/tracking";
 import { alertNewOffer } from "../../lib/sound";
 import EmptyState from "../../components/EmptyState";
 import OfferCard from "../../components/OfferCard";
+import OfferDetailSheet from "../../components/OfferDetailSheet";
 import { Body, Button, Caption, Card, ErrorText, Heading, Loading, Title } from "../../components/ui";
 import { useBottomPadding } from "../../lib/layout";
 import { colors, radius, spacing } from "../../theme";
@@ -59,6 +60,8 @@ export default function Ofertas() {
   const [myPos, setMyPos] = useState(null);
   // Negociación (canvas 1i/1j): mis contraofertas vivas y la hoja de contraofertar.
   const [myOffers, setMyOffers] = useState([]);
+  // Oferta abierta en la hoja de detalle (antes de aceptar).
+  const [detailFor, setDetailFor] = useState(null);
   const [counterFor, setCounterFor] = useState(null);
   const [counterAmount, setCounterAmount] = useState(0);
   const [counterMessage, setCounterMessage] = useState("");
@@ -171,7 +174,7 @@ export default function Ofertas() {
 
     const { data } = await supabase
       .from("transport_requests")
-      .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, origin_floors, origin_has_lift, destination_floors, destination_has_lift, estimated_price, proposed_price, needs_help, package_weight, distance_km, payment_method, created_date")
+      .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, origin_floors, origin_has_lift, destination_floors, destination_has_lift, estimated_price, proposed_price, needs_help, package_weight, distance_km, payment_method, cargo_description, cargo_photos, items_count, extra_hours, help_description, notes, created_date")
       .eq("status", "pending")
       .order("created_date", { ascending: false })
       .limit(50);
@@ -450,6 +453,7 @@ export default function Ofertas() {
                   setCounterAmount(Math.round(order.estimated_price || order.proposed_price || 40));
                   setCounterMessage("");
                 }}
+                onDetails={() => setDetailFor(order.id)}
                 onChangeCounter={() => {
                   setCounterFor(order.id);
                   setCounterAmount(Math.round(mine.amount));
@@ -460,6 +464,33 @@ export default function Ofertas() {
           })
         )}
       </ScrollView>
+      {/* Todo lo que pidió el cliente, ANTES de aceptar */}
+      {(() => {
+        const order = orders.find(o => o.id === detailFor);
+        if (!order) return null;
+        const negotiable = order.proposed_price != null;
+        return (
+          <OfferDetailSheet
+            order={order}
+            service={serviceOf(order)}
+            visible
+            busy={accepting === order.id || negotiating}
+            blocked={blocked}
+            onClose={() => setDetailFor(null)}
+            onAccept={() => {
+              setDetailFor(null);
+              negotiable ? acceptAtClientPrice(order) : accept(order);
+            }}
+            onCounter={() => {
+              setDetailFor(null);
+              setCounterFor(order.id);
+              setCounterAmount(Math.round(order.estimated_price || order.proposed_price || 40));
+              setCounterMessage("");
+            }}
+          />
+        );
+      })()}
+
       {/* Hoja de contraoferta (canvas 1j): importe grande con +/−, atajos y motivo */}
       <Modal
         visible={counterFor != null}

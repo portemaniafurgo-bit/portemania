@@ -120,8 +120,15 @@ export default function TrabajoActivo() {
   const [error, setError] = useState("");
   // ETA hacia el destino de ahora, que pinta la banda de estado (canvas 1k).
   const [eta, setEta] = useState({ route: null, freshness: null });
-  // Segundos que faltan para poder cambiar de fase. Los dice el servidor: con
-  // el reloj del móvil bastaría cambiar la hora para saltarse la espera.
+  /**
+   * Espera entre fases.
+   *
+   * Se guarda la HORA LÍMITE, no un contador que baja: un contador se congela
+   * al salir de la app y al volver marcaba el tiempo que faltaba cuando la
+   * cerraste (bug real, 25/08/2026). Con una hora límite, salir y volver da
+   * siempre el tiempo correcto — y el servidor lo comprueba igualmente.
+   */
+  const [deadline, setDeadline] = useState(0);
   const [waitSeconds, setWaitSeconds] = useState(0);
   // Foto de la carga ampliada: en miniatura no se distingue un sofá de dos plazas.
   const [zoomPhoto, setZoomPhoto] = useState(null);
@@ -190,20 +197,35 @@ export default function TrabajoActivo() {
     fetchMyDriverProfile(user).then(setProfile);
   }, [user]);
 
-  // Cuánto falta para la siguiente fase: se pregunta al servidor al entrar y
-  // tras cada cambio, y de ahí baja sola cada segundo.
-  useEffect(() => {
+  // Cuánto falta para la siguiente fase, según el SERVIDOR. Se pregunta al
+  // entrar, tras cada cambio y al volver a la pantalla.
+  const refreshWait = useCallback(async () => {
     if (!id) return;
-    supabase
-      .rpc("phase_wait_seconds", { p_request_id: id })
-      .then(({ data }) => setWaitSeconds(Number(data) || 0));
-  }, [id, order?.status, order?.phase_changed_at]);
+    const { data } = await supabase.rpc("phase_wait_seconds", { p_request_id: id });
+    const seconds = Number(data) || 0;
+    setDeadline(seconds > 0 ? Date.now() + seconds * 1000 : 0);
+    setWaitSeconds(seconds);
+  }, [id]);
 
   useEffect(() => {
-    if (waitSeconds <= 0) return;
-    const timer = setTimeout(() => setWaitSeconds(s => Math.max(0, s - 1)), 1000);
-    return () => clearTimeout(timer);
-  }, [waitSeconds]);
+    refreshWait();
+  }, [refreshWait, order?.status, order?.phase_changed_at]);
+
+  // Al volver de segundo plano se recalcula contra el reloj, no se reanuda un
+  // contador: el tiempo sigue corriendo aunque la app esté cerrada.
+  useFocusEffect(
+    useCallback(() => {
+      refreshWait();
+    }, [refreshWait]),
+  );
+
+  useEffect(() => {
+    if (!deadline) return;
+    const tick = () => setWaitSeconds(Math.max(0, Math.ceil((deadline - Date.now()) / 1000)));
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [deadline]);
 
   // Aviso de mensajes sin leer en la fila del chat. Se recalcula al volver de
   // la pantalla de chat (que es donde se marcan como leídos).
@@ -324,7 +346,8 @@ export default function TrabajoActivo() {
       });
       if (err) throw err;
       patchOrder(data); // sin esperar a Realtime: la pantalla avanza YA
-      setWaitSeconds(PHASE_GAP_SECONDS);
+      // La espera de la siguiente fase la vuelve a decir el servidor.
+      refreshWait();
 
       supabase.functions
         .invoke("send-push", { body: { mode: "status_changed", order_id: id } })
