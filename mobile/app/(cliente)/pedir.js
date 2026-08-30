@@ -531,7 +531,7 @@ export default function Pedir() {
             <View style={styles.plainCard}>
               <Toggle
                 label="Ayuda del conductor"
-                description={`Sube y baja contigo · +${tariffs.mudanza_help} €`}
+                description={`Sube y baja contigo · +${service.key === "porte" ? (tariffs.porte_help ?? 12) : tariffs.mudanza_help} €`}
                 value={form.needs_help}
                 onValueChange={v => update("needs_help", v)}
               />

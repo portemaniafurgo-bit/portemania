@@ -1,289 +1,74 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { UserPlus, Mail, Lock, Loader2, Package, Truck } from "lucide-react";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { UserPlus, Zap, ShieldCheck, KeyRound } from "lucide-react";
 import AuthLayout from "@/components/AuthLayout";
 import GoogleIcon from "@/components/GoogleIcon";
-import { toast } from "@/components/ui/use-toast";
 import { buildRequestHref, hasRequestDraft } from "@/lib/requestIntent";
 
+/**
+ * Alta SOLO con Google (decisión de negocio, 27/08/2026).
+ *
+ * Fuera el formulario de email/contraseña/OTP: una cuenta de Google trae el
+ * email verificado y el nombre, y nos ahorra contraseñas olvidadas y códigos
+ * que no llegan. El teléfono se pide una vez dentro, al completar el perfil.
+ *
+ * El login con contraseña sigue vivo para las cuentas antiguas.
+ */
+const VENTAJAS = [
+  { icon: Zap, text: "Entras en un toque, sin formularios" },
+  { icon: ShieldCheck, text: "Tu email ya llega verificado" },
+  { icon: KeyRound, text: "Sin otra contraseña que recordar" },
+];
+
 export default function RegisterContent() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [showOtp, setShowOtp] = useState(false);
-  const [otpCode, setOtpCode] = useState("");
-
   const searchParams = useSearchParams();
-  // El rol se ELIGE aquí: la URL (?role=driver) solo preselecciona. Quien
-  // llega desde "Hazte conductor" ya lo trae marcado; quien entra por el
-  // registro normal puede cambiarlo sin buscar otra página.
-  const [isDriver, setIsDriver] = useState(searchParams.get("role") === "driver");
-  const redirectUrl = isDriver
-    ? "/driver/profile"
-    : hasRequestDraft(searchParams)
+  // Quien venía a pedir algo vuelve a su pedido al terminar el alta.
+  const redirectUrl = hasRequestDraft(searchParams)
     ? buildRequestHref("/new-request", searchParams)
-    : "/new-request";
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    if (password !== confirmPassword) {
-      setError("Las contraseñas no coinciden");
-      return;
-    }
-    setLoading(true);
-    try {
-      const data = await base44.auth.register({ email, password, role: isDriver ? "driver" : undefined });
-      // Confirmación desactivada (autoconfirm): signUp ya devuelve sesión →
-      // dentro directamente, sin pantalla de código.
-      if (data?.session) {
-        window.location.href = redirectUrl;
-        return;
-      }
-      // Email ya registrado: Supabase no da error (anti-enumeración) pero
-      // devuelve user con identities vacías y NO envía ningún correo. Sin
-      // este check el usuario quedaba atrapado en una pantalla OTP sin código.
-      if (data?.user && (data.user.identities?.length ?? 0) === 0) {
-        setError("Ese correo ya tiene una cuenta. Inicia sesión o usa «¿Olvidaste la contraseña?» para recuperarla.");
-        return;
-      }
-      setShowOtp(true);
-    } catch (err) {
-      setError(err.message || "No se pudo completar el registro");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerify = async () => {
-    setError("");
-    setLoading(true);
-    try {
-      const result = await base44.auth.verifyOtp({ email, otpCode });
-      if (result?.access_token) {
-        base44.auth.setToken(result.access_token);
-      }
-      window.location.href = redirectUrl;
-    } catch (err) {
-      setError(err.message || "Código de verificación no válido");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleResend = async () => {
-    setError("");
-    try {
-      await base44.auth.resendOtp(email);
-      toast({
-        title: "Código enviado",
-        description: "Revisa tu correo para ver el nuevo código.",
-      });
-    } catch (err) {
-      setError(err.message || "No se pudo reenviar el código");
-    }
-  };
-
-  const handleGoogle = () => {
-    base44.auth.loginWithProvider("google", redirectUrl);
-  };
-
-  if (showOtp) {
-    return (
-      <AuthLayout
-        icon={Mail}
-        title="Verifica tu correo"
-        subtitle={`Te hemos enviado un código a ${email}`}>
-
-        {error &&
-        <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-            {error}
-          </div>
-        }
-        <div className="flex justify-center mb-6">
-          <InputOTP
-            maxLength={6}
-            value={otpCode}
-            onChange={setOtpCode}
-            autoFocus
-            autoComplete="one-time-code">
-
-            <InputOTPGroup>
-              <InputOTPSlot index={0} />
-              <InputOTPSlot index={1} />
-              <InputOTPSlot index={2} />
-              <InputOTPSlot index={3} />
-              <InputOTPSlot index={4} />
-              <InputOTPSlot index={5} />
-            </InputOTPGroup>
-          </InputOTP>
-        </div>
-        <Button
-          className="w-full h-12 font-medium"
-          onClick={handleVerify}
-          disabled={loading || otpCode.length < 6}>
-
-          {loading ?
-          <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Verificando...
-            </> :
-
-          "Verificar"
-          }
-        </Button>
-        <p className="text-center text-sm text-muted-foreground mt-4">
-          ¿No recibiste el código?{" "}
-          <button onClick={handleResend} className="text-primary font-medium hover:underline">
-            Reenviar
-          </button>
-        </p>
-      </AuthLayout>);
-
-  }
+    : "/dashboard";
 
   return (
     <AuthLayout
       icon={UserPlus}
-      title={isDriver ? "Regístrate como conductor" : "Crea tu cuenta"}
-      subtitle={isDriver ? "Únete a nuestra flota de conductores" : "Regístrate para empezar"}
-      footer={
-      <>
-          ¿Ya tienes cuenta?{" "}
-          <Link href="/login-clientes" className="text-primary font-medium hover:underline">
-            Iniciar sesión
-          </Link>
-        </>
-      }>
-
-      {/* Qué vas a ser: la decisión se toma AQUÍ, no en una URL escondida */}
-      <div className="grid grid-cols-2 gap-3 mb-6" role="radiogroup" aria-label="Tipo de cuenta">
-        <button
-          type="button"
-          role="radio"
-          aria-checked={!isDriver}
-          onClick={() => setIsDriver(false)}
-          className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-3 text-sm font-medium transition-colors ${
-            !isDriver ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
-          }`}>
-          <Package className="w-5 h-5" />
-          Necesito un porte
-        </button>
-        <button
-          type="button"
-          role="radio"
-          aria-checked={isDriver}
-          onClick={() => setIsDriver(true)}
-          className={`flex flex-col items-center gap-1.5 rounded-xl border-2 p-3 text-sm font-medium transition-colors ${
-            isDriver ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground hover:border-primary/40"
-          }`}>
-          <Truck className="w-5 h-5" />
-          Quiero conducir
-        </button>
+      title="Crea tu cuenta"
+      subtitle="El registro es con tu cuenta de Google. Rápido y sin contraseñas."
+    >
+      <div className="space-y-3 mb-6">
+        {VENTAJAS.map(({ icon: Icon, text }) => (
+          <div key={text} className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+              <Icon className="w-4 h-4 text-primary" />
+            </div>
+            <p className="text-sm text-muted-foreground">{text}</p>
+          </div>
+        ))}
       </div>
 
-      {isDriver && (
-        <p className="mb-6 rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-muted-foreground">
-          Después de crear la cuenta te pediremos tus datos de conductor (furgoneta,
-          documentación) y el equipo revisará tu solicitud antes de activarte.
-        </p>
-      )}
-
       <Button
+        className="w-full h-12 rounded-xl gap-3 text-base"
         variant="outline"
-        className="w-full h-12 text-sm font-medium mb-6 [font-family:'Albert_Sans',_sans-serif]"
-        onClick={handleGoogle}>
-
-        <GoogleIcon className="w-5 h-5 mr-2" />
+        onClick={() => base44.auth.loginWithProvider("google", redirectUrl)}
+      >
+        <GoogleIcon className="w-5 h-5" />
         Continuar con Google
       </Button>
 
-      <div className="relative mb-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-3 text-muted-foreground">o</span>
-        </div>
-      </div>
+      <p className="mt-6 text-center text-sm text-muted-foreground">
+        ¿Ya tienes cuenta con contraseña?{" "}
+        <Link href="/login" className="text-primary font-semibold hover:underline">
+          Entrar
+        </Link>
+      </p>
 
-      {error &&
-      <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-          {error}
-        </div>
-      }
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="email">Correo electrónico</Label>
-          <div className="relative">
-            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input
-              id="email"
-              type="email"
-              autoComplete="email"
-              autoFocus
-              placeholder="tucorreo@ejemplo.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="pl-10 h-12"
-              required />
-
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Contraseña</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="pl-10 h-12"
-              required />
-
-          </div>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="confirm">Confirmar contraseña</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
-            <Input
-              id="confirm"
-              type="password"
-              autoComplete="new-password"
-              placeholder="••••••••"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="pl-10 h-12"
-              required />
-
-          </div>
-        </div>
-        <Button type="submit" className="w-full h-12 font-medium" disabled={loading}>
-          {loading ?
-          <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Creando cuenta...
-            </> :
-
-          "Crear cuenta"
-          }
-        </Button>
-      </form>
-    </AuthLayout>);
-
+      <p className="mt-4 text-center text-xs text-muted-foreground">
+        Al crear la cuenta aceptas los{" "}
+        <Link href="/terminos" className="underline">términos</Link> y la{" "}
+        <Link href="/privacidad" className="underline">política de privacidad</Link> de ClicyVoy.
+      </p>
+    </AuthLayout>
+  );
 }

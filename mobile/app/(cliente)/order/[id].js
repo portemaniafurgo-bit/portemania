@@ -350,7 +350,7 @@ export default function OrderDetail() {
             <TrackingMap
               driverLocation={driverLocation}
               target={target}
-              height={Math.round(Dimensions.get("window").height * 0.44)}
+              height={Math.round(Dimensions.get("window").height * 0.7)}
               bare
               onInfo={setMapInfo}
             />

@@ -27,7 +27,7 @@ export const SERVICES = {
     // Flujo
     vehicle: "small",
     priceKey: "porte_base",
-    hasHelp: false,
+    hasHelp: true,
     hasExtraHours: false,
     hasStops: false,
     hasAccess: false,

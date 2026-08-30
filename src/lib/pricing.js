@@ -15,6 +15,7 @@ export const DEFAULT_TARIFFS = {
   // Porte — precio cerrado, recogida y entrega a pie de calle
   porte_base: 40,
   porte_item: 3, // por cada objeto a partir del primero
+  porte_help: 12, // ayuda del conductor en el porte (canvas 1e)
   // Mini mudanza — furgoneta grande, 2 h incluidas
   mudanza_base: 99,
   mudanza_extra_hour: 25,
@@ -141,7 +142,11 @@ export function quoteRequest(tariffs, form = {}) {
   // Las plantas solo se cobran con ayuda contratada: sin ayuda el servicio es a
   // pie de calle y el conductor no sube.
   if (service.hasHelp && form.needs_help) {
-    add("help", "Ayuda del conductor", num(tariffs, "mudanza_help"));
+    add(
+      "help",
+      "Ayuda del conductor",
+      num(tariffs, service.key === "porte" ? "porte_help" : "mudanza_help"),
+    );
 
     if (service.hasAccess) {
       const floorPrice = num(tariffs, "mudanza_floor");

@@ -3,6 +3,8 @@
 import { useParams, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
+import { supabase } from "@/lib/entities";
+import { toast } from "@/components/ui/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,9 +26,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { serviceOf } from "@/lib/services";
 
 const STEPS = [
-  { from: "accepted",   to: "in_transit",  label: "Iniciar viaje →",   icon: Truck,        color: "bg-blue-600 hover:bg-blue-700" },
-  { from: "in_transit", to: "picked_up",   label: "He llegado",         icon: MapPin,       color: "bg-amber-500 hover:bg-amber-600" },
-  { from: "picked_up",  to: "delivered",   label: "Trabajo finalizado ✓", icon: CheckCircle, color: "bg-emerald-600 hover:bg-emerald-700" },
+  { phase: "start_to_pickup", label: "Iniciar viaje →", icon: Truck, color: "bg-blue-600 hover:bg-blue-700", is: j => j.status === "accepted" },
+  { phase: "arrived_pickup", label: "He llegado", icon: MapPin, color: "bg-amber-500 hover:bg-amber-600", is: j => j.status === "in_transit" && !j.arrived_pickup_at },
+  { phase: "picked_up", label: "Carga recogida", icon: MapPin, color: "bg-amber-600 hover:bg-amber-700", is: j => j.status === "in_transit" && !!j.arrived_pickup_at },
+  { phase: "start_to_destination", label: "Iniciar viaje a destino →", icon: Truck, color: "bg-blue-600 hover:bg-blue-700", is: j => j.status === "picked_up" && !j.to_destination_at },
+  { phase: "arrived_dropoff", label: "He llegado", icon: MapPin, color: "bg-amber-500 hover:bg-amber-600", is: j => j.status === "picked_up" && !!j.to_destination_at && !j.arrived_dropoff_at },
+  { phase: "finish", label: "Trabajo finalizado ✓", icon: CheckCircle, color: "bg-emerald-600 hover:bg-emerald-700", is: j => j.status === "picked_up" && !!j.arrived_dropoff_at },
 ];
 
 // Motivos de cancelación del conductor (solo antes de recoger la mercancía)
@@ -147,13 +152,25 @@ export default function ActiveJob() {
   }, [messages]);
 
   const advanceMutation = useMutation({
-    mutationFn: async (toStatus) => {
-      const extra = {};
-      if (toStatus === "picked_up") extra.pickup_time = new Date().toISOString();
-      if (toStatus === "delivered") extra.delivery_time = new Date().toISOString();
-      await base44.entities.TransportRequest.update(id, { status: toStatus, ...extra });
+    // El MISMO RPC que la app: el servidor valida el orden de las fases y los
+    // 2 minutos entre cada una. Aqui no se decide nada.
+    mutationFn: async (phase) => {
+      if (phase === "finish") {
+        await base44.entities.TransportRequest.update(id, {
+          status: "delivered",
+          delivery_time: new Date().toISOString(),
+        });
+        return;
+      }
+      const { error } = await supabase.rpc("advance_job_phase", {
+        p_request_id: id,
+        p_phase: phase,
+      });
+      if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["job", id] }),
+    onError: (err) =>
+      toast({ title: "Todavía no", description: err.message, variant: "destructive" }),
   });
 
   // Entrega firmada: la firma se sube ANTES de dar el servicio por entregado,
@@ -248,7 +265,7 @@ export default function ActiveJob() {
     </div>
   );
 
-  const nextStep = STEPS.find(s => s.from === job.status);
+  const nextStep = STEPS.find(s => s.is(job));
   const isFinished = job.status === "delivered" || job.status === "cancelled";
 
   return (
@@ -453,7 +470,7 @@ export default function ActiveJob() {
       {/* Cierre del servicio. En los envíos de paquete y las entregas para
           tiendas no hay botón de "finalizado": se cierra con la firma. */}
       {nextStep && !isFinished && (
-        nextStep.to === "delivered" && job.signature_required ? (
+        nextStep.phase === "finish" && job.signature_required ? (
           <SignaturePad
             defaultName={job.recipient_name || ""}
             submitting={deliverWithSignatureMutation.isPending}
@@ -462,7 +479,7 @@ export default function ActiveJob() {
         ) : (
           <Button
             className={`w-full h-14 rounded-2xl text-base font-semibold gap-2 text-white ${nextStep.color}`}
-            onClick={() => advanceMutation.mutate(nextStep.to)}
+            onClick={() => advanceMutation.mutate(nextStep.phase)}
             disabled={advanceMutation.isPending}
           >
             {advanceMutation.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <nextStep.icon className="w-5 h-5" />}

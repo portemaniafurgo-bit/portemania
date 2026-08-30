@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/AuthContext";
 import { base44 } from "@/api/base44Client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
+import AppBanner from "@/components/common/AppBanner";
 import PaymentInfo from "@/components/common/PaymentInfo";
 import { serviceSummary } from "@/lib/tariffs";
 import { Check, MapPin, Package, Loader2 } from "lucide-react";
@@ -319,86 +320,18 @@ export default function DriverRequests() {
                     <Check className="w-4 h-4" /> Aceptar servicio
                   </Button>
                 </div>
-              ) : myOfferFor(req.id) ? (
-                <div className="bg-primary/5 border border-primary/20 rounded-xl p-3 text-sm">
-                  <p className="font-semibold text-foreground">
-                    Tu contraoferta: {Number(myOfferFor(req.id).amount).toFixed(2)}€
-                  </p>
-                  <p className="text-muted-foreground text-xs">
-                    Esperando al cliente. Puedes cambiarla con «Contraofertar».
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="rounded-xl mt-2"
-                    onClick={() => {
-                      setCounterFor(req.id);
-                      setCounterAmount(String(myOfferFor(req.id).amount));
-                    }}
-                  >
-                    Cambiar contraoferta
-                  </Button>
-                </div>
-              ) : counterFor === req.id ? (
-                /* Formulario de contraoferta */
-                <div className="space-y-2 bg-muted/40 rounded-xl p-3">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="number"
-                      min="5"
-                      max="500"
-                      step="1"
-                      value={counterAmount}
-                      onChange={(e) => setCounterAmount(e.target.value)}
-                      placeholder={`p. ej. ${Math.round((req.estimated_price || 40))}`}
-                      className="w-28 rounded-xl border border-input bg-background px-3 py-2 text-sm font-semibold"
-                    />
-                    <span className="text-sm font-semibold">€</span>
-                    <input
-                      type="text"
-                      value={counterMessage}
-                      onChange={(e) => setCounterMessage(e.target.value)}
-                      placeholder="Motivo (opcional): distancia, plantas…"
-                      className="flex-1 rounded-xl border border-input bg-background px-3 py-2 text-sm"
-                    />
-                  </div>
-                  <div className="flex gap-2">
-                    <Button
-                      className="flex-1 rounded-xl"
-                      disabled={!counterAmount || makeOffer.isPending}
-                      onClick={() =>
-                        makeOffer.mutate({ requestId: req.id, amount: counterAmount, message: counterMessage })
-                      }
-                    >
-                      {makeOffer.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Enviar contraoferta"}
-                    </Button>
-                    <Button variant="outline" className="rounded-xl" onClick={() => setCounterFor(null)}>
-                      Cancelar
-                    </Button>
-                  </div>
-                </div>
               ) : (
-                /* Negociación: aceptar el precio del cliente o contraofertar */
-                <div className="flex gap-2">
+                /* Con precio propuesto: aceptar sí, pero CONTRAOFERTAR vive en
+                   la app (decisión 27/08). El banner lleva a descargarla. */
+                <div className="space-y-2">
                   <Button
-                    className="flex-1 rounded-xl gap-2"
+                    className="w-full rounded-xl gap-2"
                     onClick={() => acceptAtClientPrice.mutate(req.id)}
                     disabled={acceptAtClientPrice.isPending || isUnavailable}
                   >
                     <Check className="w-4 h-4" /> Aceptar por {Number(req.proposed_price).toFixed(2)}€
                   </Button>
-                  <Button
-                    variant="outline"
-                    className="rounded-xl"
-                    disabled={isUnavailable}
-                    onClick={() => {
-                      setCounterFor(req.id);
-                      setCounterAmount(String(Math.round(req.estimated_price || req.proposed_price)));
-                      setCounterMessage("");
-                    }}
-                  >
-                    Contraofertar
-                  </Button>
+                  <AppBanner text="¿Quieres contraofertar otro precio?" />
                 </div>
               )}
             </motion.div>

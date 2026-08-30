@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { acceptanceOf } from "@/lib/acceptance";
 import {
   AlertCircle,
   ArrowLeft,
@@ -26,6 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import AppBanner from "@/components/common/AppBanner";
 import WeightCard from "@/components/common/WeightCard";
 import AccessFields from "@/components/request/AccessFields";
 import PhotosField from "@/components/request/PhotosField";
@@ -633,58 +633,9 @@ export default function RequestWizard({ authenticated = false, user = null }) {
 
             <PriceSummary quote={quote} />
 
-            {/* Negociación (opcional, solo con cuenta): el cliente propone su
-                precio y los conductores aceptan o contraofertan. El suelo del
-                60% lo valida también el servidor (migración 0014). */}
-            {authenticated && quote.total > 0 && (
-              <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-foreground">¿Quieres proponer tu precio?</p>
-                  <span className="text-[11px] text-muted-foreground">opcional</span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Los conductores podrán aceptarlo o hacerte una contraoferta. Mínimo{" "}
-                  {Math.ceil(quote.total * 0.6)}€.
-                </p>
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min={Math.ceil(quote.total * 0.6)}
-                    max={500}
-                    step="1"
-                    placeholder={`${quote.total}`}
-                    value={form.proposed_price ?? ""}
-                    onChange={(e) => f.update("proposed_price", e.target.value)}
-                    className="w-32 rounded-xl font-semibold"
-                  />
-                  <span className="text-sm font-semibold text-foreground">€</span>
-                  {form.proposed_price ? (
-                    <button
-                      type="button"
-                      onClick={() => f.update("proposed_price", "")}
-                      className="text-xs text-muted-foreground underline"
-                    >
-                      quitar
-                    </button>
-                  ) : null}
-                </div>
-
-                {/* Aviso de aceptación: cuanto más baja la oferta, más difícil
-                    que un conductor la coja. Mismo criterio que la app. */}
-                {form.proposed_price ? (
-                  (() => {
-                    const chance = acceptanceOf(Number(form.proposed_price), quote.total);
-                    return (
-                      <div className={`flex items-center gap-2 rounded-xl px-3 py-2 ${chance.bg}`}>
-                        <span className={`h-2 w-2 rounded-full ${chance.dot}`} />
-                        <span className={`text-xs font-semibold ${chance.text}`}>{chance.label}</span>
-                        <span className="text-xs text-muted-foreground">{chance.hint}</span>
-                      </div>
-                    );
-                  })()
-                ) : null}
-              </div>
-            )}
+            {/* La negociación vive SOLO en la app (decisión 27/08): aquí,
+                el banner que lleva a descargarla. */}
+            <AppBanner />
 
             {authenticated ? (
               <div className="space-y-3">

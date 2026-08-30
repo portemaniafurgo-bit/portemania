@@ -32,6 +32,7 @@ import { format, addMinutes } from "date-fns";
 import { es } from "date-fns/locale";
 import { useState, useEffect, useRef } from "react";
 import DriverTrackingMap from "@/components/common/DriverTrackingMap";
+import AppBanner from "@/components/common/AppBanner";
 import DeliveryProofCard from "@/components/order/DeliveryProofCard";
 import OrderExtras, { InvoiceNote } from "@/components/order/OrderExtras";
 import { fetchRouteEta, geocodeAlbacete, distanceKm } from "@/lib/eta";
@@ -457,48 +458,10 @@ export default function OrderDetail() {
         </div>
       )}
 
-      {/* Negociación: respuestas de conductores mientras el pedido busca dueño */}
+      {/* La negociación vive en la app (decisión 27/08): si este pedido
+          lleva precio propuesto, las respuestas se gestionan alli. */}
       {order.status === "pending" && order.proposed_price != null && (
-        <div className="bg-card rounded-2xl border border-border p-5 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-sm text-foreground">Respuestas de conductores</h2>
-            <span className="text-xs bg-primary/10 text-primary font-semibold px-3 py-1 rounded-full">
-              Tu oferta: {Number(order.proposed_price).toFixed(2)}€
-            </span>
-          </div>
-          {priceOffers.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Aún no hay contraofertas. Un conductor puede aceptar tu precio directamente o
-              proponerte otro — lo verás aquí al momento.
-            </p>
-          ) : (
-            priceOffers.map(offer => (
-              <div key={offer.id} className="border border-border rounded-xl p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <p className="font-semibold text-sm text-foreground">{offer.driver_name || "Conductor"}</p>
-                  <span className="text-lg font-bold text-primary">{Number(offer.amount).toFixed(2)}€</span>
-                </div>
-                {offer.message && <p className="text-xs text-muted-foreground">«{offer.message}»</p>}
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => acceptOffer(offer.id)}
-                    disabled={negotiating}
-                    className="flex-1 bg-primary text-primary-foreground text-sm font-semibold rounded-xl py-2 hover:bg-primary/90 disabled:opacity-50"
-                  >
-                    Aceptar por {Number(offer.amount).toFixed(2)}€
-                  </button>
-                  <button
-                    onClick={() => rejectOffer(offer.id)}
-                    disabled={negotiating}
-                    className="border border-border text-sm text-muted-foreground rounded-xl px-4 hover:bg-muted disabled:opacity-50"
-                  >
-                    No, gracias
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
+        <AppBanner text={`Tu oferta de ${Number(order.proposed_price).toFixed(2)} € tiene ${priceOffers.length} respuesta${priceOffers.length === 1 ? "" : "s"}`} />
       )}
 
       {/* ETA en tiempo real / llegada inminente */}

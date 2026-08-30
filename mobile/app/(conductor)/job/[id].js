@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { supabase } from "../../../lib/supabase";
@@ -476,10 +476,9 @@ export default function TrabajoActivo() {
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
       <Stack.Screen options={{ headerShown: true, title: "Servicio" }} />
-      <ScrollView contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg, paddingBottom: bottomPad }}>
-        {/* Banda morada del canvas 1k: barras de avance en amarillo, servicio y
-            precio pactado, el estado en grande y qué toca después. */}
-        <View style={styles.statusBand}>
+      {/* Banda morada FIJA y compacta: barras de avance, servicio con el precio
+          pactado y el estado. No rueda con la lista. */}
+      <View style={styles.statusBand}>
           {!finished && order.status !== "cancelled" ? (
             <View style={styles.stepper}>
               {["accepted", "in_transit", "picked_up", "delivered"].map((s, i) => {
@@ -505,53 +504,92 @@ export default function TrabajoActivo() {
           ) : null}
         </View>
 
-        {/* Mapa DENTRO de la app (petición del cliente: como Uber), con la
-            tarjeta de tiempo y dirección flotando encima, como en el canvas. */}
+      {/* Mapa FIJO al 70 % de la pantalla, estilo Uber: sin nada encima (solo
+          el botón de centrar) y FUERA del scroll, para que el zoom y el
+          arrastre con los dedos no peleen con la lista. Todo lo demás va
+          debajo. */}
+      {!finished && (
+        <TrackingMap
+          driverLocation={myPos}
+          target={mapTarget}
+          height={Math.round(Dimensions.get("window").height * 0.7)}
+          self
+          bare
+          targetKind={goingToPickup ? "pickup" : "dropoff"}
+          onInfo={setEta}
+        />
+      )}
+
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg, paddingBottom: bottomPad }}
+      >
+        {/* Tiempo restante y a dónde se va, debajo del mapa (antes flotaba) */}
         {!finished && (
-          <View style={styles.mapWrap}>
-            <TrackingMap
-              driverLocation={myPos}
-              target={mapTarget}
-              height={300}
-              self
-              bare
-              targetKind={goingToPickup ? "pickup" : "dropoff"}
-              onInfo={setEta}
+          <View style={styles.etaRow}>
+            <View>
+              <Text style={styles.etaBig}>{eta?.route ? `${eta.route.minutes} min` : "—"}</Text>
+              <Text style={styles.etaKm}>
+                {eta?.route ? `${String(eta.route.km).replace(".", ",")} km` : "calculando"}
+              </Text>
+            </View>
+            <View style={styles.etaDivider} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.etaAddress}>
+                {(goingToPickup ? order.origin_address : order.destination_address) || "—"}
+              </Text>
+              <Text style={styles.etaMeta}>
+                {[
+                  goingToPickup
+                    ? floorLabel(order.origin_floors, order.origin_has_lift)
+                    : floorLabel(order.destination_floors, order.destination_has_lift),
+                  order.needs_help ? "con ayuda" : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* El botón de fase, lo primero al asomar la hoja: es la acción */}
+        {step && !showProof && (
+          <View style={{ gap: spacing.sm }}>
+            <Button
+              title={
+                waitSeconds > 0
+                  ? `${step.label} · en ${Math.floor(waitSeconds / 60)}:${String(waitSeconds % 60).padStart(2, "0")}`
+                  : step.label
+              }
+              onPress={advance}
+              loading={saving}
+              disabled={waitSeconds > 0}
             />
-            <View style={styles.floatingEta}>
-              <View>
-                <Text style={styles.etaBig}>{eta?.route ? `${eta.route.minutes} min` : "—"}</Text>
-                <Text style={styles.etaKm}>
-                  {eta?.route ? `${String(eta.route.km).replace(".", ",")} km` : "calculando"}
-                </Text>
-              </View>
-              <View style={styles.etaDivider} />
-              <View style={{ flex: 1 }}>
-                <Text style={styles.etaAddress}>
-                  {(goingToPickup ? order.origin_address : order.destination_address) || "—"}
-                </Text>
-                <Text style={styles.etaMeta}>
-                  {[
-                    goingToPickup
-                      ? floorLabel(order.origin_floors, order.origin_has_lift)
-                      : floorLabel(order.destination_floors, order.destination_has_lift),
-                    order.needs_help ? "con ayuda" : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.floatingNav}>
-              <Pressable onPress={() => navigate("gmaps")} style={styles.navPill}>
-                <Ionicons name="navigate-outline" size={16} color={colors.primary} />
-                <Text style={styles.navPillText}>Google Maps</Text>
-              </Pressable>
-              <Pressable onPress={() => navigate("waze")} style={styles.navPill}>
-                <Ionicons name="car-outline" size={16} color={colors.primary} />
-                <Text style={styles.navPillText}>Waze</Text>
-              </Pressable>
-            </View>
+            {waitSeconds > 0 ? (
+              <Caption style={{ textAlign: "center" }}>
+                Entre fase y fase pasan 2 minutos: así el historial del servicio se sostiene si
+                alguien reclama.
+              </Caption>
+            ) : null}
+          </View>
+        )}
+
+        {!finished && (
+          <View style={{ flexDirection: "row", gap: spacing.sm }}>
+            <Button
+              title="Google Maps"
+              icon="navigate-outline"
+              variant="plain"
+              onPress={() => navigate("gmaps")}
+              style={{ flex: 1 }}
+            />
+            <Button
+              title="Waze"
+              icon="car-outline"
+              variant="plain"
+              onPress={() => navigate("waze")}
+              style={{ flex: 1 }}
+            />
           </View>
         )}
 
@@ -726,27 +764,6 @@ export default function TrabajoActivo() {
 
         <ErrorText>{error}</ErrorText>
 
-        {step && !showProof && (
-          <View style={{ gap: spacing.sm }}>
-            <Button
-              title={
-                waitSeconds > 0
-                  ? `${step.label} · en ${Math.floor(waitSeconds / 60)}:${String(waitSeconds % 60).padStart(2, "0")}`
-                  : step.label
-              }
-              onPress={advance}
-              loading={saving}
-              disabled={waitSeconds > 0}
-            />
-            {waitSeconds > 0 ? (
-              <Caption style={{ textAlign: "center" }}>
-                Entre fase y fase pasan 2 minutos: así el historial del servicio se sostiene si
-                alguien reclama.
-              </Caption>
-            ) : null}
-          </View>
-        )}
-
         {/* Prueba de entrega: foto de lo entregado + firma del receptor.
             Obligatoria en paquetes y compras en tienda; opcional en el resto. */}
         {showProof && !finished && (
@@ -908,24 +925,34 @@ const styles = StyleSheet.create({
   },
   chipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   chipText: { fontSize: 13, color: colors.mutedForeground },
-  // Banda a sangre, como en el canvas: el morado llega hasta los bordes.
+  // Banda fija arriba, compacta: con el mapa al 70 % cada punto de alto cuenta.
   statusBand: {
     backgroundColor: colors.primary,
-    marginHorizontal: -spacing.screen,
-    marginTop: -spacing.screen,
     paddingHorizontal: spacing.screen,
     paddingTop: 6,
-    paddingBottom: 20,
+    paddingBottom: 12,
+  },
+  // La fila de tiempo y destino, ahora BAJO el mapa (antes flotaba encima).
+  etaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+    backgroundColor: colors.card,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
   },
   // Canvas 1k: rótulo lila, titular blanco de 27 y la siguiente acción debajo.
   statusBandService: { fontSize: 12.5, fontFamily: "DMSans_400Regular", color: "#C9B4F0" },
   statusBandTitle: {
-    fontSize: 27,
-    lineHeight: 32,
+    fontSize: 20,
+    lineHeight: 25,
     fontFamily: "Poppins_600SemiBold",
     color: "#FFFFFF",
     letterSpacing: -0.3,
-    marginTop: 6,
+    marginTop: 4,
   },
   statusBandNext: { fontSize: 13, fontFamily: "DMSans_400Regular", color: "#E4D8FA", marginTop: 8 },
   mapWrap: { marginHorizontal: -spacing.screen, position: "relative" },

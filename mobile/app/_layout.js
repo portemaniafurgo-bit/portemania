@@ -73,6 +73,18 @@ function RootNavigation() {
     // que devolverlo a su grupo (con sesión ya iniciada, claro).
     if (group === "chat") return;
 
+    // Registro con Google: la cuenta llega sin teléfono, y sin teléfono el
+    // conductor y el cliente no pueden llamarse. Se pide UNA vez y de ahí a la
+    // app. Vale para cuentas nuevas y para las antiguas que nunca lo pusieron.
+    if (!session.user?.user_metadata?.phone) {
+      if (group !== "completar-perfil") router.replace("/completar-perfil");
+      return;
+    }
+    if (group === "completar-perfil") {
+      router.replace(role === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir");
+      return;
+    }
+
     // Redirigir SIEMPRE que no se esté ya en el grupo correcto — incluido el
     // arranque en la raíz (group undefined): no redirigir ahí dejaba al usuario
     // con sesión mirando "Abriendo ClicyVoy…" para siempre (bug real, 0.1.1).
@@ -98,6 +110,8 @@ function RootNavigation() {
       <Stack.Screen name="(conductor)" />
       {/* El chat es pantalla completa, no una pestaña (canvas 2g). */}
       <Stack.Screen name="chat/[id]" />
+      {/* El teléfono que Google no trae, una sola vez tras el alta. */}
+      <Stack.Screen name="completar-perfil" />
     </Stack>
   );
 }

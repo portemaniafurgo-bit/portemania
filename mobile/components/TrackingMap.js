@@ -175,15 +175,6 @@ export default function TrackingMap({
           <Ionicons name="locate" size={18} color={colors.primary} />
         </Pressable>
 
-        {/* Cuánto queda: lo primero que se mira. */}
-        {route ? (
-          <View style={styles.etaBadge}>
-            <Ionicons name="time-outline" size={13} color={colors.foreground} />
-            <Text style={styles.etaBadgeText}>
-              {route.minutes} min · {String(route.km).replace(".", ",")} km
-            </Text>
-          </View>
-        ) : null}
       </View>
 
       {freshness && !bare ? (
