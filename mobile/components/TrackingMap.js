@@ -73,7 +73,9 @@ export default function TrackingMap({
   // el mapa arrancaba en el mundo entero y había que buscar la furgoneta.
   useEffect(() => {
     if (camera || !center?.lat) return;
-    setCamera({ center: [center.lng, center.lat], zoom: 14, animate: false });
+    // Zoom 15: nivel de calle. Con 14 se veía el pueblo entero y había que
+    // acercar a mano cada vez.
+    setCamera({ center: [center.lng, center.lat], zoom: 15, animate: false });
   }, [camera, center?.lat, center?.lng]);
 
   if (!center?.lat) {

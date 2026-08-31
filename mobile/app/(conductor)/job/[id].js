@@ -504,24 +504,27 @@ export default function TrabajoActivo() {
           ) : null}
         </View>
 
-      {/* Mapa FIJO al 70 % de la pantalla, estilo Uber: sin nada encima (solo
-          el botón de centrar) y FUERA del scroll, para que el zoom y el
-          arrastre con los dedos no peleen con la lista. Todo lo demás va
-          debajo. */}
+      {/* Mapa estilo Uber: el 70 % DEL ESPACIO DISPONIBLE (flex 7/3), no de la
+          pantalla entera — con el 70 % de la pantalla, la cabecera, la banda y
+          la barra de pestañas sumaban más del 100 % y la hoja de abajo se
+          quedaba con CERO píxeles: ni se veía ni se podía hacer scroll (bug
+          real, 31/08/2026). Con flex, la hoja siempre conserva su 30 %. */}
       {!finished && (
-        <TrackingMap
-          driverLocation={myPos}
-          target={mapTarget}
-          height={Math.round(Dimensions.get("window").height * 0.7)}
-          self
-          bare
-          targetKind={goingToPickup ? "pickup" : "dropoff"}
-          onInfo={setEta}
-        />
+        <View style={{ flex: 7 }}>
+          <TrackingMap
+            driverLocation={myPos}
+            target={mapTarget}
+            height="100%"
+            self
+            bare
+            targetKind={goingToPickup ? "pickup" : "dropoff"}
+            onInfo={setEta}
+          />
+        </View>
       )}
 
       <ScrollView
-        style={{ flex: 1 }}
+        style={{ flex: finished ? 1 : 3 }}
         contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg, paddingBottom: bottomPad }}
       >
         {/* Tiempo restante y a dónde se va, debajo del mapa (antes flotaba) */}
