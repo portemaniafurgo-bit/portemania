@@ -187,8 +187,13 @@ export default function TrackingMap({
       >
         {/* Sin encuadre todavía no se pinta: montar el mapa sin coordenadas es
             justo lo que enseñaba el planisferio. */}
+        {/* dragPan EXPLÍCITO y no por defecto: en Android, el mapa solo pide
+            al ScrollView padre «no me interceptes los dedos» cuando
+            scrollEnabled es true, y ese valor nativo arranca en null — sin el
+            prop, cada pellizco se lo disputaba el scroll de la página y el
+            zoom iba a trompicones (bug real, 31/08/2026). */}
         {!initialFrame ? null : (
-        <Map style={{ flex: 1 }} mapStyle={OSM_STYLE} logo={false}>
+        <Map style={{ flex: 1 }} mapStyle={OSM_STYLE} logo={false} dragPan touchZoom>
           {/* La posición inicial va SOLO en initialViewState (se aplica una
               vez); después la cámara es del usuario y solo el botón «centrar»
               (o la llegada del segundo punto) la mueve, por ref. */}

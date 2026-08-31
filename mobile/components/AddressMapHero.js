@@ -28,7 +28,9 @@ export default function AddressMapHero({ origin, destination, height = 210 }) {
   const focus = origin || destination || ALBACETE;
   return (
     <View style={[styles.wrap, { height }]}>
-      <Map style={{ flex: 1 }} mapStyle={OSM_STYLE} logo={false}>
+      {/* dragPan explícito: sin él, el nativo nunca bloquea al scroll padre
+          y los gestos sobre el mapa van a trompicones (ver TrackingMap). */}
+      <Map style={{ flex: 1 }} mapStyle={OSM_STYLE} logo={false} dragPan touchZoom>
         <Camera center={[focus.lng, focus.lat]} zoom={origin || destination ? 14 : 12.5} />
         {origin ? (
           <Marker id="hero-origin" lngLat={[origin.lng, origin.lat]}>
