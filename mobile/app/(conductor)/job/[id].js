@@ -165,6 +165,20 @@ export default function TrabajoActivo() {
         let { granted } = await Location.getForegroundPermissionsAsync();
         if (!granted) granted = (await Location.requestForegroundPermissionsAsync()).granted;
         if (!granted || !active) return;
+        // La última posición CONOCIDA llega al instante (el fix del GPS tarda
+        // varios segundos): así el mapa encuadra la ruta entera desde el
+        // primer momento, no primero el destino y luego el reencuadre.
+        Location.getLastKnownPositionAsync().then(pos => {
+          if (active && pos) {
+            setMyPos(prev =>
+              prev || {
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                updatedAt: new Date(pos.timestamp || Date.now()).toISOString(),
+              },
+            );
+          }
+        }).catch(() => {});
         subscription = await Location.watchPositionAsync(
           { accuracy: Location.Accuracy.Balanced, timeInterval: 5000, distanceInterval: 20 },
           pos => {

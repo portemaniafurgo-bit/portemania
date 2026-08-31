@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { fetchRouteEta } from "../lib/eta";
@@ -15,6 +15,37 @@ import { colors, radius, spacing } from "../theme";
  * tiene— la FRESCURA de la posición: una posición congelada no puede
  * presentarse como si fuera actual.
  */
+/** Latitud → Y de Mercator (radianes), y su inversa. */
+const mercatorY = lat => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
+const mercatorLat = y => (Math.atan(Math.sinh(y)) * 180) / Math.PI;
+
+/**
+ * Centro y zoom que encuadran dos puntos con margen, calculados AQUÍ y no con
+ * el `bounds` nativo: en Android, el encuadre por bounds deja su padding
+ * pegado a la cámara para siempre (CameraStop.kt aplica builder.padding con
+ * el resultado del fit) y con ese padding el pinch-zoom muere — bug real,
+ * 31/08/2026, tres tardes de mapa. Con centro+zoom la cámara queda limpia y
+ * los gestos intactos.
+ *
+ * Tiles de 512 px: al zoom z el mundo mide 512·2^z px, tanto en los 360° de
+ * longitud como en los 2π de Y de Mercator.
+ */
+function fitTwoPoints(a, b, widthPx, heightPx) {
+  const PAD = 70; // margen visual alrededor de la ruta, metido en el cálculo
+  const usableW = Math.max(50, widthPx - PAD * 2);
+  const usableH = Math.max(50, heightPx - PAD * 2);
+
+  const lngSpan = Math.max(Math.abs(a.lng - b.lng), 0.0005);
+  const ySpan = Math.max(Math.abs(mercatorY(a.lat) - mercatorY(b.lat)), 0.00001);
+
+  const zoomW = Math.log2((360 * usableW) / (512 * lngSpan));
+  const zoomH = Math.log2((2 * Math.PI * usableH) / (512 * ySpan));
+  const zoom = Math.max(1, Math.min(zoomW, zoomH, 16));
+
+  const midY = (mercatorY(a.lat) + mercatorY(b.lat)) / 2;
+  return { center: [(a.lng + b.lng) / 2, mercatorLat(midY)], zoom };
+}
+
 const OSM_STYLE = {
   version: 8,
   sources: {
@@ -55,6 +86,9 @@ export default function TrackingMap({
    */
   const [initialFrame, setInitialFrame] = useState(null);
   const cameraRef = useRef(null);
+  // Ancho real del mapa (para el cálculo del zoom); mientras no se mida, el
+  // de la pantalla, que es su caso habitual.
+  const [mapWidth, setMapWidth] = useState(Dimensions.get("window").width);
 
   useEffect(() => {
     if (!driverLocation || !target?.lat) {
@@ -80,23 +114,13 @@ export default function TrackingMap({
   const center = driverLocation || target;
 
   /**
-   * Encuadre: con la furgoneta Y el destino, la cámara ABARCA LOS DOS (la ruta
-   * entera, de punta a punta); con uno solo, zoom de calle sobre ese punto.
-   * `bounds` en v11 es [oeste, sur, este, norte]; el margencito EPS evita una
-   * caja de tamaño cero (zoom infinito) cuando los dos puntos casi coinciden.
+   * Encuadre: con la furgoneta Y el destino, centro y zoom que abarcan los
+   * dos (la ruta entera, de punta a punta); con uno solo, zoom de calle sobre
+   * ese punto. SIEMPRE centro+zoom, nunca el bounds nativo: ver fitTwoPoints.
    */
-  const EPS = 0.0005;
   const frameFor = () => {
     if (driverLocation?.lat && target?.lat) {
-      return {
-        bounds: [
-          Math.min(driverLocation.lng, target.lng) - EPS,
-          Math.min(driverLocation.lat, target.lat) - EPS,
-          Math.max(driverLocation.lng, target.lng) + EPS,
-          Math.max(driverLocation.lat, target.lat) + EPS,
-        ],
-        padding: { top: 70, bottom: 70, left: 60, right: 60 },
-      };
+      return fitTwoPoints(driverLocation, target, mapWidth, height);
     }
     const point = driverLocation || target;
     return point?.lat ? { center: [point.lng, point.lat], zoom: 15 } : null;
@@ -105,11 +129,7 @@ export default function TrackingMap({
   /** Aplica un encuadre por ref: lo único que mueve la cámara tras montar. */
   const applyFrame = frame => {
     if (!frame || !cameraRef.current) return;
-    if (frame.bounds) {
-      cameraRef.current.fitBounds(frame.bounds, { padding: frame.padding, duration: 600 });
-    } else {
-      cameraRef.current.easeTo({ center: frame.center, zoom: frame.zoom, duration: 600 });
-    }
+    cameraRef.current.easeTo({ center: frame.center, zoom: frame.zoom, duration: 600 });
   };
 
   // Colocación inicial (una sola vez); y si el segundo punto llega DESPUÉS de
@@ -158,7 +178,13 @@ export default function TrackingMap({
 
   return (
     <View style={{ gap: spacing.sm }}>
-      <View style={[bare ? styles.mapBare : styles.map, { height }]}>
+      <View
+        style={[bare ? styles.mapBare : styles.map, { height }]}
+        onLayout={e => {
+          const w = e?.nativeEvent?.layout?.width;
+          if (w) setMapWidth(w);
+        }}
+      >
         {/* Sin encuadre todavía no se pinta: montar el mapa sin coordenadas es
             justo lo que enseñaba el planisferio. */}
         {!initialFrame ? null : (
