@@ -42,9 +42,19 @@ export default function TrackingMap({
   onInfo,
 }) {
   const [route, setRoute] = useState(null);
-  // Dónde mira la cámara. Solo se toca al recibir la primera posición y al
-  // pulsar «centrar»: el resto del tiempo el mapa es del usuario.
-  const [camera, setCamera] = useState(null);
+  /**
+   * Cámara, con la API REAL de MapLibre v11: la colocación inicial va en
+   * `initialViewState` (se aplica UNA vez al montar) y los reencuadres
+   * posteriores por REF (`fitBounds`/`easeTo`). Nada de props de stop en cada
+   * render: eso re-aplicaba la cámara mientras el usuario pellizcaba.
+   *
+   * (Antes se pasaban `centerCoordinate`/`zoomLevel`/`bounds:{ne,sw}`, que son
+   * de la v10: la v11 los ignoraba —por eso el mapa salía sin encuadrar— y el
+   * objeto de bounds mal formado tumbaba el lado nativo al hacer zoom,
+   * pantalla negra incluida. Bug real, 31/08/2026.)
+   */
+  const [initialFrame, setInitialFrame] = useState(null);
+  const cameraRef = useRef(null);
 
   useEffect(() => {
     if (!driverLocation || !target?.lat) {
@@ -69,42 +79,56 @@ export default function TrackingMap({
 
   const center = driverLocation || target;
 
-  // Primera colocación: en cuanto hay una posición, la cámara va ahí. Sin esto
-  // el mapa arrancaba en el mundo entero y había que buscar la furgoneta.
   /**
-   * Encuadre inicial y del botón «centrar»: si están la furgoneta Y el
-   * destino, la cámara ABARCA LOS DOS (se ve la ruta entera, de punta a
-   * punta); con uno solo, zoom de calle sobre ese punto.
+   * Encuadre: con la furgoneta Y el destino, la cámara ABARCA LOS DOS (la ruta
+   * entera, de punta a punta); con uno solo, zoom de calle sobre ese punto.
+   * `bounds` en v11 es [oeste, sur, este, norte]; el margencito EPS evita una
+   * caja de tamaño cero (zoom infinito) cuando los dos puntos casi coinciden.
    */
-  const frameFor = animate => {
+  const EPS = 0.0005;
+  const frameFor = () => {
     if (driverLocation?.lat && target?.lat) {
       return {
-        bounds: {
-          ne: [Math.max(driverLocation.lng, target.lng), Math.max(driverLocation.lat, target.lat)],
-          sw: [Math.min(driverLocation.lng, target.lng), Math.min(driverLocation.lat, target.lat)],
-          paddingTop: 70,
-          paddingBottom: 70,
-          paddingLeft: 60,
-          paddingRight: 60,
-        },
-        animate,
+        bounds: [
+          Math.min(driverLocation.lng, target.lng) - EPS,
+          Math.min(driverLocation.lat, target.lat) - EPS,
+          Math.max(driverLocation.lng, target.lng) + EPS,
+          Math.max(driverLocation.lat, target.lat) + EPS,
+        ],
+        padding: { top: 70, bottom: 70, left: 60, right: 60 },
       };
     }
     const point = driverLocation || target;
-    return point?.lat ? { center: [point.lng, point.lat], zoom: 15, animate } : null;
+    return point?.lat ? { center: [point.lng, point.lat], zoom: 15 } : null;
   };
 
-  // Colocación inicial; y cuando por fin están AMBOS puntos (el GPS suele
-  // llegar después que el destino), se reencuadra una única vez.
+  /** Aplica un encuadre por ref: lo único que mueve la cámara tras montar. */
+  const applyFrame = frame => {
+    if (!frame || !cameraRef.current) return;
+    if (frame.bounds) {
+      cameraRef.current.fitBounds(frame.bounds, { padding: frame.padding, duration: 600 });
+    } else {
+      cameraRef.current.easeTo({ center: frame.center, zoom: frame.zoom, duration: 600 });
+    }
+  };
+
+  // Colocación inicial (una sola vez); y si el segundo punto llega DESPUÉS de
+  // montar (el GPS suele tardar más que el destino), un único reencuadre.
   const framedBoth = useRef(false);
   useEffect(() => {
     const both = !!(driverLocation?.lat && target?.lat);
-    if (camera && (!both || framedBoth.current)) return;
-    const frame = frameFor(false);
-    if (!frame) return;
-    if (both) framedBoth.current = true;
-    setCamera(frame);
-  }, [camera, driverLocation?.lat, driverLocation?.lng, target?.lat, target?.lng]);
+    if (!initialFrame) {
+      const frame = frameFor();
+      if (!frame) return;
+      if (both) framedBoth.current = true;
+      setInitialFrame(frame);
+      return;
+    }
+    if (both && !framedBoth.current) {
+      framedBoth.current = true;
+      applyFrame(frameFor());
+    }
+  }, [initialFrame, driverLocation?.lat, driverLocation?.lng, target?.lat, target?.lng]);
 
   if (!center?.lat) {
     return (
@@ -135,20 +159,14 @@ export default function TrackingMap({
   return (
     <View style={{ gap: spacing.sm }}>
       <View style={[bare ? styles.mapBare : styles.map, { height }]}>
-        {/* Sin cámara todavía no se pinta: montar el mapa sin coordenadas es
+        {/* Sin encuadre todavía no se pinta: montar el mapa sin coordenadas es
             justo lo que enseñaba el planisferio. */}
-        {!camera ? null : (
+        {!initialFrame ? null : (
         <Map style={{ flex: 1 }} mapStyle={OSM_STYLE} logo={false}>
-          {/* La cámara SIEMPRE lleva coordenadas: al dejarlas en blanco entre
-              recentrados, el mapa se iba al mundo entero (bug real,
-              25/08/2026). Solo cambian al entrar y al pulsar «centrar», así que
-              entre medias se puede arrastrar y hacer zoom con los dedos. */}
-          <Camera
-            {...(camera.bounds
-              ? { bounds: camera.bounds }
-              : { centerCoordinate: camera.center, zoomLevel: camera.zoom })}
-            animationDuration={camera.animate ? 600 : 0}
-          />
+          {/* La posición inicial va SOLO en initialViewState (se aplica una
+              vez); después la cámara es del usuario y solo el botón «centrar»
+              (o la llegada del segundo punto) la mueve, por ref. */}
+          <Camera ref={cameraRef} initialViewState={initialFrame} />
 
           {routeLine.length > 1 ? (
             <GeoJSONSource
@@ -199,10 +217,7 @@ export default function TrackingMap({
         {/* Centrar: el mapa se mueve y se hace zoom con los dedos, así que
             hace falta una forma de volver a lo importante. */}
         <Pressable
-          onPress={() => {
-            const frame = frameFor(true);
-            if (frame) setCamera(frame);
-          }}
+          onPress={() => applyFrame(frameFor())}
           style={styles.recenterButton}
           hitSlop={8}
         >
