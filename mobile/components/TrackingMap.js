@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -71,12 +71,40 @@ export default function TrackingMap({
 
   // Primera colocación: en cuanto hay una posición, la cámara va ahí. Sin esto
   // el mapa arrancaba en el mundo entero y había que buscar la furgoneta.
+  /**
+   * Encuadre inicial y del botón «centrar»: si están la furgoneta Y el
+   * destino, la cámara ABARCA LOS DOS (se ve la ruta entera, de punta a
+   * punta); con uno solo, zoom de calle sobre ese punto.
+   */
+  const frameFor = animate => {
+    if (driverLocation?.lat && target?.lat) {
+      return {
+        bounds: {
+          ne: [Math.max(driverLocation.lng, target.lng), Math.max(driverLocation.lat, target.lat)],
+          sw: [Math.min(driverLocation.lng, target.lng), Math.min(driverLocation.lat, target.lat)],
+          paddingTop: 70,
+          paddingBottom: 70,
+          paddingLeft: 60,
+          paddingRight: 60,
+        },
+        animate,
+      };
+    }
+    const point = driverLocation || target;
+    return point?.lat ? { center: [point.lng, point.lat], zoom: 15, animate } : null;
+  };
+
+  // Colocación inicial; y cuando por fin están AMBOS puntos (el GPS suele
+  // llegar después que el destino), se reencuadra una única vez.
+  const framedBoth = useRef(false);
   useEffect(() => {
-    if (camera || !center?.lat) return;
-    // Zoom 15: nivel de calle. Con 14 se veía el pueblo entero y había que
-    // acercar a mano cada vez.
-    setCamera({ center: [center.lng, center.lat], zoom: 15, animate: false });
-  }, [camera, center?.lat, center?.lng]);
+    const both = !!(driverLocation?.lat && target?.lat);
+    if (camera && (!both || framedBoth.current)) return;
+    const frame = frameFor(false);
+    if (!frame) return;
+    if (both) framedBoth.current = true;
+    setCamera(frame);
+  }, [camera, driverLocation?.lat, driverLocation?.lng, target?.lat, target?.lng]);
 
   if (!center?.lat) {
     return (
@@ -116,8 +144,9 @@ export default function TrackingMap({
               25/08/2026). Solo cambian al entrar y al pulsar «centrar», así que
               entre medias se puede arrastrar y hacer zoom con los dedos. */}
           <Camera
-            centerCoordinate={camera.center}
-            zoomLevel={camera.zoom}
+            {...(camera.bounds
+              ? { bounds: camera.bounds }
+              : { centerCoordinate: camera.center, zoomLevel: camera.zoom })}
             animationDuration={camera.animate ? 600 : 0}
           />
 
@@ -170,7 +199,10 @@ export default function TrackingMap({
         {/* Centrar: el mapa se mueve y se hace zoom con los dedos, así que
             hace falta una forma de volver a lo importante. */}
         <Pressable
-          onPress={() => setCamera({ center: [center.lng, center.lat], zoom: 15, animate: true })}
+          onPress={() => {
+            const frame = frameFor(true);
+            if (frame) setCamera(frame);
+          }}
           style={styles.recenterButton}
           hitSlop={8}
         >

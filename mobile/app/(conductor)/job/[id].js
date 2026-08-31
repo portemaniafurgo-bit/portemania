@@ -475,10 +475,19 @@ export default function TrabajoActivo() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
-      <Stack.Screen options={{ headerShown: true, title: "Servicio" }} />
-      {/* Banda morada FIJA y compacta: barras de avance, servicio con el precio
-          pactado y el estado. No rueda con la lista. */}
+      {/* Sin cabecera nativa: robaba una franja entera sobre el mapa y el
+          «atrás» ya vive en la banda morada. */}
+      <Stack.Screen options={{ headerShown: false }} />
+      {/* UNA sola página que rueda entera (petición del 31/08): banda, mapa y
+          contenido en el mismo scroll — al subir, el mapa se va hacia arriba
+          con todo lo demás, en vez de quedarse fijo con la lista colándose por
+          debajo. */}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: bottomPad }}>
       <View style={styles.statusBand}>
+        {/* Sin cabecera nativa: el atrás vive en la propia banda */}
+        <Pressable onPress={() => router.back()} hitSlop={10} style={{ marginBottom: 6 }}>
+          <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+        </Pressable>
           {!finished && order.status !== "cancelled" ? (
             <View style={styles.stepper}>
               {["accepted", "in_transit", "picked_up", "delivered"].map((s, i) => {
@@ -504,29 +513,21 @@ export default function TrabajoActivo() {
           ) : null}
         </View>
 
-      {/* Mapa estilo Uber: el 70 % DEL ESPACIO DISPONIBLE (flex 7/3), no de la
-          pantalla entera — con el 70 % de la pantalla, la cabecera, la banda y
-          la barra de pestañas sumaban más del 100 % y la hoja de abajo se
-          quedaba con CERO píxeles: ni se veía ni se podía hacer scroll (bug
-          real, 31/08/2026). Con flex, la hoja siempre conserva su 30 %. */}
+      {/* Mapa grande dentro del scroll: al arrastrar SOBRE el mapa se mueve el
+          mapa; al arrastrar el contenido de abajo, sube la página entera. */}
       {!finished && (
-        <View style={{ flex: 7 }}>
-          <TrackingMap
-            driverLocation={myPos}
-            target={mapTarget}
-            height="100%"
-            self
-            bare
-            targetKind={goingToPickup ? "pickup" : "dropoff"}
-            onInfo={setEta}
-          />
-        </View>
+        <TrackingMap
+          driverLocation={myPos}
+          target={mapTarget}
+          height={Math.round(Dimensions.get("window").height * 0.62)}
+          self
+          bare
+          targetKind={goingToPickup ? "pickup" : "dropoff"}
+          onInfo={setEta}
+        />
       )}
 
-      <ScrollView
-        style={{ flex: finished ? 1 : 3 }}
-        contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg, paddingBottom: bottomPad }}
-      >
+      <View style={{ padding: spacing.screen, gap: spacing.lg }}>
         {/* Tiempo restante y a dónde se va, debajo del mapa (antes flotaba) */}
         {!finished && (
           <View style={styles.etaRow}>
@@ -897,8 +898,8 @@ export default function TrabajoActivo() {
             />
           </Card>
         )}
-
-              </ScrollView>
+      </View>
+      </ScrollView>
 
       {/* Chat flotante con el cliente */}
       <Modal visible={!!zoomPhoto} transparent animationType="fade" onRequestClose={() => setZoomPhoto(null)}>
