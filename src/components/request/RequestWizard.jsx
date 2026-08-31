@@ -15,6 +15,7 @@ import {
   Package,
   PenLine,
   Shield,
+  Smartphone,
   Square,
   Users,
 } from "lucide-react";
@@ -33,8 +34,9 @@ import PriceSummary from "@/components/request/PriceSummary";
 import ServicePicker from "@/components/request/ServicePicker";
 import StopsField from "@/components/request/StopsField";
 import { useRequestForm } from "@/components/request/useRequestForm";
+import GoogleIcon from "@/components/GoogleIcon";
 import { INCLUDED_HOURS } from "@/lib/pricing";
-import { readRequestDraft } from "@/lib/requestIntent";
+import { buildRequestHref, readRequestDraft } from "@/lib/requestIntent";
 import { ZONES } from "@/lib/zones";
 
 const TOTAL_STEPS = 4;
@@ -141,7 +143,6 @@ export default function RequestWizard({ authenticated = false, user = null }) {
           </h1>
           <p className="text-sm text-muted-foreground">
             Paso {step} de {TOTAL_STEPS}
-            {authenticated ? "" : " · Como invitado"}
           </p>
         </div>
       </div>
@@ -295,7 +296,7 @@ export default function RequestWizard({ authenticated = false, user = null }) {
               onRemove={f.removePhoto}
               hint={
                 service.needsPhotos
-                  ? "Al menos 1 foto. Ayuda al conductor a saber con qué se encuentra."
+                  ? "Sube fotos de TODO lo que hay que transportar y descríbelo entero: el conductor acepta por lo que ve aquí, y lo que no aparezca puede quedarse sin sitio en la furgoneta."
                   : "Opcional, pero ayuda al repartidor a identificar el paquete."
               }
             />
@@ -640,9 +641,10 @@ export default function RequestWizard({ authenticated = false, user = null }) {
             {authenticated ? (
               <div className="space-y-3">
                 <p className="text-sm font-medium text-foreground">Método de pago</p>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   {[
                     { key: "card", icon: CreditCard, label: "Tarjeta", hint: "Pago seguro online" },
+                    { key: "bizum", icon: Smartphone, label: "Bizum", hint: "Al móvil del conductor" },
                     { key: "cash", icon: Banknote, label: "Efectivo", hint: "Al conductor" },
                   ].map(({ key, icon: Icon, label, hint }) => (
                     <button
@@ -665,15 +667,33 @@ export default function RequestWizard({ authenticated = false, user = null }) {
                 </div>
               </div>
             ) : (
-              <div className="flex gap-3 p-4 rounded-xl bg-muted border border-border items-center">
-                <Banknote className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+              // Publicar exige cuenta (decisión 31/08): con Google, el pedido
+              // continúa en /new-request con lo que ya venía en la URL.
+              <div className="p-4 rounded-xl bg-muted border border-border space-y-3">
                 <p className="text-sm text-foreground">
-                  Pago en <strong>efectivo al conductor</strong>. Para pagar con tarjeta,{" "}
-                  <a href="/login-clientes" className="text-primary underline">
-                    inicia sesión
-                  </a>
-                  .
+                  Para publicar el pedido necesitas entrar con tu cuenta de Google. Un toque y
+                  sigues justo donde estás.
                 </p>
+                <Button
+                  variant="outline"
+                  className="w-full h-11 rounded-xl gap-2 bg-card"
+                  onClick={() =>
+                    base44.auth.loginWithProvider(
+                      "google",
+                      buildRequestHref("/new-request", {
+                        service: form.service,
+                        zone: f.destinationZoneKey,
+                        client_name: form.client_name,
+                        client_phone: form.client_phone,
+                        origin_address: form.origin_address,
+                        destination_address: form.destination_address,
+                      }),
+                    )
+                  }
+                >
+                  <GoogleIcon className="w-4 h-4" />
+                  Continuar con Google
+                </Button>
               </div>
             )}
           </motion.div>
@@ -729,7 +749,8 @@ export default function RequestWizard({ authenticated = false, user = null }) {
           ) : (
             <Button
               className="rounded-xl flex-1 h-12 gap-2"
-              disabled={loading || duplicateWarning || quote.total <= 0}
+              // Sin cuenta no se publica: el botón de Google de arriba es el camino.
+              disabled={!authenticated || loading || duplicateWarning || quote.total <= 0}
               onClick={() => handleSubmit(false)}
             >
               {loading ? (

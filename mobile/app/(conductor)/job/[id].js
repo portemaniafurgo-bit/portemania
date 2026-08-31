@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../lib/auth";
 import { fetchMyDriverProfile } from "../../../lib/driverProfile";
@@ -96,6 +99,16 @@ const CANCEL_REASONS = [
   "La carga no es la descrita",
   "Motivo personal",
 ];
+
+/** «1 h 25 min» / «40 min», para la duración del servicio terminado. */
+function durationLabel(fromIso, toIso) {
+  if (!fromIso || !toIso) return null;
+  const minutes = Math.round((new Date(toIso) - new Date(fromIso)) / 60000);
+  if (minutes < 1) return null;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h > 0 ? `${h} h ${String(m).padStart(2, "0")} min` : `${m} min`;
+}
 
 /** Dato suelto de la ficha de carga: etiqueta arriba, valor debajo. */
 function Detail({ label, value }) {
@@ -327,6 +340,69 @@ export default function TrabajoActivo() {
   const mapTarget =
     targetLat && targetLng ? { lat: targetLat, lng: targetLng } : fallbackTarget;
 
+  /**
+   * Fecha y hora REAL del servicio, puesta por el conductor al aceptar
+   * (petición de Renato, 31/08). Diálogos nativos encadenados, como al
+   * programar un pedido. El servidor guarda y el cron avisa a los dos cuando
+   * queda media hora.
+   */
+  const pickAgreedStart = () => {
+    const now = new Date();
+    const current = order.agreed_start_at ? new Date(order.agreed_start_at) : now;
+    DateTimePickerAndroid.open({
+      value: current,
+      mode: "date",
+      minimumDate: now,
+      onChange: (event, date) => {
+        if (event.type !== "set" || !date) return;
+        DateTimePickerAndroid.open({
+          value: current,
+          mode: "time",
+          is24Hour: true,
+          onChange: async (timeEvent, time) => {
+            if (timeEvent.type !== "set" || !time) return;
+            const chosen = new Date(date);
+            chosen.setHours(time.getHours(), time.getMinutes(), 0, 0);
+            setSaving(true);
+            setError("");
+            try {
+              const { data, error: err } = await supabase.rpc("set_agreed_start", {
+                p_request_id: id,
+                p_when: chosen.toISOString(),
+              });
+              if (err) throw err;
+              patchOrder(data);
+              supabase.functions
+                .invoke("send-push", { body: { mode: "service_scheduled", order_id: id } })
+                .catch(() => {});
+            } catch (err) {
+              setError("No se pudo guardar la fecha: " + (err.message || "error de conexión"));
+            } finally {
+              setSaving(false);
+            }
+          },
+        });
+      },
+    });
+  };
+
+  /** El conductor confirma que YA tiene el dinero (efectivo o Bizum). */
+  const confirmCollected = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      const { data, error: err } = await supabase.rpc("confirm_payment_collected", {
+        p_request_id: id,
+      });
+      if (err) throw err;
+      patchOrder(data);
+    } catch (err) {
+      setError("No se pudo confirmar el cobro: " + (err.message || "error de conexión"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const advance = async () => {
     if (!step) return;
     // Finalizar pasa SIEMPRE por la prueba de entrega (foto + firma). En los
@@ -393,6 +469,22 @@ export default function TrabajoActivo() {
       supabase.functions
         .invoke("send-push", { body: { mode: "status_changed", order_id: id } })
         .catch(() => {});
+
+      // Cobro en mano: ya no se marca pagado solo (decisión de Renato, 31/08).
+      // El conductor confirma que TIENE el dinero; si aún no, la pantalla de
+      // terminado deja el aviso y el botón para confirmarlo después.
+      if (["cash", "bizum"].includes(data.payment_method) && data.payment_status !== "paid") {
+        const amount = euro(data.final_price ?? data.estimated_price ?? 0, 2);
+        const via = data.payment_method === "bizum" ? "por Bizum" : "en efectivo";
+        Alert.alert(
+          "¿Has cobrado el servicio?",
+          `${amount} ${via}. Confírmalo solo si ya tienes el dinero: es lo que deja el recibo del cliente como PAGADO.`,
+          [
+            { text: "Todavía no", style: "cancel" },
+            { text: "Sí, cobrado", onPress: confirmCollected },
+          ],
+        );
+      }
     } catch (err) {
       setError("No se pudo registrar la entrega: " + (err.message || "error de conexión"));
     } finally {
@@ -597,6 +689,40 @@ export default function TrabajoActivo() {
           </View>
         )}
 
+        {/* CUÁNDO se hará de verdad: lo fija el conductor al aceptar, el
+            cliente lo ve en su pedido y a los dos les avisa el servidor cuando
+            queda media hora. */}
+        {order.status === "accepted" && (
+          <Pressable onPress={pickAgreedStart} disabled={saving}>
+            <Card
+              style={
+                order.agreed_start_at
+                  ? null
+                  : { borderColor: colors.primary, borderWidth: 1.5 }
+              }
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Title>
+                    {order.agreed_start_at
+                      ? format(new Date(order.agreed_start_at), "EEEE d 'de' MMMM 'a las' HH:mm", {
+                          locale: es,
+                        })
+                      : "¿Cuándo harás el servicio?"}
+                  </Title>
+                  <Caption>
+                    {order.agreed_start_at
+                      ? "Toca para cambiarla. El cliente ya la ve en su pedido."
+                      : "Pon la fecha real y la hora aproximada: el cliente la verá y a los dos os avisaremos cuando quede poco."}
+                  </Caption>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.subtle} />
+              </View>
+            </Card>
+          </Pressable>
+        )}
+
         {/* La otra punta del viaje, para tenerla a mano sin salir de aquí. */}
         <Card>
           <Caption>{goingToPickup ? "Después, entrega en" : "Se recogió en"}</Caption>
@@ -612,46 +738,58 @@ export default function TrabajoActivo() {
 
         {/* CÓMO SE COBRA. Sin esto, el conductor podía pedir en efectivo un
             servicio ya pagado con tarjeta, o marcharse sin cobrar. */}
-        {!finished && pactado != null && (
-          <View
-            style={[
-              styles.paymentBox,
-              order.payment_method === "cash"
-                ? { backgroundColor: colors.warningBg, borderColor: colors.warning }
-                : order.payment_status === "paid"
+        {!finished && pactado != null && (() => {
+          // Efectivo y Bizum se cobran EN MANO y los confirma el conductor;
+          // la tarjeta la confirma Stripe.
+          const inHand = ["cash", "bizum"].includes(order.payment_method);
+          const paid = order.payment_status === "paid";
+          return (
+            <View
+              style={[
+                styles.paymentBox,
+                paid
                   ? { backgroundColor: colors.successBg, borderColor: colors.success }
-                  : { backgroundColor: colors.primarySoft, borderColor: colors.primary },
-            ]}
-          >
-            <Ionicons
-              name={order.payment_method === "cash" ? "cash-outline" : "card-outline"}
-              size={20}
-              color={
-                order.payment_method === "cash"
-                  ? "#B27700"
-                  : order.payment_status === "paid"
-                    ? colors.success
-                    : colors.primary
-              }
-            />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text style={styles.paymentTitle}>
-                {order.payment_method === "cash"
-                  ? `Cobra ${euro(pactado, 2)} en efectivo`
-                  : order.payment_status === "paid"
-                    ? "Ya pagado con tarjeta"
-                    : "Pago con tarjeta pendiente"}
-              </Text>
-              <Caption>
-                {order.payment_method === "cash"
-                  ? "Al terminar el servicio, en mano."
-                  : order.payment_status === "paid"
-                    ? "No le cobres nada al cliente."
-                    : "Lo paga desde su app; no aceptes efectivo."}
-              </Caption>
+                  : inHand
+                    ? { backgroundColor: colors.warningBg, borderColor: colors.warning }
+                    : { backgroundColor: colors.primarySoft, borderColor: colors.primary },
+              ]}
+            >
+              <Ionicons
+                name={
+                  order.payment_method === "cash"
+                    ? "cash-outline"
+                    : order.payment_method === "bizum"
+                      ? "phone-portrait-outline"
+                      : "card-outline"
+                }
+                size={20}
+                color={paid ? colors.success : inHand ? "#B27700" : colors.primary}
+              />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.paymentTitle}>
+                  {paid
+                    ? inHand
+                      ? "Cobro ya confirmado"
+                      : "Ya pagado con tarjeta"
+                    : order.payment_method === "cash"
+                      ? `Cobra ${euro(pactado, 2)} en efectivo`
+                      : order.payment_method === "bizum"
+                        ? `Cobra ${euro(pactado, 2)} por Bizum`
+                        : "Pago con tarjeta pendiente"}
+                </Text>
+                <Caption>
+                  {paid
+                    ? "No le cobres nada más al cliente."
+                    : order.payment_method === "cash"
+                      ? "En mano. Al terminar te pediremos confirmar que lo tienes."
+                      : order.payment_method === "bizum"
+                        ? "A tu móvil, cuando acordéis: antes, durante o al terminar. Confírmalo cuando lo recibas."
+                        : "Lo paga desde su app; no aceptes efectivo."}
+                </Caption>
+              </View>
             </View>
-          </View>
-        )}
+          );
+        })()}
 
         {/* TODO lo que el cliente rellenó: es lo que el conductor necesita para
             saber si le cabe, si hay que subir y qué se lleva. */}
@@ -824,8 +962,32 @@ export default function TrabajoActivo() {
         {finished && (
           <Card style={{ backgroundColor: colors.successBg, borderColor: colors.success }}>
             <Body>Servicio terminado. Ya no se comparte tu posición.</Body>
+            {/* La duración medida del servicio: base para la conversación del
+                tiempo de cortesía (se mide antes de decidir si se cobra). */}
+            {order.status === "delivered" && durationLabel(order.pickup_time, order.delivery_time) ? (
+              <Caption>
+                Tiempo con la carga: {durationLabel(order.pickup_time, order.delivery_time)}
+                {durationLabel(order.accepted_at, order.delivery_time)
+                  ? ` · desde que aceptaste: ${durationLabel(order.accepted_at, order.delivery_time)}`
+                  : ""}
+              </Caption>
+            ) : null}
           </Card>
         )}
+
+        {/* Cobro en mano AÚN sin confirmar tras terminar: el aviso no se va
+            hasta que el conductor diga que tiene el dinero. */}
+        {order.status === "delivered" &&
+          ["cash", "bizum"].includes(order.payment_method) &&
+          order.payment_status !== "paid" && (
+            <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
+              <Title>Cobro pendiente de confirmar</Title>
+              <Caption>
+                {`${euro(pactado ?? 0, 2)} ${order.payment_method === "bizum" ? "por Bizum" : "en efectivo"}. Hasta que lo confirmes, el recibo del cliente sale como PENDIENTE.`}
+              </Caption>
+              <Button title="Ya lo he cobrado" loading={saving} onPress={confirmCollected} />
+            </Card>
+          )}
 
         {/* Opinión del conductor: la lee la empresa en el panel de admin. */}
         {order.status === "delivered" && !order.driver_feedback_tags && !order.driver_feedback_text && (

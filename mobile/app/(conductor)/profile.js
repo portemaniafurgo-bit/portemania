@@ -14,6 +14,7 @@ import {
   uploadPrivateDriverDocFromUri,
 } from "../../lib/driverProfile";
 import { rating1 } from "../../lib/money";
+import { SERVICE_LIST } from "../../lib/services";
 import { pickPhotos, takePhoto, uploadPhoto } from "../../lib/photos";
 import DeleteAccount from "../../components/DeleteAccount";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRow";
@@ -106,6 +107,33 @@ export default function PerfilConductor() {
     } finally {
       setSavingFiscal(false);
     }
+  };
+
+  /**
+   * Qué tipos de servicio quiere recibir (petición de Renato, 31/08). En BD,
+   * null = todos; aquí se traduce a "todos marcados". Se guarda al toque.
+   */
+  const activeServices = Array.isArray(profile?.service_keys) && profile.service_keys.length
+    ? profile.service_keys
+    : SERVICE_LIST.map(s => s.key);
+
+  const toggleService = async key => {
+    const on = activeServices.includes(key);
+    // El último no se apaga: sin ningún servicio marcado no llegaría NADA y
+    // parecería una avería, no un filtro.
+    if (on && activeServices.length === 1) return;
+    const next = on ? activeServices.filter(k => k !== key) : [...activeServices, key];
+    // Todos marcados vuelve a null: es el estado "sin filtro" de siempre.
+    const stored = next.length === SERVICE_LIST.length ? null : next;
+    const { error: err } = await supabase
+      .from("driver_profiles")
+      .update({ service_keys: stored })
+      .eq("id", profile.id);
+    if (err) {
+      setError("No se pudo guardar el filtro de servicios: " + err.message);
+      return;
+    }
+    setProfile(prev => ({ ...prev, service_keys: stored }));
   };
 
   // «4,9 · 212 servicios»: el número sale de sus entregas, no de una columna
@@ -313,6 +341,44 @@ export default function PerfilConductor() {
             />
           </Card>
 
+          {/* Filtro de servicios: qué tipos de trabajo quiere que le lleguen.
+              Afecta a la lista de ofertas Y a los avisos push. */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.overline}>Servicios que recibes</Text>
+            <Caption>
+              {activeServices.length === SERVICE_LIST.length
+                ? "Todos"
+                : `${activeServices.length} de ${SERVICE_LIST.length}`}
+            </Caption>
+          </View>
+          <Card>
+            <Caption>
+              Toca para apagar los que no te interesen: ni te aparecerán ni te sonarán. Al menos
+              uno tiene que quedar encendido.
+            </Caption>
+            <View style={styles.serviceChips}>
+              {SERVICE_LIST.map(s => {
+                const on = activeServices.includes(s.key);
+                return (
+                  <Pressable
+                    key={s.key}
+                    onPress={() => toggleService(s.key)}
+                    style={[styles.serviceChip, on && styles.serviceChipOn]}
+                  >
+                    <Ionicons
+                      name={on ? "checkmark-circle" : "ellipse-outline"}
+                      size={15}
+                      color={on ? colors.primary : colors.subtle}
+                    />
+                    <Text style={[styles.serviceChipText, on && { color: colors.primary }]}>
+                      {s.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Card>
+
           <View style={styles.sectionHeader}>
             <Text style={styles.overline}>Documentación</Text>
             <Caption>
@@ -428,6 +494,19 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   divider: { height: 1, backgroundColor: colors.border },
+  serviceChips: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
+  serviceChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  serviceChipOn: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  serviceChipText: { fontSize: 13, fontFamily: "DMSans_500Medium", color: colors.mutedForeground },
   docRow: { flexDirection: "row", alignItems: "center", gap: spacing.md, paddingVertical: spacing.md },
   docDot: { width: 8, height: 8, borderRadius: radius.full },
   docLabel: { fontSize: 14, fontFamily: "DMSans_500Medium", color: colors.foreground },

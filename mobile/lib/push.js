@@ -28,7 +28,15 @@ Notifications.setNotificationHandler({
       (["price_offer", "offer_accepted", "new_request"].includes(mode) && !prefs.offers) ||
       (["news", "promo"].includes(mode) && !prefs.news) ||
       // El chat va con el estado del pedido: los dos son el servicio en curso.
-      (["chat_message", "status_changed", "driver_assigned", "driver_arriving", "driver_cancelled"].includes(mode) &&
+      ([
+        "chat_message",
+        "status_changed",
+        "driver_assigned",
+        "driver_arriving",
+        "driver_cancelled",
+        "service_scheduled",
+        "service_reminder",
+      ].includes(mode) &&
         !prefs.status);
     return {
       shouldShowBanner: !muted,

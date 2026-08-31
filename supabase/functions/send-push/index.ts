@@ -103,6 +103,27 @@ function clientUserId(order: { created_by_id?: string | null }) {
   return order.created_by_id ? [order.created_by_id] : [];
 }
 
+/** Clave de servicio moderna del pedido (los antiguos usaban transport/package). */
+function serviceKeyOf(order: { service_type?: string | null; vehicle_type?: string | null }) {
+  const raw = order.service_type || "";
+  if (["porte", "mini_mudanza", "porte_tienda", "paquete"].includes(raw)) return raw;
+  if (raw === "transport") return order.vehicle_type === "large" ? "mini_mudanza" : "porte";
+  if (raw === "package") return "paquete";
+  return "porte";
+}
+
+/** «lunes 2 de septiembre a las 17:30», en hora peninsular. */
+function spanishWhen(iso: string) {
+  return new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(iso));
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -177,7 +198,7 @@ Deno.serve(async (req: Request) => {
   const { data: order } = await admin
     .from("transport_requests")
     .select(
-      "id, status, created_by_id, driver_id, client_name, service_type, vehicle_type, origin_address, destination_address, estimated_price, proposed_price",
+      "id, status, created_by_id, driver_id, client_name, service_type, vehicle_type, origin_address, destination_address, estimated_price, proposed_price, agreed_start_at",
     )
     .eq("id", body.order_id)
     .single();
@@ -193,17 +214,20 @@ Deno.serve(async (req: Request) => {
 
       const { data: drivers } = await admin
         .from("driver_profiles")
-        .select("email, vehicle_type, is_available")
+        .select("email, vehicle_type, is_available, service_keys")
         .eq("status", "verified");
 
       // Misma regla de reparto que send-email: los pedidos de furgón grande solo
       // a conductores con furgón grande. Y solo a quien está disponible: la app
-      // añade ese matiz que el email no tiene.
+      // añade ese matiz que el email no tiene. Además, si el conductor filtró
+      // qué servicios quiere (service_keys), se respeta.
+      const orderService = serviceKeyOf(order);
       const emails = (drivers || [])
-        .filter((d: { email?: string; vehicle_type?: string; is_available?: boolean }) =>
+        .filter((d: { email?: string; vehicle_type?: string; is_available?: boolean; service_keys?: string[] | null }) =>
           d.email &&
           d.is_available !== false &&
-          (order.vehicle_type !== "large" || d.vehicle_type === "large")
+          (order.vehicle_type !== "large" || d.vehicle_type === "large") &&
+          (!Array.isArray(d.service_keys) || d.service_keys.length === 0 || d.service_keys.includes(orderService))
         )
         .map((d: { email: string }) => d.email.toLowerCase());
       if (!emails.length) return json({ sent: 0, total: 0 });
@@ -250,6 +274,54 @@ Deno.serve(async (req: Request) => {
         await tokensFor(admin, [order.driver_id]),
         "Servicio aceptado",
         `Recogida en ${order.origin_address || "la dirección indicada"}.`,
+        data,
+        CHANNEL_STATUS,
+      );
+      return json({ sent: toClient.sent + toDriver.sent, total: toClient.total + toDriver.total });
+    }
+
+    // ---------- El conductor fija la fecha real del servicio → cliente ----------
+    case "service_scheduled": {
+      // La fecha se lee del pedido, no del llamante: si no hay, no hay aviso.
+      if (!order.agreed_start_at) return json({ sent: 0, skipped: "sin fecha acordada" });
+      const tokens = await tokensFor(admin, clientUserId(order));
+      return json(
+        await push(
+          admin,
+          tokens,
+          "Tu servicio ya tiene fecha",
+          `El conductor lo hará el ${spanishWhen(order.agreed_start_at)} (hora aproximada).`,
+          data,
+          CHANNEL_STATUS,
+        ),
+      );
+    }
+
+    // ---------- El servicio acordado está al caer → cliente Y conductor ----------
+    // Lo dispara el cron remind-upcoming-services (migración 0025).
+    case "service_reminder": {
+      if (!order.agreed_start_at || order.status !== "accepted") {
+        return json({ sent: 0, skipped: "sin fecha o ya en marcha" });
+      }
+      const hora = new Intl.DateTimeFormat("es-ES", {
+        timeZone: "Europe/Madrid",
+        hour: "2-digit",
+        minute: "2-digit",
+      }).format(new Date(order.agreed_start_at));
+
+      const toClient = await push(
+        admin,
+        await tokensFor(admin, clientUserId(order)),
+        "Tu servicio es en breve",
+        `El conductor llegará sobre las ${hora}. Ten la carga a punto.`,
+        data,
+        CHANNEL_STATUS,
+      );
+      const toDriver = await push(
+        admin,
+        await tokensFor(admin, order.driver_id ? [order.driver_id] : []),
+        "Servicio a las " + hora,
+        `Recogida en ${order.origin_address || "la dirección indicada"}. Ve saliendo.`,
         data,
         CHANNEL_STATUS,
       );

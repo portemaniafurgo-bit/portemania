@@ -1,21 +1,36 @@
 import { CreditCard, Banknote, CheckCircle2 } from "lucide-react";
 
 // Resuelve, para el CONDUCTOR, qué tiene que hacer con el cobro de un pedido:
-//  - efectivo            -> debe cobrar el importe al cliente
+//  - efectivo / Bizum    -> se cobra en mano y lo confirma el conductor
 //  - tarjeta + pagado    -> ya está pagado online, no cobra nada
 //  - tarjeta + pendiente -> lo paga online, no cobra en efectivo
 export function paymentInfo(order) {
   const isCard = order?.payment_method === "card";
+  const isBizum = order?.payment_method === "bizum";
   const isPaid = order?.payment_status === "paid";
   const amount = Number(order?.final_price ?? order?.estimated_price ?? 0);
 
   if (!isCard) {
+    if (isPaid) {
+      return {
+        collect: false,
+        icon: CheckCircle2,
+        title: "Cobro confirmado",
+        detail: isBizum ? "Bizum recibido — no cobres nada más" : "Efectivo cobrado y confirmado",
+        pillLabel: isBizum ? "Bizum · cobrado" : "Efectivo · cobrado",
+        banner: "bg-emerald-50 border-emerald-300 text-emerald-900",
+        iconWrap: "bg-emerald-500 text-white",
+        pill: "bg-emerald-100 text-emerald-700 border-emerald-300",
+      };
+    }
     return {
       collect: true,
       icon: Banknote,
-      title: "Cobra en efectivo",
-      detail: `Cobra ${amount.toFixed(2)}€ al cliente al finalizar`,
-      pillLabel: "Efectivo",
+      title: isBizum ? "Cobra por Bizum" : "Cobra en efectivo",
+      detail: isBizum
+        ? `${amount.toFixed(2)}€ a tu móvil: antes, durante o al finalizar`
+        : `Cobra ${amount.toFixed(2)}€ al cliente al finalizar`,
+      pillLabel: isBizum ? "Bizum" : "Efectivo",
       banner: "bg-amber-50 border-amber-300 text-amber-900",
       iconWrap: "bg-amber-500 text-white",
       pill: "bg-amber-100 text-amber-800 border-amber-300",

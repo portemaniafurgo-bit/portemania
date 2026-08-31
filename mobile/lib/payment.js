@@ -9,13 +9,14 @@ const KEY = "default_payment_v1";
 
 export const PAYMENT_LABELS = {
   card: "Tarjeta o Google Pay",
+  bizum: "Bizum al conductor",
   cash: "Efectivo al conductor",
 };
 
 export async function getDefaultPayment() {
   try {
     const value = await AsyncStorage.getItem(KEY);
-    return value === "card" || value === "cash" ? value : "cash";
+    return PAYMENT_LABELS[value] ? value : "cash";
   } catch {
     return "cash";
   }

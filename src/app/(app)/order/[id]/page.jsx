@@ -630,13 +630,44 @@ export default function OrderDetail() {
             </Button>
           )}
           {order.payment_method === "cash" && (
-            <div className="flex items-center gap-1.5 mt-2 text-xs text-muted-foreground">
+            <div className={`flex items-center gap-1.5 mt-2 text-xs ${
+              order.payment_status === "paid" ? "text-emerald-600 font-medium" : "text-muted-foreground"
+            }`}>
               <Banknote className="w-3.5 h-3.5" />
-              Pago en efectivo
+              {order.payment_status === "paid" ? "Pagado en efectivo" : "Pago en efectivo"}
+            </div>
+          )}
+          {order.payment_method === "bizum" && (
+            <div className={`flex items-center gap-1.5 mt-2 text-xs ${
+              order.payment_status === "paid" ? "text-emerald-600 font-medium" : "text-muted-foreground"
+            }`}>
+              <Banknote className="w-3.5 h-3.5" />
+              {order.payment_status === "paid"
+                ? "Pagado por Bizum"
+                : "Bizum al conductor · antes, durante o al final"}
             </div>
           )}
         </div>
       </div>
+
+      {/* Fecha REAL confirmada por el conductor al aceptar (distinta de la
+          programación del cliente). El servidor avisa cuando queda media hora. */}
+      {order.agreed_start_at && !["delivered", "cancelled"].includes(order.status) && (
+        <div className="bg-primary/5 rounded-2xl border border-primary/20 p-5">
+          <p className="font-heading font-semibold text-foreground">
+            {new Intl.DateTimeFormat("es-ES", {
+              weekday: "long",
+              day: "numeric",
+              month: "long",
+              hour: "2-digit",
+              minute: "2-digit",
+            }).format(new Date(order.agreed_start_at))}
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Fecha y hora aproximada confirmadas por el conductor. Te avisaremos cuando quede poco.
+          </p>
+        </div>
+      )}
 
       {/* Driver info */}
       {order.driver_name && (

@@ -60,6 +60,8 @@ export default function Ofertas() {
   const [myPos, setMyPos] = useState(null);
   // Negociación (canvas 1i/1j): mis contraofertas vivas y la hoja de contraofertar.
   const [myOffers, setMyOffers] = useState([]);
+  // Pedidos que este conductor descartó («No me interesa»): no vuelven a salir.
+  const [dismissed, setDismissed] = useState(new Set());
   // Oferta abierta en la hoja de detalle (antes de aceptar).
   const [detailFor, setDetailFor] = useState(null);
   const [counterFor, setCounterFor] = useState(null);
@@ -151,6 +153,22 @@ export default function Ofertas() {
     };
   }, []);
 
+  /** Quitar un pedido de MI lista (el pedido sigue vivo para los demás). */
+  const dismiss = async order => {
+    // Primero en pantalla, luego en BD: descartar tiene que sentirse inmediato.
+    setDismissed(prev => new Set(prev).add(order.id));
+    setOrders(prev => (prev || []).filter(o => o.id !== order.id));
+    await supabase
+      .from("driver_dismissals")
+      .insert({ driver_id: user.id, request_id: order.id })
+      .then(({ error: err }) => {
+        // Si ya estaba descartado (doble toque), el conflicto da igual.
+        if (err && !String(err.message || "").includes("duplicate")) {
+          setError("No se pudo ocultar la oferta: " + err.message);
+        }
+      });
+  };
+
   const load = useCallback(async () => {
     const prof = await fetchMyDriverProfile(user);
     setProfile(prof);
@@ -172,15 +190,30 @@ export default function Ofertas() {
       .limit(1);
     setActiveJob(mine?.[0] || null);
 
-    const { data } = await supabase
-      .from("transport_requests")
-      .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, origin_floors, origin_has_lift, destination_floors, destination_has_lift, estimated_price, proposed_price, needs_help, package_weight, distance_km, payment_method, cargo_description, cargo_photos, items_count, extra_hours, help_description, notes, created_date")
-      .eq("status", "pending")
-      .order("created_date", { ascending: false })
-      .limit(50);
+    // Mis descartes van en la misma tanda: la RLS ya limita a los míos.
+    const [{ data }, { data: dis }] = await Promise.all([
+      supabase
+        .from("transport_requests")
+        .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, origin_floors, origin_has_lift, destination_floors, destination_has_lift, estimated_price, proposed_price, needs_help, package_weight, distance_km, payment_method, cargo_description, cargo_photos, items_count, extra_hours, help_description, notes, created_date")
+        .eq("status", "pending")
+        .order("created_date", { ascending: false })
+        .limit(50),
+      supabase.from("driver_dismissals").select("request_id"),
+    ]);
 
+    const hidden = new Set((dis || []).map(d => d.request_id));
+    setDismissed(hidden);
+
+    // Filtro de tipos de servicio del perfil (null/vacío = todos), además de
+    // la regla de furgón grande y de los descartes.
+    const wanted = Array.isArray(prof.service_keys) && prof.service_keys.length
+      ? new Set(prof.service_keys)
+      : null;
     const visibles = (data || []).filter(
-      o => prof.vehicle_type === "large" || o.vehicle_type !== "large",
+      o =>
+        (prof.vehicle_type === "large" || o.vehicle_type !== "large") &&
+        !hidden.has(o.id) &&
+        (!wanted || wanted.has(serviceOf(o).key)),
     );
 
     // Si entra una oferta que no estaba y el conductor está disponible, se le
@@ -454,6 +487,7 @@ export default function Ofertas() {
                   setCounterMessage("");
                 }}
                 onDetails={() => setDetailFor(order.id)}
+                onDismiss={() => dismiss(order)}
                 onChangeCounter={() => {
                   setCounterFor(order.id);
                   setCounterAmount(Math.round(mine.amount));

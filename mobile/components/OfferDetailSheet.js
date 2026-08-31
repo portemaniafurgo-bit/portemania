@@ -93,7 +93,15 @@ export default function OfferDetailSheet({ order, service, visible, onClose, onA
             {order.distance_km ? (
               <Tag text={`${Number(order.distance_km).toFixed(1).replace(".", ",")} km de ruta`} />
             ) : null}
-            <Tag text={order.payment_method === "cash" ? "Cobro en efectivo" : "Pago con tarjeta"} />
+            <Tag
+              text={
+                order.payment_method === "cash"
+                  ? "Cobro en efectivo"
+                  : order.payment_method === "bizum"
+                    ? "Cobro por Bizum"
+                    : "Pago con tarjeta"
+              }
+            />
           </View>
 
           {order.needs_help && order.help_description ? (

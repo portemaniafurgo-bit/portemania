@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useLocalSearchParams } from "expo-router";
 import { format } from "date-fns";
+import { es } from "date-fns/locale";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../lib/auth";
 import { STATUS_FLOW, STATUS_LABELS, useDriverLocation, useOrder } from "../../../lib/orders";
@@ -575,12 +576,52 @@ export default function OrderDetail() {
           </Card>
         )}
 
+        {/* Fecha REAL puesta por el conductor al aceptar: distinta de la
+            programación del cliente. Cuando quede media hora avisamos. */}
+        {order.agreed_start_at && !delivered && order.status !== "cancelled" && !searching && (
+          <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Title>
+                  {format(new Date(order.agreed_start_at), "EEEE d 'de' MMMM 'a las' HH:mm", {
+                    locale: es,
+                  })}
+                </Title>
+                <Caption>
+                  Fecha y hora aproximada confirmadas por el conductor. Te avisaremos cuando quede
+                  poco.
+                </Caption>
+              </View>
+            </View>
+          </Card>
+        )}
+
         {/* Pago con tarjeta pendiente. En efectivo no aparece; y mientras se
             negocia tampoco: el importe aún no está pactado. */}
         {order.payment_method === "card" &&
           order.payment_status !== "paid" &&
           order.status !== "cancelled" &&
           !searching && <PayButton order={order} />}
+
+        {/* Bizum: no hay pasarela, es entre móviles. Se recuerda cómo va. */}
+        {order.payment_method === "bizum" &&
+          order.payment_status !== "paid" &&
+          order.status !== "cancelled" &&
+          !searching && (
+            <Card>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                <Ionicons name="phone-portrait-outline" size={20} color={colors.primary} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Title>Pago por Bizum al conductor</Title>
+                  <Caption>
+                    Se lo envías a su móvil cuando acordéis: antes, durante o al terminar. Él
+                    confirmará el cobro y tu recibo quedará como pagado.
+                  </Caption>
+                </View>
+              </View>
+            </Card>
+          )}
 
         {/* Canvas 1i — «¿Cómo ha ido con Javier?» */}
         {delivered && !order.client_rating && (

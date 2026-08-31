@@ -30,7 +30,9 @@ export const SERVICES = {
     hasHelp: true,
     hasExtraHours: false,
     hasStops: false,
-    hasAccess: false,
+    // Con ayuda, el porte también pregunta plantas y ascensor (petición de
+    // Renato, 31/08): compute_quote ya cobraba las plantas del porte con ayuda.
+    hasAccess: true,
     hasItemsLimit: true,
     maxItems: 6,
     hasWeights: false,

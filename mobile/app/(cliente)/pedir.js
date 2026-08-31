@@ -499,12 +499,14 @@ export default function Pedir() {
                 {photosMissing ? " · falta al menos 1" : ""}
               </Caption>
             </View>
-            {service.key === "mini_mudanza" ? (
-              <Caption>
-                Sube fotos de <Caption style={{ fontFamily: "DMSans_700Bold", color: colors.foreground }}>todo lo que
-                hay que transportar</Caption>: así el conductor sabe si le cabe y no hay sorpresas al llegar.
-              </Caption>
-            ) : null}
+            {/* En TODOS los servicios con fotos (petición de Renato, 31/08):
+                el conductor acepta por lo que ve, y lo que no salga en las
+                fotos puede acabar en discusión al llegar. */}
+            <Caption>
+              Sube fotos de <Caption style={{ fontFamily: "DMSans_700Bold", color: colors.foreground }}>TODO lo que
+              hay que transportar</Caption> y descríbelo entero: el conductor acepta el servicio por lo
+              que ve aquí. Lo que no aparezca puede quedarse sin sitio en la furgoneta.
+            </Caption>
             <View style={styles.photos}>
               {photos.map((url, i) => (
                 <Pressable key={url} onPress={() => removePhoto(i)}>
@@ -820,6 +822,12 @@ export default function Pedir() {
               description="Se paga desde la app, con el importe pactado"
               selected={form.payment_method === "card"}
               onPress={() => update("payment_method", "card")}
+            />
+            <Option
+              label="Bizum al conductor"
+              description="Antes, durante o al terminar: como acordéis"
+              selected={form.payment_method === "bizum"}
+              onPress={() => update("payment_method", "bizum")}
             />
             <Option
               label="Efectivo al conductor"

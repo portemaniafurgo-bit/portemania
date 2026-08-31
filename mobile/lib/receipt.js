@@ -115,7 +115,7 @@ function documentHtml({ order, service, issuer, billing, vatRate, number }) {
     </table>
 
     <p class="muted" style="margin-top:16px">
-      Forma de pago: ${order.payment_method === "card" ? "tarjeta" : "efectivo"}
+      Forma de pago: ${order.payment_method === "card" ? "tarjeta" : order.payment_method === "bizum" ? "Bizum" : "efectivo"}
       · <span class="badge">${paid ? "PAGADO" : "PENDIENTE"}</span>
     </p>
 

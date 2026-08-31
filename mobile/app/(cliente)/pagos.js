@@ -19,6 +19,12 @@ const OPTIONS = [
     hint: "Se cobra al terminar el servicio, con el importe pactado.",
   },
   {
+    key: "bizum",
+    icon: "phone-portrait-outline",
+    label: "Bizum al conductor",
+    hint: "Se lo envías a su móvil: antes, durante o al terminar, como acordéis.",
+  },
+  {
     key: "cash",
     icon: "cash-outline",
     label: "Efectivo al conductor",

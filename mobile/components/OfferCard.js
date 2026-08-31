@@ -26,6 +26,7 @@ export default function OfferCard({
   onCounter,
   onChangeCounter,
   onDetails,
+  onDismiss,
 }) {
   const originFloor = floorLabel(order.origin_floors, order.origin_has_lift);
   const destFloor = floorLabel(order.destination_floors, order.destination_has_lift);
@@ -92,7 +93,11 @@ export default function OfferCard({
         {/* Cómo se cobra, antes de aceptar: cambia si hay que llevar cambio. */}
         <View style={styles.tag}>
           <Text style={styles.tagText}>
-            {order.payment_method === "cash" ? "cobro en efectivo" : "pago con tarjeta"}
+            {order.payment_method === "cash"
+              ? "cobro en efectivo"
+              : order.payment_method === "bizum"
+                ? "cobro por Bizum"
+                : "pago con tarjeta"}
           </Text>
         </View>
       </View>
@@ -144,6 +149,14 @@ export default function OfferCard({
             />
           ) : null}
           </View>
+
+          {/* Descartar es PERSONAL: se lo quita de SU lista, el pedido sigue
+              vivo para el resto de conductores. */}
+          {onDismiss ? (
+            <Pressable onPress={onDismiss} hitSlop={6} style={{ paddingVertical: 4 }}>
+              <Text style={styles.dismissLink}>No me interesa · ocultar</Text>
+            </Pressable>
+          ) : null}
         </View>
       )}
     </View>
@@ -206,4 +219,10 @@ const styles = StyleSheet.create({
   },
   myOfferText: { fontSize: 13.5, fontFamily: "DMSans_700Bold", color: colors.primary },
   myOfferLink: { fontSize: 13, fontFamily: "DMSans_700Bold", color: colors.primary },
+  dismissLink: {
+    fontSize: 12.5,
+    fontFamily: "DMSans_500Medium",
+    color: colors.subtle,
+    textAlign: "center",
+  },
 });

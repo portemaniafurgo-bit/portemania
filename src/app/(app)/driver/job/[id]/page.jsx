@@ -189,6 +189,21 @@ export default function ActiveJob() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["job", id] }),
   });
 
+  // El conductor confirma que YA tiene el dinero (efectivo o Bizum): es lo
+  // que pone el recibo del cliente en PAGADO. El RPC valida que sea su
+  // servicio y un método que se cobra en mano.
+  const confirmCollectedMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc("confirm_payment_collected", {
+        p_request_id: id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["job", id] }),
+    onError: (err) =>
+      toast({ title: "No se pudo confirmar", description: err.message, variant: "destructive" }),
+  });
+
   const sendMutation = useMutation({
     mutationFn: (msg) => base44.entities.ChatMessage.create({
       request_id: id,
@@ -374,34 +389,69 @@ export default function ActiveJob() {
 
       {/* CÓMO SE COBRA. Igual que en la app: sin esto, el conductor podía pedir
           en efectivo un servicio ya pagado con tarjeta, o irse sin cobrar. */}
-      {!["delivered", "cancelled"].includes(job.status) && (
-        <div
-          className={`rounded-2xl border p-5 flex items-center gap-3 ${
-            job.payment_method === "cash"
-              ? "bg-amber-50 border-amber-200"
-              : job.payment_status === "paid"
+      {!["delivered", "cancelled"].includes(job.status) && (() => {
+        // Efectivo y Bizum se cobran EN MANO y los confirma el conductor;
+        // la tarjeta la confirma Stripe.
+        const inHand = ["cash", "bizum"].includes(job.payment_method);
+        const paid = job.payment_status === "paid";
+        const amount = Number(job.final_price || job.estimated_price || 0).toFixed(2);
+        return (
+          <div
+            className={`rounded-2xl border p-5 flex items-center gap-3 ${
+              paid
                 ? "bg-emerald-50 border-emerald-200"
-                : "bg-primary/5 border-primary/20"
-          }`}
-        >
-          <div className="flex-1">
-            <p className="font-heading font-semibold text-foreground">
-              {job.payment_method === "cash"
-                ? `Cobra ${Number(job.final_price || job.estimated_price || 0).toFixed(2)} € en efectivo`
-                : job.payment_status === "paid"
-                  ? "Ya pagado con tarjeta"
-                  : "Pago con tarjeta pendiente"}
-            </p>
-            <p className="text-sm text-muted-foreground">
-              {job.payment_method === "cash"
-                ? "Al terminar el servicio, en mano."
-                : job.payment_status === "paid"
-                  ? "No le cobres nada al cliente."
-                  : "Lo paga desde su app; no aceptes efectivo."}
-            </p>
+                : inHand
+                  ? "bg-amber-50 border-amber-200"
+                  : "bg-primary/5 border-primary/20"
+            }`}
+          >
+            <div className="flex-1">
+              <p className="font-heading font-semibold text-foreground">
+                {paid
+                  ? inHand
+                    ? "Cobro ya confirmado"
+                    : "Ya pagado con tarjeta"
+                  : job.payment_method === "cash"
+                    ? `Cobra ${amount} € en efectivo`
+                    : job.payment_method === "bizum"
+                      ? `Cobra ${amount} € por Bizum`
+                      : "Pago con tarjeta pendiente"}
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {paid
+                  ? "No le cobres nada más al cliente."
+                  : job.payment_method === "cash"
+                    ? "En mano. Al terminar, confirma que lo tienes."
+                    : job.payment_method === "bizum"
+                      ? "A tu móvil, cuando acordéis: antes, durante o al terminar. Confírmalo al recibirlo."
+                      : "Lo paga desde su app; no aceptes efectivo."}
+              </p>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
+
+      {/* Cobro en mano sin confirmar tras terminar: el recibo del cliente
+          sigue en PENDIENTE hasta que el conductor confirme (decisión 31/08). */}
+      {job.status === "delivered" &&
+        ["cash", "bizum"].includes(job.payment_method) &&
+        job.payment_status !== "paid" && (
+          <div className="rounded-2xl border p-5 bg-amber-50 border-amber-200 space-y-3">
+            <p className="font-heading font-semibold text-foreground">Cobro pendiente de confirmar</p>
+            <p className="text-sm text-muted-foreground">
+              {Number(job.final_price || job.estimated_price || 0).toFixed(2)} €{" "}
+              {job.payment_method === "bizum" ? "por Bizum" : "en efectivo"}. Hasta que lo
+              confirmes, el recibo del cliente sale como PENDIENTE.
+            </p>
+            <Button
+              className="rounded-xl"
+              disabled={confirmCollectedMutation.isPending}
+              onClick={() => confirmCollectedMutation.mutate()}
+            >
+              Ya lo he cobrado
+            </Button>
+          </div>
+        )}
 
       {/* Route */}
       <div className="bg-card rounded-2xl border border-border p-5 space-y-3">

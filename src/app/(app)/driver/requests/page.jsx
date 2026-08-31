@@ -39,13 +39,46 @@ export default function DriverRequests() {
     enabled: !!user?.id,
   });
 
+  // Pedidos que este conductor descartó («No me interesa»): fuera de SU lista,
+  // vivos para los demás. La RLS limita la consulta a los suyos.
+  const { data: dismissals = [] } = useQuery({
+    queryKey: ["driver-dismissals", user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from("driver_dismissals").select("request_id");
+      return data || [];
+    },
+    enabled: !!user?.id,
+  });
+  const dismissedIds = new Set(dismissals.map(d => d.request_id));
+
+  const dismissMutation = useMutation({
+    mutationFn: async (requestId) => {
+      const { error } = await supabase
+        .from("driver_dismissals")
+        .insert({ driver_id: user.id, request_id: requestId });
+      if (error && !String(error.message || "").includes("duplicate")) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["driver-dismissals"] }),
+  });
+
   // Reparto por tamaño: un furgón grande puede con todo; los pedidos de
   // furgoneta grande solo los ven conductores con furgón grande. Los envíos de
   // paquete (máx. 30 kg) los ve cualquier conductor: caben en cualquier vehículo.
   const myVehicle = profile?.vehicle_type;
+  // Filtro de tipos de servicio del perfil (null/vacío = todos), igual que la
+  // app y que los avisos push.
+  const wantedServices =
+    Array.isArray(profile?.service_keys) && profile.service_keys.length
+      ? new Set(profile.service_keys)
+      : null;
   // `vehicle_type` lo fija el servidor según el servicio: 'large' solo en mini
   // mudanza y null en los envíos de paquete, que caben en cualquier furgoneta.
-  const requests = allRequests.filter(r => r.vehicle_type !== "large" || myVehicle === "large");
+  const requests = allRequests.filter(
+    r =>
+      (r.vehicle_type !== "large" || myVehicle === "large") &&
+      !dismissedIds.has(r.id) &&
+      (!wantedServices || wantedServices.has(serviceOf(r).key)),
+  );
   const isUnavailable = profile?.is_available === false;
 
   // Mis contraofertas vivas, para mostrar "enviada, esperando respuesta".
@@ -334,6 +367,17 @@ export default function DriverRequests() {
                   <AppBanner text="¿Quieres contraofertar otro precio?" />
                 </div>
               )}
+
+              {/* Descartar es PERSONAL: se lo quita de SU lista, el pedido
+                  sigue vivo para el resto de conductores. */}
+              <button
+                type="button"
+                className="w-full mt-2 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                onClick={() => dismissMutation.mutate(req.id)}
+                disabled={dismissMutation.isPending}
+              >
+                No me interesa · ocultar
+              </button>
             </motion.div>
           ))}
         </div>
