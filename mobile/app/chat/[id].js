@@ -13,6 +13,8 @@ import ChatThread from "../../components/ChatThread";
  */
 export default function Chat() {
   const { id } = useLocalSearchParams();
-  const { role } = useAuth();
-  return <ChatThread orderId={id} partnerRole={role === "driver" ? "client" : "driver"} />;
+  // La CARA visible (mode), no el rol: un conductor pidiendo como cliente
+  // chatea con SU conductor, no con "el cliente".
+  const { mode } = useAuth();
+  return <ChatThread orderId={id} partnerRole={mode === "driver" ? "client" : "driver"} />;
 }

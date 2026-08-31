@@ -16,6 +16,11 @@ const AuthContext = createContext({
   session: null,
   user: null,
   role: null,
+  // Cara de la app que se muestra ("client" | "driver"). El ROL no cambia: un
+  // conductor puede pasarse a la cara de cliente para pedir un porte (como en
+  // Uber) y volver. Para un cliente, mode es siempre "client".
+  mode: null,
+  setMode: async () => {},
   loading: true,
   signOut: async () => {},
   refreshRole: async () => {},
@@ -30,6 +35,9 @@ AppState.addEventListener("change", (state) => {
 });
 
 const ROLE_CACHE_KEY = "cached_role_v1";
+// Cara elegida por un conductor ("client" para pedir como cliente). Local al
+// dispositivo: no toca profiles.role, que es cosa del negocio.
+const MODE_KEY = "active_mode_v1";
 
 async function fetchRole(userId) {
   if (!userId) return null;
@@ -64,6 +72,15 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
+  // null = aún leyendo la preferencia; sin esperarla, un conductor que dejó la
+  // app en modo cliente parpadearía por las pantallas de conductor al abrir.
+  const [facePref, setFacePref] = useState(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(MODE_KEY)
+      .then(v => setFacePref(v || "driver"))
+      .catch(() => setFacePref("driver"));
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -133,15 +150,36 @@ export function AuthProvider({ children }) {
     } catch {}
     setSession(null);
     setRole(null);
+    // La cara elegida es de ESTA cuenta: el siguiente que entre en el móvil
+    // empieza en la suya por defecto.
+    setFacePref("driver");
+    AsyncStorage.removeItem(MODE_KEY).catch(() => {});
   }, []);
 
   const refreshRole = useCallback(async () => {
     setRole(await fetchRole(session?.user?.id));
   }, [session?.user?.id]);
 
+  const setMode = useCallback(async m => {
+    setFacePref(m);
+    AsyncStorage.setItem(MODE_KEY, m).catch(() => {});
+  }, []);
+
+  // La cara efectiva: solo un conductor puede elegirla; para el resto es
+  // siempre cliente. null mientras falte el rol o la preferencia guardada.
+  const mode = !role
+    ? null
+    : role !== "driver"
+      ? "client"
+      : facePref === null
+        ? null
+        : facePref === "client"
+          ? "client"
+          : "driver";
+
   return (
     <AuthContext.Provider
-      value={{ session, user: session?.user ?? null, role, loading, signOut, refreshRole }}
+      value={{ session, user: session?.user ?? null, role, mode, setMode, loading, signOut, refreshRole }}
     >
       {children}
     </AuthContext.Provider>

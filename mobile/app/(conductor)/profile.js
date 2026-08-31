@@ -53,7 +53,7 @@ function ExpiryField({ initial, onSave }) {
 }
 
 export default function PerfilConductor() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, setMode } = useAuth();
   const router = useRouter();
   const [profile, setProfile] = useState(undefined);
   const [jobCount, setJobCount] = useState(null);
@@ -444,6 +444,17 @@ export default function PerfilConductor() {
       )}
 
       <SettingsGroup>
+        {/* Una app, dos caras (como Uber): el conductor puede pedir un porte
+            como cliente sin cerrar sesión. El rol no cambia, solo la cara. */}
+        <SettingsRow
+          icon="swap-horizontal-outline"
+          label="Usar como cliente"
+          hint="Pide un porte como cualquier cliente; vuelves desde tu perfil"
+          onPress={async () => {
+            await setMode("client");
+            router.replace("/(cliente)/pedir");
+          }}
+        />
         <SettingsRow
           icon="receipt-outline"
           label="Mis facturas"

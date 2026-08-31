@@ -28,7 +28,7 @@ import { colors } from "../theme";
  * de cliente.
  */
 function RootNavigation() {
-  const { session, role, loading } = useAuth();
+  const { session, role, mode, loading } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   // null = aún leyendo el flag; true/false = decidido. Sin esperar a saberlo,
@@ -43,7 +43,9 @@ function RootNavigation() {
     // momento en que el flag vuelve a importar.
   }, [segments[0], session]);
 
-  usePushNotifications({ userId: session?.user?.id, role });
+  // Los toques en las notificaciones navegan según la CARA visible (mode):
+  // un conductor en modo cliente debe aterrizar en pantallas de cliente.
+  usePushNotifications({ userId: session?.user?.id, role: mode });
 
   useEffect(() => {
     if (loading || onboardingSeen === null) return;
@@ -65,9 +67,10 @@ function RootNavigation() {
       return;
     }
 
-    // El rol tarda un instante más que la sesión: sin él no se puede decidir
-    // grupo, y mandar a todo el mundo a cliente haría parpadear al conductor.
-    if (!role) return;
+    // La cara (rol + preferencia guardada) tarda un instante más que la
+    // sesión: sin ella no se puede decidir grupo, y mandar a todo el mundo a
+    // cliente haría parpadear al conductor.
+    if (!mode) return;
 
     // El chat vive fuera de las pestañas, en el stack raíz: es suyo y no hay
     // que devolverlo a su grupo (con sesión ya iniciada, claro).
@@ -81,7 +84,7 @@ function RootNavigation() {
       return;
     }
     if (group === "completar-perfil") {
-      router.replace(role === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir");
+      router.replace(mode === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir");
       return;
     }
 
@@ -90,15 +93,15 @@ function RootNavigation() {
     // con sesión mirando "Abriendo ClicyVoy…" para siempre (bug real, 0.1.1).
     // El destino es una pantalla CON NOMBRE, nunca el grupo a secas: tres
     // rutas index disputándose "/" era lo que provocaba el "Unmatched Route".
-    const target = role === "driver" ? "(conductor)" : "(cliente)";
+    const target = mode === "driver" ? "(conductor)" : "(cliente)";
     if (group !== target) {
-      router.replace(role === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir");
+      router.replace(mode === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir");
     }
     // ⚠️ onboardingSeen DEBE estar en las dependencias: el guardia lo lee, y
     // sin escucharlo, cuando el flag se resolvía después que la sesión el
     // efecto no re-evaluaba — el onboarding se saltaba en silencio (bug real
     // reportado el 2026-08-18: "nunca vi las pantallas de introducción").
-  }, [session, role, loading, segments, router, onboardingSeen]);
+  }, [session, mode, loading, segments, router, onboardingSeen]);
 
   if (loading) return <Loading label="Abriendo ClicyVoy…" />;
 

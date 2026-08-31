@@ -19,7 +19,7 @@ import { colors, radius, spacing } from "../../theme";
  * cuenta al final — esta última la exige Google Play en toda app con registro.
  */
 export default function Perfil() {
-  const { user, role, signOut } = useAuth();
+  const { user, role, signOut, setMode } = useAuth();
   const router = useRouter();
   const [payment, setPayment] = useState("cash");
   // Resumen de los datos fiscales, para que se vea de un vistazo si hay factura.
@@ -79,6 +79,26 @@ export default function Perfil() {
       <NotificationPrefs />
 
       <SettingsGroup>
+        {/* Un conductor real que está pidiendo como cliente vuelve a su cara
+            desde aquí; quien no lo es puede empezar el alta en la web. */}
+        {role === "driver" ? (
+          <SettingsRow
+            icon="swap-horizontal-outline"
+            label="Volver al modo conductor"
+            hint="Tus ofertas y servicios de conductor"
+            onPress={async () => {
+              await setMode("driver");
+              router.replace("/(conductor)/ofertas");
+            }}
+          />
+        ) : (
+          <SettingsRow
+            icon="car-outline"
+            label="¿Quieres conducir con ClicyVoy?"
+            hint="Hazte conductor: date de alta en dos minutos"
+            onPress={() => Linking.openURL("https://clicyvoy.es/ser-conductor")}
+          />
+        )}
         <SettingsRow
           icon="card-outline"
           label="Métodos de pago"
