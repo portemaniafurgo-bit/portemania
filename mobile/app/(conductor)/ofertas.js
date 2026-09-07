@@ -413,10 +413,35 @@ export default function Ofertas() {
           </Card>
         )}
 
-        {profile && profile.status !== "verified" && (
+        {/* Cada estado con su mensaje: un perfil suspendido o rechazado no
+            está "pendiente", y decírselo así lo dejaba esperando algo que no
+            iba a llegar (petición 01/09). */}
+        {profile && profile.status === "suspended" && (
+          <Card style={{ backgroundColor: "#FEF2F2", borderColor: colors.destructive }}>
+            <Body style={{ fontFamily: "DMSans_700Bold", color: colors.destructive }}>
+              Tu perfil está suspendido.
+            </Body>
+            <Caption>
+              No recibirás ofertas mientras siga así. Ponte en contacto con ClicyVoy para
+              aclararlo: portemaniafurgo@gmail.com o el teléfono de la empresa.
+            </Caption>
+          </Card>
+        )}
+        {profile && profile.status === "rejected" && (
+          <Card style={{ backgroundColor: "#FEF2F2", borderColor: colors.destructive }}>
+            <Body style={{ fontFamily: "DMSans_700Bold", color: colors.destructive }}>
+              Tu alta no ha sido aprobada.
+            </Body>
+            <Caption>Si crees que es un error, escribe a ClicyVoy y lo revisamos contigo.</Caption>
+          </Card>
+        )}
+        {profile && !["verified", "suspended", "rejected"].includes(profile.status) && (
           <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
             <Body>Tu perfil está pendiente de verificación.</Body>
-            <Caption>En cuanto la empresa lo apruebe empezarás a ver pedidos.</Caption>
+            <Caption>
+              La empresa está revisando tu documentación. En cuanto la apruebe empezarás a ver
+              pedidos — también pasa por aquí cada vez que subes o sustituyes un documento.
+            </Caption>
           </Card>
         )}
 

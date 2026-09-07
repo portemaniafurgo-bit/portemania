@@ -165,7 +165,20 @@ export default function DriverDashboard() {
       {profile.status === "pending_verification" && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-800">
           <p className="font-semibold">Tu perfil está en revisión</p>
-          <p className="text-xs mt-1">El equipo de ClicyVoy está verificando tu documentación. Recibirás los trabajos disponibles en cuanto quede aprobado.</p>
+          <p className="text-xs mt-1">El equipo de ClicyVoy está verificando tu documentación. Recibirás los trabajos disponibles en cuanto quede aprobado — también pasa por aquí cada vez que subes o sustituyes un documento.</p>
+        </div>
+      )}
+      {/* Suspendido o rechazado: decirlo claro, no "en revisión" (petición 01/09). */}
+      {profile.status === "suspended" && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-800">
+          <p className="font-semibold">Tu perfil está suspendido</p>
+          <p className="text-xs mt-1">No recibirás trabajos mientras siga así. Ponte en contacto con ClicyVoy (portemaniafurgo@gmail.com) para aclararlo.</p>
+        </div>
+      )}
+      {profile.status === "rejected" && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-sm text-red-800">
+          <p className="font-semibold">Tu alta no ha sido aprobada</p>
+          <p className="text-xs mt-1">Si crees que es un error, escribe a ClicyVoy y lo revisamos contigo.</p>
         </div>
       )}
       {/* Header with availability toggle */}

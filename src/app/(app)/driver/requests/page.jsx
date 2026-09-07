@@ -262,6 +262,14 @@ export default function DriverRequests() {
           </p>
         </div>
       )}
+      {profile.status === "suspended" && (
+        <div className="flex items-start gap-2 text-sm bg-red-50 border border-red-200 rounded-2xl p-4">
+          <span className="flex-shrink-0">⛔</span>
+          <p className="text-red-800 font-medium">
+            Tu perfil está suspendido: no recibirás solicitudes hasta que ClicyVoy lo reactive. Contacta con la empresa para aclararlo.
+          </p>
+        </div>
+      )}
 
       {requests.length === 0 ? (
         <div className="text-center py-16">

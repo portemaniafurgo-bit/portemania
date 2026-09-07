@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import { supabase } from "../../lib/supabase";
 import { signInWithGoogle } from "../../lib/googleAuth";
 import GoogleButton from "../../components/GoogleButton";
-import { Button, Caption, ErrorText, Field, Heading, Screen } from "../../components/ui";
+import { Button, Caption, ErrorText, Field, Heading, PasswordField, Screen } from "../../components/ui";
 import { colors, spacing } from "../../theme";
 
 /**
@@ -74,12 +74,11 @@ export default function Login() {
           inputMode="email"
         />
         <View style={{ gap: spacing.xs }}>
-          <Field
+          <PasswordField
             label="Contraseña"
             value={password}
             onChangeText={setPassword}
             placeholder="Tu contraseña"
-            secureTextEntry
             autoComplete="current-password"
           />
           <Pressable onPress={() => router.push("/(auth)/forgot-password")}>

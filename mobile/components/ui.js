@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -136,6 +137,37 @@ export function Field({ label, error, ...props }) {
   );
 }
 
+/**
+ * Contraseña con el ojo para verla (petición de Renato, 01/09): escribir a
+ * ciegas en el móvil es la primera causa de "contraseña incorrecta".
+ */
+export function PasswordField({ label, error, style, ...props }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <View style={{ gap: spacing.xs }}>
+      {label ? <Text style={styles.fieldLabel}>{label}</Text> : null}
+      <View>
+        <TextInput
+          style={[styles.input, { paddingRight: 46 }, error && { borderColor: colors.destructive }, style]}
+          placeholderTextColor={colors.mutedForeground}
+          secureTextEntry={!visible}
+          autoCapitalize="none"
+          {...props}
+        />
+        <Pressable
+          onPress={() => setVisible(v => !v)}
+          hitSlop={10}
+          style={styles.eyeButton}
+          accessibilityLabel={visible ? "Ocultar contraseña" : "Mostrar contraseña"}
+        >
+          <Ionicons name={visible ? "eye-off-outline" : "eye-outline"} size={20} color={colors.mutedForeground} />
+        </Pressable>
+      </View>
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+    </View>
+  );
+}
+
 export function ErrorText({ children }) {
   if (!children) return null;
   return <Text style={styles.errorText}>{children}</Text>;
@@ -151,6 +183,15 @@ export function Loading({ label = "Cargando…" }) {
 }
 
 const styles = StyleSheet.create({
+  eyeButton: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    bottom: 0,
+    width: 46,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   screen: { flex: 1, backgroundColor: colors.background },
   screenContent: { padding: spacing.screen, gap: spacing.lg },
   card: {

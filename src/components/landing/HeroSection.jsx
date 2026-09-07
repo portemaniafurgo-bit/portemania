@@ -146,7 +146,7 @@ export default function HeroSection() {
           </motion.button>
 
           <p className="text-xs text-white/70 text-center">
-            Sin registro obligatorio · Precio cerrado antes de reservar
+            Entra con Google en un toque · Precio cerrado antes de reservar
           </p>
         </div>
       </div>

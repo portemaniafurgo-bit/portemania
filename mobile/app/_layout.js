@@ -18,6 +18,7 @@ import { StripeProvider } from "@stripe/stripe-react-native";
 import { STRIPE_MERCHANT_ID, STRIPE_PUBLISHABLE_KEY } from "../lib/payments";
 import { AuthProvider, useAuth } from "../lib/auth";
 import { usePushNotifications } from "../lib/push";
+import { DialogProvider } from "../components/Dialog";
 import { Loading } from "../components/ui";
 import { colors } from "../theme";
 
@@ -196,8 +197,12 @@ export default function RootLayout() {
           merchantIdentifier={STRIPE_MERCHANT_ID}
         >
           <AuthProvider>
-            <StatusBar style="dark" />
-            <RootNavigation />
+            {/* Diálogos propios en vez de Alert.alert: se cierran tocando
+                fuera o con atrás (petición 01/09). */}
+            <DialogProvider>
+              <StatusBar style="dark" />
+              <RootNavigation />
+            </DialogProvider>
           </AuthProvider>
         </StripeProvider>
       </SafeAreaProvider>

@@ -22,8 +22,9 @@ export default function PreciosVigentes() {
         </li>
         <li>
           <strong>Ayuda del conductor</strong> (cargar y descargar junto al cliente) —{" "}
-          {t.mudanza_help} €. Con ayuda contratada, cada planta sin ascensor añade{" "}
-          {t.mudanza_floor} € por dirección.
+          {t.porte_help ?? 12} € en porte y {t.mudanza_help} € en mini mudanza. Con ayuda
+          contratada, cada planta sin ascensor añade {t.porte_floor ?? t.mudanza_floor} € por
+          dirección en porte y {t.mudanza_floor} € en mini mudanza.
         </li>
         <li>
           <strong>Parada intermedia</strong> en mini mudanza — {t.mudanza_stop} € por parada.

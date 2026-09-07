@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Alert } from "react-native";
+import { useDialog } from "./Dialog";
 import { supabase } from "../lib/supabase";
 import { useAuth } from "../lib/auth";
 import { Button, Caption, Card, ErrorText, Title } from "./ui";
@@ -12,16 +12,17 @@ import { colors } from "../theme";
  */
 export default function DeleteAccount() {
   const { signOut } = useAuth();
+  const dialog = useDialog();
   const [open, setOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
 
   const confirm = () => {
-    Alert.alert(
-      "¿Borrar tu cuenta para siempre?",
-      "Se eliminarán tu perfil, tus datos personales y tu acceso. Los servicios ya realizados se conservan de forma anónima. Esta acción no se puede deshacer.",
-      [
-        { text: "Conservar mi cuenta", style: "cancel" },
+    dialog.show({
+      title: "¿Borrar tu cuenta para siempre?",
+      message:
+        "Se eliminarán tu perfil, tus datos personales y tu acceso. Los servicios ya realizados se conservan de forma anónima. Esta acción no se puede deshacer.",
+      actions: [
         {
           text: "Borrar definitivamente",
           style: "destructive",
@@ -38,8 +39,9 @@ export default function DeleteAccount() {
             await signOut(); // la sesión ya no vale: limpiar y volver al login
           },
         },
+        { text: "Conservar mi cuenta", style: "cancel" },
       ],
-    );
+    });
   };
 
   if (!open) {

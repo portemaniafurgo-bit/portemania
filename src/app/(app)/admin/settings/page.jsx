@@ -19,8 +19,13 @@ const GROUPS = [
   {
     title: "Porte",
     icon: Truck,
-    hint: "Servicio directo A→B a pie de calle, precio cerrado.",
-    fields: [{ key: "porte_base", label: "Precio del porte (€)", step: "1" }],
+    hint: "Servicio directo A→B, precio cerrado. Con ayuda contratada se cobran las plantas sin ascensor.",
+    fields: [
+      { key: "porte_base", label: "Precio del porte (€)", step: "1" },
+      { key: "porte_item", label: "Objeto adicional (€)", step: "1" },
+      { key: "porte_help", label: "Ayuda del conductor (€)", step: "1" },
+      { key: "porte_floor", label: "Planta sin ascensor (€)", step: "1" },
+    ],
   },
   {
     title: "Mini mudanza",

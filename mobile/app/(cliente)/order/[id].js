@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Dimensions,
   Image,
   Linking,
@@ -27,6 +26,8 @@ import ServiceIcon from "../../../components/ServiceIcon";
 import DriverCard from "../../../components/DriverCard";
 import { Ionicons } from "@expo/vector-icons";
 import ReportIncident from "../../../components/ReportIncident";
+import IncidentList from "../../../components/IncidentList";
+import { useDialog } from "../../../components/Dialog";
 import PayButton from "../../../components/PayButton";
 import TipCard from "../../../components/TipCard";
 import DeliveryProof from "../../../components/DeliveryProof";
@@ -72,6 +73,7 @@ export default function OrderDetail() {
   // Aire al final para que ningun boton quede bajo la barra del sistema.
   const bottomPad = useBottomPadding();
   const { id } = useLocalSearchParams();
+  const dialog = useDialog();
   const { user } = useAuth();
   const { order, driver, loading, patchOrder } = useOrder(id);
   const driverLocation = useDriverLocation(driver);
@@ -256,22 +258,23 @@ export default function OrderDetail() {
     const { data: fee } = await supabase.rpc("cancellation_fee_now", { p_request_id: id });
     const penalty = Number(fee) || 0;
 
-    Alert.alert(
-      "Cancelar el pedido",
-      penalty > 0
-        ? `${driverFirst} ya ha salido hacia la recogida, así que cancelar ahora tiene una penalización de ${euro(penalty)}.\n\n¿Seguro que quieres cancelar?`
-        : order.driver_id
-          ? "Todavía estás a tiempo: cancelar ahora no tiene ningún coste."
-          : "Se cancelará y dejaremos de buscar conductor. No tiene ningún coste.",
-      [
-        { text: "No, seguir", style: "cancel" },
+    dialog.show({
+      title: "Cancelar el pedido",
+      message:
+        penalty > 0
+          ? `${driverFirst} ya ha salido hacia la recogida, así que cancelar ahora tiene una penalización de ${euro(penalty)}.\n\n¿Seguro que quieres cancelar?`
+          : order.driver_id
+            ? "Todavía estás a tiempo: cancelar ahora no tiene ningún coste."
+            : "Se cancelará y dejaremos de buscar conductor. No tiene ningún coste.",
+      actions: [
         {
           text: penalty > 0 ? `Cancelar y pagar ${euro(penalty)}` : "Cancelar pedido",
           style: "destructive",
           onPress: () => reallyCancel(penalty),
         },
+        { text: "No, seguir", style: "cancel" },
       ],
-    );
+    });
   };
 
   const reallyCancel = async penalty => {
@@ -291,10 +294,10 @@ export default function OrderDetail() {
           .catch(() => {});
       }
       if (penalty > 0) {
-        Alert.alert(
-          "Pedido cancelado",
-          `Queda anotada la penalización de ${euro(penalty)}. Te la cobraremos con tu próximo servicio o te escribiremos para resolverlo.`,
-        );
+        dialog.show({
+          title: "Pedido cancelado",
+          message: `Queda anotada la penalización de ${euro(penalty)}. Te la cobraremos con tu próximo servicio o te escribiremos para resolverlo.`,
+        });
       }
     } catch (err) {
       setActionError(err.message || "No se pudo cancelar el pedido.");
@@ -771,6 +774,8 @@ export default function OrderDetail() {
         ) : null}
 
         <ReportIncident orderId={order.id} user={user} />
+        {/* Y lo que la empresa respondió: antes el cliente no lo veía nunca. */}
+        <IncidentList orderId={order.id} />
       </ScrollView>
 
       {/* Chat flotante: siempre a la vista, con no leidos y "escribiendo" */}

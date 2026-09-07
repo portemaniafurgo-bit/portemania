@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Alert, Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import { Image, Pressable, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -17,6 +17,7 @@ import { rating1 } from "../../lib/money";
 import { SERVICE_LIST } from "../../lib/services";
 import { pickPhotos, takePhoto, uploadPhoto } from "../../lib/photos";
 import DeleteAccount from "../../components/DeleteAccount";
+import { useDialog } from "../../components/Dialog";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRow";
 import { Body, Button, Caption, Card, ErrorText, Field, Heading, Loading, Screen, Title } from "../../components/ui";
 import { colors, radius, spacing } from "../../theme";
@@ -55,6 +56,7 @@ function ExpiryField({ initial, onSave }) {
 export default function PerfilConductor() {
   const { user, signOut, setMode } = useAuth();
   const router = useRouter();
+  const dialog = useDialog();
   const [profile, setProfile] = useState(undefined);
   const [jobCount, setJobCount] = useState(null);
   const [uploading, setUploading] = useState(null);
@@ -193,11 +195,15 @@ export default function PerfilConductor() {
   };
 
   const chooseSource = doc => {
-    Alert.alert(doc.label, "¿De dónde sale la imagen?", [
-      { text: "Cámara", onPress: () => uploadDoc(doc, "camera") },
-      { text: "Galería", onPress: () => uploadDoc(doc, "gallery") },
-      { text: "Cancelar", style: "cancel" },
-    ]);
+    dialog.show({
+      title: doc.label,
+      message: "¿De dónde sale la imagen?",
+      actions: [
+        { text: "Cámara", onPress: () => uploadDoc(doc, "camera") },
+        { text: "Galería", onPress: () => uploadDoc(doc, "gallery") },
+        { text: "Cancelar", style: "cancel" },
+      ],
+    });
   };
 
   if (profile === undefined) return <Loading label="Cargando tu perfil…" />;

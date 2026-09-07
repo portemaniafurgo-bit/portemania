@@ -280,7 +280,9 @@ export default function RequestWizard({ authenticated = false, user = null }) {
                 placeholder={
                   service.key === "paquete"
                     ? "Describe el contenido del paquete: qué es, tamaño aproximado, si es frágil…"
-                    : "Describe qué necesitas transportar: tipo de objetos, cantidad, peso aproximado…"
+                    : service.key === "porte_tienda"
+                      ? "Describe tu compra: qué es, en qué tienda se recoge y su tamaño aproximado. Un solo bulto."
+                      : "Describe qué necesitas transportar: tipo de objetos, cantidad, peso aproximado…"
                 }
                 value={form.cargo_description}
                 onChange={(e) => f.update("cargo_description", e.target.value)}
@@ -307,7 +309,11 @@ export default function RequestWizard({ authenticated = false, user = null }) {
                   <div>
                     <p className="text-sm font-medium text-foreground">
                       ¿Necesitas ayuda del conductor?{" "}
-                      <span className="text-primary font-semibold">+{tariffs.mudanza_help}€</span>
+                      {/* 12 € en porte, 39 € solo en mini mudanza: el precio que
+                          cobra el servidor (compute_quote) por servicio. */}
+                      <span className="text-primary font-semibold">
+                        +{service.key === "porte" ? (tariffs.porte_help ?? 12) : tariffs.mudanza_help}€
+                      </span>
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Para cargar y descargar contigo.

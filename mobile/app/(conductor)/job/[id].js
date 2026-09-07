@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Alert, Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Dimensions, Image, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
@@ -17,6 +17,7 @@ import { geocodeAlbacete } from "../../../lib/eta";
 import { setArrivalTarget, startTracking, stopTracking } from "../../../lib/tracking";
 import TrackingMap from "../../../components/TrackingMap";
 import ChatBubbleButton from "../../../components/ChatBubbleButton";
+import { useDialog } from "../../../components/Dialog";
 import { uploadProofPhoto, uploadSignature } from "../../../lib/deliveryProof";
 import { countUnread } from "../../../lib/unread";
 import { takePhoto } from "../../../lib/photos";
@@ -125,6 +126,7 @@ export default function TrabajoActivo() {
   const bottomPad = useBottomPadding();
   const { id } = useLocalSearchParams();
   const router = useRouter();
+  const dialog = useDialog();
   const { user } = useAuth();
   const { order, loading, patchOrder } = useOrder(id);
 
@@ -490,14 +492,14 @@ export default function TrabajoActivo() {
       if (["cash", "bizum"].includes(data.payment_method) && data.payment_status !== "paid") {
         const amount = euro(data.final_price ?? data.estimated_price ?? 0, 2);
         const via = data.payment_method === "bizum" ? "por Bizum" : "en efectivo";
-        Alert.alert(
-          "¿Has cobrado el servicio?",
-          `${amount} ${via}. Confírmalo solo si ya tienes el dinero: es lo que deja el recibo del cliente como PAGADO.`,
-          [
-            { text: "Todavía no", style: "cancel" },
+        dialog.show({
+          title: "¿Has cobrado el servicio?",
+          message: `${amount} ${via}. Confírmalo solo si ya tienes el dinero: es lo que deja el recibo del cliente como PAGADO.`,
+          actions: [
             { text: "Sí, cobrado", onPress: confirmCollected },
+            { text: "Todavía no", style: "cancel" },
           ],
-        );
+        });
       }
     } catch (err) {
       setError("No se pudo registrar la entrega: " + (err.message || "error de conexión"));
@@ -511,7 +513,10 @@ export default function TrabajoActivo() {
    * registrado, igual que en la web, y avisa a la empresa.
    */
   const cancel = (reason) => {
-    Alert.alert("Cancelar el servicio", `Motivo: ${reason}\n\nEl pedido volverá a la lista de pendientes.`, [
+    dialog.show({
+      title: "Cancelar el servicio",
+      message: `Motivo: ${reason}\n\nEl pedido volverá a la lista de pendientes.`,
+      actions: [
       { text: "Seguir con el servicio", style: "cancel" },
       {
         text: "Cancelar servicio",
@@ -543,26 +548,27 @@ export default function TrabajoActivo() {
           }
         },
       },
-    ]);
+      ],
+    });
   };
 
   /** Primero el motivo, luego la confirmación: cancelar es cosa seria y la
    *  empresa necesita saber por qué. Ya en camino, el aviso es más serio y el
    *  motivo se marca como imprevisto en viaje. */
   const chooseCancelReason = () => {
-    Alert.alert(
-      startedTrip ? "No puedo continuar" : "Cancelar el servicio",
-      startedTrip
+    dialog.show({
+      title: startedTrip ? "No puedo continuar" : "Cancelar el servicio",
+      message: startedTrip
         ? "Ya has salido hacia la recogida: esto se registra como imprevisto, se avisa a la empresa y el cliente vuelve a buscar conductor. ¿Qué ha pasado?"
         : "¿Qué ha pasado?",
-      [
+      actions: [
         ...CANCEL_REASONS.map(reason => ({
           text: reason,
           onPress: () => cancel(startedTrip ? `En viaje — ${reason}` : reason),
         })),
         { text: "Volver", style: "cancel" },
       ],
-    );
+    });
   };
 
   const navigate = (app) => {

@@ -24,6 +24,7 @@ import { Textarea } from "@/components/ui/textarea";
 import StatusBadge from "@/components/common/StatusBadge";
 import RatingVans from "@/components/common/RatingVans";
 import ReportIncidentButton from "@/components/common/ReportIncidentButton";
+import IncidentList from "@/components/common/IncidentList";
 import { vehicleData } from "@/components/common/VehicleCard";
 import { packageWeightLabel } from "@/lib/tariffs";
 import ServiceExtras from "@/components/common/ServiceExtras";
@@ -297,6 +298,14 @@ export default function OrderDetail() {
     },
   });
 
+  // Solo el DUEÑO del pedido valora y cancela: el conductor también puede abrir
+  // esta vista (p.ej. desde su historial) y sin este check podía puntuarse a sí
+  // mismo. Va ANTES de los efectos que lo usan: declararlo después del return
+  // temprano lo dejaba en zona muerta y la página entera reventaba con
+  // "Cannot access before initialization" (bug real, 01/09/2026: era el
+  // "no se puede cancelar" y el "error al abrir un servicio activo").
+  const isOwner = !!(user?.id && order?.created_by_id === user.id);
+
   // Cuánto costaría cancelar AHORA. Lo dice el servidor, y se enseña antes de
   // preguntar: nadie debe descubrir una penalización después de aceptarla.
   const [cancelFee, setCancelFee] = useState(0);
@@ -370,9 +379,6 @@ export default function OrderDetail() {
 
   const vehicle = vehicleData[order.vehicle_type];
   const isActive = !["delivered", "cancelled"].includes(order.status);
-  // Solo el DUEÑO del pedido valora: el conductor también puede abrir esta
-  // vista (p.ej. desde su historial) y sin este check podía puntuarse a sí mismo.
-  const isOwner = user?.id && order.created_by_id === user.id;
   const canRate = order.status === "delivered" && !order.client_rating && isOwner;
   const canPayNow = isOwner && order.payment_method === "card" && order.payment_status !== "paid" && order.status !== "cancelled";
 
@@ -763,6 +769,8 @@ export default function OrderDetail() {
       {isOwner && order.driver_id && (
         <ReportIncidentButton order={order} user={user} />
       )}
+      {/* Y lo que la empresa respondió: antes el cliente no lo veía nunca. */}
+      {isOwner && <IncidentList orderId={order.id} />}
 
       {/* Cancel — hasta que la carga esté recogida, como en la app */}
       {isOwner && ["pending", "scheduled", "accepted", "in_transit"].includes(order.status) && (

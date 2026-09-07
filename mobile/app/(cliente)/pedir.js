@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
@@ -19,6 +19,7 @@ import { Body, Button, Caption, ErrorText, Field, Heading, Overline, Title } fro
 import { Counter, Option, Toggle } from "../../components/wizard";
 import WizardChrome from "../../components/WizardChrome";
 import OfferControl from "../../components/OfferControl";
+import { useDialog } from "../../components/Dialog";
 import AddressField from "../../components/AddressField";
 import FloorPicker from "../../components/FloorPicker";
 import RecentAddresses from "../../components/RecentAddresses";
@@ -51,6 +52,7 @@ const PUBLISH_NOUN = {
 
 export default function Pedir() {
   const router = useRouter();
+  const dialog = useDialog();
   const { user } = useAuth();
   const wizard = useRequestForm({ user });
   const {
@@ -213,14 +215,14 @@ export default function Pedir() {
       const duplicate = await findRecentDuplicate();
       if (duplicate) {
         setSending(false);
-        Alert.alert(
-          "Ya tienes un pedido en marcha",
-          "Hace menos de 30 minutos creaste otro pedido que sigue activo. ¿Quieres crear este también?",
-          [
-            { text: "Ver mis pedidos", onPress: () => router.push("/(cliente)/orders") },
+        dialog.show({
+          title: "Ya tienes un pedido en marcha",
+          message: "Hace menos de 30 minutos creaste otro pedido que sigue activo. ¿Quieres crear este también?",
+          actions: [
             { text: "Crear igualmente", style: "destructive", onPress: () => reallyCreate() },
+            { text: "Ver mis pedidos", style: "cancel", onPress: () => router.push("/(cliente)/orders") },
           ],
-        );
+        });
         return;
       }
       await reallyCreate();
@@ -244,11 +246,15 @@ export default function Pedir() {
   };
 
   const addPhoto = () =>
-    Alert.alert("Añadir foto", "¿De dónde sale la imagen?", [
-      { text: "Cámara", onPress: async () => addSafely(takePhoto) },
-      { text: "Galería", onPress: async () => addSafely(pickPhotos) },
-      { text: "Cancelar", style: "cancel" },
-    ]);
+    dialog.show({
+      title: "Añadir foto",
+      message: "¿De dónde sale la imagen?",
+      actions: [
+        { text: "Cámara", onPress: async () => addSafely(takePhoto) },
+        { text: "Galería", onPress: async () => addSafely(pickPhotos) },
+        { text: "Cancelar", style: "cancel" },
+      ],
+    });
 
   const addSafely = async picker => {
     try {
@@ -259,17 +265,21 @@ export default function Pedir() {
   };
 
   const discard = () =>
-    Alert.alert("Empezar de cero", "Se borrará lo que has escrito en este pedido.", [
-      { text: "Seguir aquí", style: "cancel" },
-      {
-        text: "Empezar de cero",
-        style: "destructive",
-        onPress: async () => {
-          await clearDraft();
-          setStep(0);
+    dialog.show({
+      title: "Empezar de cero",
+      message: "Se borrará lo que has escrito en este pedido.",
+      actions: [
+        {
+          text: "Empezar de cero",
+          style: "destructive",
+          onPress: async () => {
+            await clearDraft();
+            setStep(0);
+          },
         },
-      },
-    ]);
+        { text: "Seguir aquí", style: "cancel" },
+      ],
+    });
 
   const STEPS = [
     { title: "¿Qué necesitas\nmover hoy?", cta: `Continuar con ${service.label}`, ctaIcon: "arrow-forward" },
@@ -448,8 +458,14 @@ export default function Pedir() {
           <View style={styles.note}>
             <Ionicons name="flash-outline" size={16} color={colors.primary} />
             <Text style={styles.noteText}>
-              Precios actualizados hoy. En el paso 4 podrás{" "}
-              <Text style={styles.noteStrong}>proponer tu propio precio</Text>.
+              Precios actualizados hoy.
+              {["porte", "mini_mudanza"].includes(service.key) ? (
+                <>
+                  {" "}En el paso 4 podrás <Text style={styles.noteStrong}>proponer tu propio precio</Text>.
+                </>
+              ) : (
+                " Precio cerrado, sin sorpresas."
+              )}
             </Text>
           </View>
         </>
@@ -474,7 +490,9 @@ export default function Pedir() {
               placeholder={
                 service.key === "mini_mudanza"
                   ? "Ej.: sofá de 3 plazas, mesa de comedor con 4 sillas, armario de 2 puertas y 6 cajas medianas"
-                  : "Ej.: un sofá de 2 plazas y dos cajas medianas"
+                  : service.key === "porte_tienda"
+                    ? "Ej.: un colchón de 150 comprado en Conforama, para recoger en tienda"
+                    : "Ej.: un sofá de 2 plazas y dos cajas medianas"
               }
               multiline
               numberOfLines={3}
@@ -484,7 +502,9 @@ export default function Pedir() {
             <Caption>
               {service.key === "mini_mudanza"
                 ? "Cuanto más detallada, mejor: el conductor necesita saber qué hay que mover para llevar la furgoneta y el tiempo adecuados."
-                : "Di qué hay que mover y cuántas piezas son."}
+                : service.key === "porte_tienda"
+                  ? "Este servicio lleva UN solo bulto: di qué es, en qué tienda se recoge y su tamaño. Si son varios bultos, contrata un porte."
+                  : "Di qué hay que mover y cuántas piezas son."}
             </Caption>
           </View>
 
@@ -709,7 +729,9 @@ export default function Pedir() {
             </View>
           </View>
 
-          {quote.total > 0 && (
+          {/* Negociar el precio solo en porte y mini mudanza: la compra en
+              tienda y el paquete van a precio cerrado (petición 01/09). */}
+          {quote.total > 0 && ["porte", "mini_mudanza"].includes(service.key) && (
             <>
               <OfferControl
                 value={offer ?? quote.total}

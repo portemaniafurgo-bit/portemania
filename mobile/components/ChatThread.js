@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -11,6 +10,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useDialog } from "./Dialog";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { format, isToday, isYesterday } from "date-fns";
@@ -48,6 +48,7 @@ function messageDate(message) {
 
 export default function ChatThread({ orderId, partnerRole }) {
   const router = useRouter();
+  const dialog = useDialog();
   const { user, role } = useAuth();
   const { order, driver, loading } = useOrder(orderId);
   const { messages, send, sending } = useChat(orderId, { user, role });
@@ -90,11 +91,15 @@ export default function ChatThread({ orderId, partnerRole }) {
   };
 
   const sendPhoto = () => {
-    Alert.alert("Enviar foto", "¿De dónde sale la imagen?", [
-      { text: "Cámara", onPress: () => attach(takePhoto) },
-      { text: "Galería", onPress: () => attach(() => pickPhotos(1)) },
-      { text: "Cancelar", style: "cancel" },
-    ]);
+    dialog.show({
+      title: "Enviar foto",
+      message: "¿De dónde sale la imagen?",
+      actions: [
+        { text: "Cámara", onPress: () => attach(takePhoto) },
+        { text: "Galería", onPress: () => attach(() => pickPhotos(1)) },
+        { text: "Cancelar", style: "cancel" },
+      ],
+    });
   };
 
   const attach = async picker => {
