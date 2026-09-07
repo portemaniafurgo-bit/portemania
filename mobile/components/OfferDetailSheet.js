@@ -93,6 +93,11 @@ export default function OfferDetailSheet({ order, service, visible, onClose, onA
             {order.distance_km ? (
               <Tag text={`${Number(order.distance_km).toFixed(1).replace(".", ",")} km de ruta`} />
             ) : null}
+            {order.scheduled_at ? (
+              <Tag
+                text={`📅 Programado: ${new Date(order.scheduled_at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`}
+              />
+            ) : null}
             <Tag
               text={
                 order.payment_method === "cash"

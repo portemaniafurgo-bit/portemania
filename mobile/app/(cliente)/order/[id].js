@@ -277,6 +277,31 @@ export default function OrderDetail() {
     });
   };
 
+  /**
+   * El conductor propone fecha; aquí el cliente la acepta o la rechaza.
+   * Sin su OK el conductor no puede salir antes de la hora programada.
+   */
+  const [respondingSchedule, setRespondingSchedule] = useState(false);
+  const respondSchedule = async accept => {
+    setRespondingSchedule(true);
+    setActionError("");
+    try {
+      const { data, error } = await supabase.rpc("respond_agreed_start", {
+        p_request_id: id,
+        p_accept: accept,
+      });
+      if (error) throw error;
+      patchOrder(data);
+      supabase.functions
+        .invoke("send-push", { body: { mode: "schedule_response", order_id: id } })
+        .catch(() => {});
+    } catch (err) {
+      setActionError(err.message || "No se pudo responder a la fecha.");
+    } finally {
+      setRespondingSchedule(false);
+    }
+  };
+
   const reallyCancel = async penalty => {
     setActionError("");
     try {
@@ -581,24 +606,58 @@ export default function OrderDetail() {
 
         {/* Fecha REAL puesta por el conductor al aceptar: distinta de la
             programación del cliente. Cuando quede media hora avisamos. */}
-        {order.agreed_start_at && !delivered && order.status !== "cancelled" && !searching && (
-          <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-              <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-              <View style={{ flex: 1, gap: 2 }}>
-                <Title>
-                  {format(new Date(order.agreed_start_at), "EEEE d 'de' MMMM 'a las' HH:mm", {
-                    locale: es,
-                  })}
-                </Title>
+        {order.agreed_start_at && !delivered && order.status !== "cancelled" && !searching && (() => {
+          const when = format(new Date(order.agreed_start_at), "EEEE d 'de' MMMM 'a las' HH:mm", {
+            locale: es,
+          });
+          const status = order.agreed_start_status;
+          if (status === "proposed") {
+            return (
+              <Card style={{ borderColor: colors.primary, borderWidth: 1.5 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                  <Ionicons name="calendar-outline" size={20} color={colors.primary} />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Title>El conductor propone: {when}</Title>
+                    <Caption>
+                      Hora aproximada. Si te viene bien, confírmala; si no, te propondrá otra.
+                    </Caption>
+                  </View>
+                </View>
+                <Button
+                  title="Aceptar la fecha"
+                  loading={respondingSchedule}
+                  onPress={() => respondSchedule(true)}
+                />
+                <Button
+                  title="No me viene bien"
+                  variant="plain"
+                  disabled={respondingSchedule}
+                  onPress={() => respondSchedule(false)}
+                />
+              </Card>
+            );
+          }
+          if (status === "rejected") {
+            return (
+              <Card>
                 <Caption>
-                  Fecha y hora aproximada confirmadas por el conductor. Te avisaremos cuando quede
-                  poco.
+                  Rechazaste la fecha del {when}. El conductor te propondrá otra; te avisaremos.
                 </Caption>
+              </Card>
+            );
+          }
+          return (
+            <Card style={{ backgroundColor: colors.successBg, borderColor: colors.success }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                <Ionicons name="checkmark-circle-outline" size={20} color={colors.success} />
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Title>{when}</Title>
+                  <Caption>Fecha confirmada. Te avisaremos cuando quede poco.</Caption>
+                </View>
               </View>
-            </View>
-          </Card>
-        )}
+            </Card>
+          );
+        })()}
 
         {/* Pago con tarjeta pendiente. En efectivo no aparece; y mientras se
             negocia tampoco: el importe aún no está pactado. */}

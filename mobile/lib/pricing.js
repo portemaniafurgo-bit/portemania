@@ -21,6 +21,7 @@ export const DEFAULT_TARIFFS = {
   mudanza_extra_hour: 25,
   mudanza_help: 39,
   mudanza_floor: 15, // por planta sin ascensor, solo con ayuda contratada
+  porte_floor: 7, // la planta del porte es más barata que la de la mudanza (01/09)
   mudanza_stop: 20, // por parada intermedia
   // Portes para tiendas / compra en tienda — con subida y firma
   tienda_base: 30,
@@ -67,7 +68,7 @@ export const VILLARROBLEDO_WEIGHTS = [
     key: "vr_light",
     label: "Hasta 10 kg",
     priceKey: "pkg_villarrobledo",
-    hint: "Recogida en Albacete y entrega en Villarrobledo en 24 h",
+    hint: "Entre Albacete y Villarrobledo, en cualquier sentido · entrega en 24 h",
   },
 ];
 
@@ -125,13 +126,15 @@ export function quoteRequest(tariffs, form = {}) {
   };
 
   if (service.key === "paquete") {
-    const zone = form.destination_zone === "villarrobledo" ? "villarrobledo" : "albacete";
+    // Villarrobledo en cualquiera de los dos sentidos (01/09): mismo precio.
+    const intercity = form.destination_zone === "villarrobledo" || form.origin_zone === "villarrobledo";
+    const zone = intercity ? "villarrobledo" : "albacete";
     const bracket = weightsForZone(zone).find((w) => w.key === form.package_weight);
     if (!bracket) return { total: 0, lines: [] };
     add(
       "base",
-      zone === "villarrobledo"
-        ? `Envío a Villarrobledo · ${bracket.label}`
+      intercity
+        ? `Envío Albacete ↔ Villarrobledo · ${bracket.label}`
         : `Envío de paquete · ${bracket.label}`,
       num(tariffs, bracket.priceKey),
     );
@@ -161,7 +164,7 @@ export function quoteRequest(tariffs, form = {}) {
     );
 
     if (service.hasAccess) {
-      const floorPrice = num(tariffs, "mudanza_floor");
+      const floorPrice = num(tariffs, service.key === "porte" ? "porte_floor" : "mudanza_floor");
       const origin = billableFloors(form.origin_has_lift, form.origin_floors);
       const destination = billableFloors(form.destination_has_lift, form.destination_floors);
       add("origin_floors", `Recogida sin ascensor · ${plural(origin, "planta")}`, origin * floorPrice);

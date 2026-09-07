@@ -288,9 +288,16 @@ export default function DriverRequests() {
               className="bg-card rounded-2xl border border-border p-5 hover:shadow-md transition-shadow"
             >
               <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-2xl">{serviceOf(req).emoji}</span>
                   <span className="font-semibold text-foreground">{serviceSummary(req)}</span>
+                  {/* Programado por el cliente: el servidor no deja salir antes
+                      de esa hora sin su autorización. */}
+                  {req.scheduled_at && (
+                    <span className="text-xs font-medium text-primary bg-primary/10 rounded-full px-2.5 py-1">
+                      📅 {new Date(req.scheduled_at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  )}
                 </div>
                 {req.proposed_price != null ? (
                   <div className="text-right">

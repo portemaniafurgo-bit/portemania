@@ -1,5 +1,6 @@
 ﻿import "./globals.css";
 import Providers from "@/components/Providers";
+import CookieConsent from "@/components/common/CookieConsent";
 
 export const metadata = {
   metadataBase: new URL("https://clicyvoy.es"),
@@ -58,6 +59,9 @@ export default function RootLayout({ children }) {
       </head>
       <body>
         <Providers>{children}</Providers>
+        {/* Google Analytics 4, solo con consentimiento y solo si hay
+            NEXT_PUBLIC_GA_MEASUREMENT_ID configurado (Vercel → Environment). */}
+        <CookieConsent />
       </body>
     </html>
   );

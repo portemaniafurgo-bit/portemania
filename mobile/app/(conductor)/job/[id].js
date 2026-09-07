@@ -362,6 +362,27 @@ export default function TrabajoActivo() {
    * programar un pedido. El servidor guarda y el cron avisa a los dos cuando
    * queda media hora.
    */
+  /** Manda la PROPUESTA al servidor; el cliente la acepta o rechaza. */
+  const proposeStart = async chosen => {
+    setSaving(true);
+    setError("");
+    try {
+      const { data, error: err } = await supabase.rpc("set_agreed_start", {
+        p_request_id: id,
+        p_when: chosen.toISOString(),
+      });
+      if (err) throw err;
+      patchOrder(data);
+      supabase.functions
+        .invoke("send-push", { body: { mode: "service_scheduled", order_id: id } })
+        .catch(() => {});
+    } catch (err) {
+      setError("No se pudo proponer la fecha: " + (err.message || "error de conexión"));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const pickAgreedStart = () => {
     const now = new Date();
     const current = order.agreed_start_at ? new Date(order.agreed_start_at) : now;
@@ -375,27 +396,11 @@ export default function TrabajoActivo() {
           value: current,
           mode: "time",
           is24Hour: true,
-          onChange: async (timeEvent, time) => {
+          onChange: (timeEvent, time) => {
             if (timeEvent.type !== "set" || !time) return;
             const chosen = new Date(date);
             chosen.setHours(time.getHours(), time.getMinutes(), 0, 0);
-            setSaving(true);
-            setError("");
-            try {
-              const { data, error: err } = await supabase.rpc("set_agreed_start", {
-                p_request_id: id,
-                p_when: chosen.toISOString(),
-              });
-              if (err) throw err;
-              patchOrder(data);
-              supabase.functions
-                .invoke("send-push", { body: { mode: "service_scheduled", order_id: id } })
-                .catch(() => {});
-            } catch (err) {
-              setError("No se pudo guardar la fecha: " + (err.message || "error de conexión"));
-            } finally {
-              setSaving(false);
-            }
+            proposeStart(chosen);
           },
         });
       },
@@ -445,7 +450,22 @@ export default function TrabajoActivo() {
         .invoke("send-push", { body: { mode: "status_changed", order_id: id } })
         .catch(() => {});
     } catch (err) {
-      setError("No se pudo actualizar el estado: " + (err.message || "error de conexión"));
+      const message = err.message || "error de conexión";
+      // El servidor no deja salir antes de la hora acordada/programada sin el
+      // OK del cliente: se le ofrece proponer la nueva hora ahí mismo.
+      if (message.includes("autorización del cliente")) {
+        dialog.show({
+          title: "Todavía no es la hora",
+          message,
+          actions: [
+            { text: "Proponer hacerlo ahora", onPress: () => proposeStart(new Date()) },
+            { text: "Proponer otra hora", onPress: pickAgreedStart },
+            { text: "Volver", style: "cancel" },
+          ],
+        });
+      } else {
+        setError("No se pudo actualizar el estado: " + message);
+      }
     } finally {
       setSaving(false);
     }
@@ -712,36 +732,71 @@ export default function TrabajoActivo() {
         {/* CUÁNDO se hará de verdad: lo fija el conductor al aceptar, el
             cliente lo ve en su pedido y a los dos les avisa el servidor cuando
             queda media hora. */}
-        {order.status === "accepted" && (
-          <Pressable onPress={pickAgreedStart} disabled={saving}>
-            <Card
-              style={
-                order.agreed_start_at
-                  ? null
-                  : { borderColor: colors.primary, borderWidth: 1.5 }
-              }
-            >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
-                <Ionicons name="calendar-outline" size={20} color={colors.primary} />
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Title>
-                    {order.agreed_start_at
-                      ? format(new Date(order.agreed_start_at), "EEEE d 'de' MMMM 'a las' HH:mm", {
-                          locale: es,
-                        })
-                      : "¿Cuándo harás el servicio?"}
-                  </Title>
-                  <Caption>
-                    {order.agreed_start_at
-                      ? "Toca para cambiarla. El cliente ya la ve en su pedido."
-                      : "Pon la fecha real y la hora aproximada: el cliente la verá y a los dos os avisaremos cuando quede poco."}
-                  </Caption>
-                </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.subtle} />
+        {/* Programado por el CLIENTE: es su hora. Adelantarla exige su OK. */}
+        {order.status === "accepted" && order.scheduled_at && (
+          <Card style={{ backgroundColor: colors.primarySoft, borderColor: colors.primary }}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+              <Ionicons name="time-outline" size={20} color={colors.primary} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <Title>
+                  Programado para el{" "}
+                  {format(new Date(order.scheduled_at), "EEEE d 'de' MMMM 'a las' HH:mm", { locale: es })}
+                </Title>
+                <Caption>
+                  Lo eligió el cliente. Si quieres hacerlo antes, propón la hora abajo y espera a
+                  que lo autorice.
+                </Caption>
               </View>
-            </Card>
-          </Pressable>
+            </View>
+          </Card>
         )}
+
+        {order.status === "accepted" && (() => {
+          const status = order.agreed_start_status;
+          const when = order.agreed_start_at
+            ? format(new Date(order.agreed_start_at), "EEEE d 'de' MMMM 'a las' HH:mm", { locale: es })
+            : null;
+          const title = !when
+            ? "¿Cuándo harás el servicio?"
+            : status === "confirmed"
+              ? `Confirmado: ${when}`
+              : status === "rejected"
+                ? `No aceptado: ${when}`
+                : `Propuesto: ${when}`;
+          const caption = !when
+            ? "Propón fecha y hora aproximada: el cliente la confirma y a los dos os avisaremos cuando quede poco."
+            : status === "confirmed"
+              ? "El cliente ha aceptado. Toca si necesitas proponer otra."
+              : status === "rejected"
+                ? "Al cliente no le viene bien. Toca para proponer otra hora."
+                : "Esperando la respuesta del cliente. Toca para cambiarla.";
+          const tone =
+            status === "confirmed"
+              ? { backgroundColor: colors.successBg, borderColor: colors.success }
+              : status === "rejected"
+                ? { backgroundColor: colors.warningBg, borderColor: colors.warning }
+                : when
+                  ? null
+                  : { borderColor: colors.primary, borderWidth: 1.5 };
+          return (
+            <Pressable onPress={pickAgreedStart} disabled={saving}>
+              <Card style={tone}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: spacing.md }}>
+                  <Ionicons
+                    name={status === "confirmed" ? "checkmark-circle-outline" : "calendar-outline"}
+                    size={20}
+                    color={status === "confirmed" ? colors.success : colors.primary}
+                  />
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <Title>{title}</Title>
+                    <Caption>{caption}</Caption>
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.subtle} />
+                </View>
+              </Card>
+            </Pressable>
+          );
+        })()}
 
         {/* La otra punta del viaje, para tenerla a mano sin salir de aquí. */}
         <Card>

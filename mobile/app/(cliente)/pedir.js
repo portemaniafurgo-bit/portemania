@@ -60,7 +60,8 @@ export default function Pedir() {
     update,
     service,
     setService,
-    setZone,
+    setRoute,
+    originZoneKey,
     tariffs,
     quote,
     photos,
@@ -350,7 +351,7 @@ export default function Pedir() {
           <AddressField
             label="Recogida"
             value={form.origin_address}
-            zone="albacete"
+            zone={originZoneKey}
             error={form.origin_address ? addressErrors.origin : ""}
             onChange={(text, picked) => {
               update("origin_address", text);
@@ -370,20 +371,27 @@ export default function Pedir() {
             }}
           />
 
+          {/* Solo Albacete y Villarrobledo, en cualquier sentido (01/09). */}
           {service.hasZones && (
             <View style={{ gap: spacing.sm }}>
-              <Overline>ZONA DE ENTREGA</Overline>
+              <Overline>RUTA DEL ENVÍO</Overline>
               <Option
-                label="Albacete capital"
-                description="Entrega el mismo día"
-                selected={destinationZoneKey === "albacete"}
-                onPress={() => setZone("albacete")}
+                label="Dentro de Albacete"
+                description="Hasta 30 kg · entrega el mismo día"
+                selected={originZoneKey === "albacete" && destinationZoneKey === "albacete"}
+                onPress={() => setRoute("albacete", "albacete")}
               />
               <Option
-                label="Villarrobledo"
+                label="Albacete → Villarrobledo"
                 description="Hasta 10 kg · entrega en 24 h"
-                selected={destinationZoneKey === "villarrobledo"}
-                onPress={() => setZone("villarrobledo")}
+                selected={originZoneKey === "albacete" && destinationZoneKey === "villarrobledo"}
+                onPress={() => setRoute("albacete", "villarrobledo")}
+              />
+              <Option
+                label="Villarrobledo → Albacete"
+                description="Hasta 10 kg · entrega en 24 h"
+                selected={originZoneKey === "villarrobledo" && destinationZoneKey === "albacete"}
+                onPress={() => setRoute("villarrobledo", "albacete")}
               />
             </View>
           )}
@@ -578,7 +586,7 @@ export default function Pedir() {
                           update("origin_has_lift", hasLift);
                           update("origin_floors", floors);
                         }}
-                        pricePerFloor={tariffs.mudanza_floor}
+                        pricePerFloor={service.key === "porte" ? (tariffs.porte_floor ?? 7) : tariffs.mudanza_floor}
                       />
                       <FloorPicker
                         label="PLANTA ENTREGA"
@@ -588,7 +596,7 @@ export default function Pedir() {
                           update("destination_has_lift", hasLift);
                           update("destination_floors", floors);
                         }}
-                        pricePerFloor={tariffs.mudanza_floor}
+                        pricePerFloor={service.key === "porte" ? (tariffs.porte_floor ?? 7) : tariffs.mudanza_floor}
                       />
                     </>
                   )}

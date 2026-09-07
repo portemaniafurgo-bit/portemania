@@ -13,6 +13,7 @@ import { euro } from "../../lib/money";
 import { stopTracking } from "../../lib/tracking";
 import { alertNewOffer } from "../../lib/sound";
 import EmptyState from "../../components/EmptyState";
+import { useDialog } from "../../components/Dialog";
 import OfferCard from "../../components/OfferCard";
 import OfferDetailSheet from "../../components/OfferDetailSheet";
 import { Body, Button, Caption, Card, ErrorText, Heading, Loading, Title } from "../../components/ui";
@@ -49,6 +50,7 @@ export default function Ofertas() {
   const bottomPad = useBottomPadding();
   const { user } = useAuth();
   const router = useRouter();
+  const dialog = useDialog();
   const [profile, setProfile] = useState(null);
   const [orders, setOrders] = useState(null);
   const [activeJob, setActiveJob] = useState(null);
@@ -153,6 +155,27 @@ export default function Ofertas() {
     };
   }, []);
 
+  /**
+   * Un pedido PROGRAMADO se acepta con los ojos abiertos (petición 01/09):
+   * la fecha es la del cliente, y el servidor no deja salir antes sin su
+   * autorización. Se avisa antes de aceptar, no después.
+   */
+  const withScheduleWarning = (order, accept) => {
+    const when = order.scheduled_at ? new Date(order.scheduled_at) : null;
+    if (!when || when.getTime() < Date.now() + 30 * 60 * 1000) {
+      accept();
+      return;
+    }
+    dialog.show({
+      title: "Servicio programado",
+      message: `El cliente lo ha programado para el ${when.toLocaleString("es-ES", { weekday: "long", day: "numeric", month: "long", hour: "2-digit", minute: "2-digit" })}. Al aceptar te comprometes a esa hora; para adelantarla necesitarás que el cliente lo autorice desde la app.`,
+      actions: [
+        { text: "Aceptar para esa fecha", onPress: accept },
+        { text: "Volver", style: "cancel" },
+      ],
+    });
+  };
+
   /** Quitar un pedido de MI lista (el pedido sigue vivo para los demás). */
   const dismiss = async order => {
     // Primero en pantalla, luego en BD: descartar tiene que sentirse inmediato.
@@ -194,7 +217,7 @@ export default function Ofertas() {
     const [{ data }, { data: dis }] = await Promise.all([
       supabase
         .from("transport_requests")
-        .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, origin_floors, origin_has_lift, destination_floors, destination_has_lift, estimated_price, proposed_price, needs_help, package_weight, distance_km, payment_method, cargo_description, cargo_photos, items_count, extra_hours, help_description, notes, created_date")
+        .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, origin_floors, origin_has_lift, destination_floors, destination_has_lift, estimated_price, proposed_price, needs_help, package_weight, distance_km, payment_method, cargo_description, cargo_photos, items_count, extra_hours, help_description, notes, scheduled_at, created_date")
         .eq("status", "pending")
         .order("created_date", { ascending: false })
         .limit(50),
@@ -503,7 +526,9 @@ export default function Ofertas() {
                 myOffer={mine}
                 blocked={blocked}
                 busy={accepting === order.id || negotiating}
-                onAccept={() => (negotiable ? acceptAtClientPrice(order) : accept(order))}
+                onAccept={() =>
+                  withScheduleWarning(order, () => (negotiable ? acceptAtClientPrice(order) : accept(order)))
+                }
                 onCounter={() => {
                   setCounterFor(order.id);
                   // Se abre en la tarifa calculada: es el precio que la empresa
@@ -538,7 +563,7 @@ export default function Ofertas() {
             onClose={() => setDetailFor(null)}
             onAccept={() => {
               setDetailFor(null);
-              negotiable ? acceptAtClientPrice(order) : accept(order);
+              withScheduleWarning(order, () => (negotiable ? acceptAtClientPrice(order) : accept(order)));
             }}
             onCounter={() => {
               setDetailFor(null);

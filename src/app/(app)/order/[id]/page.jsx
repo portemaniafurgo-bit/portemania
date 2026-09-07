@@ -351,6 +351,25 @@ export default function OrderDetail() {
     },
   });
 
+  // El conductor propone fecha; el cliente la acepta o rechaza (migración
+  // 0026). Sin su OK el conductor no puede salir antes de la hora programada.
+  const respondScheduleMutation = useMutation({
+    mutationFn: async (accept) => {
+      const { data, error } = await supabase.rpc("respond_agreed_start", {
+        p_request_id: id,
+        p_accept: accept,
+      });
+      if (error) throw error;
+      supabase.functions
+        .invoke("send-push", { body: { mode: "schedule_response", order_id: id } })
+        .catch(() => {});
+      return data;
+    },
+    onSuccess: (data) => setOrder(prev => ({ ...prev, ...(data || {}) })),
+    onError: (err) =>
+      toast({ title: "No se pudo responder", description: err.message, variant: "destructive" }),
+  });
+
   useEffect(() => {
     if (chatEndRef.current) {
       chatEndRef.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -658,22 +677,62 @@ export default function OrderDetail() {
 
       {/* Fecha REAL confirmada por el conductor al aceptar (distinta de la
           programación del cliente). El servidor avisa cuando queda media hora. */}
-      {order.agreed_start_at && !["delivered", "cancelled"].includes(order.status) && (
-        <div className="bg-primary/5 rounded-2xl border border-primary/20 p-5">
-          <p className="font-heading font-semibold text-foreground">
-            {new Intl.DateTimeFormat("es-ES", {
-              weekday: "long",
-              day: "numeric",
-              month: "long",
-              hour: "2-digit",
-              minute: "2-digit",
-            }).format(new Date(order.agreed_start_at))}
-          </p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Fecha y hora aproximada confirmadas por el conductor. Te avisaremos cuando quede poco.
-          </p>
-        </div>
-      )}
+      {order.agreed_start_at && !["delivered", "cancelled"].includes(order.status) && (() => {
+        const when = new Intl.DateTimeFormat("es-ES", {
+          weekday: "long",
+          day: "numeric",
+          month: "long",
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(new Date(order.agreed_start_at));
+        const status = order.agreed_start_status;
+        if (status === "proposed") {
+          return (
+            <div className="bg-card rounded-2xl border-2 border-primary p-5 space-y-3">
+              <p className="font-heading font-semibold text-foreground">El conductor propone: {when}</p>
+              <p className="text-sm text-muted-foreground">
+                Hora aproximada. Si te viene bien, confírmala; si no, te propondrá otra.
+              </p>
+              {isOwner && (
+                <div className="flex gap-2">
+                  <Button
+                    className="rounded-xl flex-1"
+                    disabled={respondScheduleMutation.isPending}
+                    onClick={() => respondScheduleMutation.mutate(true)}
+                  >
+                    Aceptar la fecha
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="rounded-xl flex-1"
+                    disabled={respondScheduleMutation.isPending}
+                    onClick={() => respondScheduleMutation.mutate(false)}
+                  >
+                    No me viene bien
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        }
+        if (status === "rejected") {
+          return (
+            <div className="bg-card rounded-2xl border border-border p-5">
+              <p className="text-sm text-muted-foreground">
+                Rechazaste la fecha del {when}. El conductor te propondrá otra; te avisaremos.
+              </p>
+            </div>
+          );
+        }
+        return (
+          <div className="bg-emerald-50 rounded-2xl border border-emerald-200 p-5">
+            <p className="font-heading font-semibold text-foreground">{when}</p>
+            <p className="text-sm text-muted-foreground mt-1">
+              Fecha confirmada. Te avisaremos cuando quede poco.
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Driver info */}
       {order.driver_name && (

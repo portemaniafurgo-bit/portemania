@@ -28,6 +28,8 @@ const DRAFT_KEY = "request_draft_v1";
 const emptyForm = (draft = {}) => ({
   service: draft.service || "porte",
   destination_zone: draft.destination_zone || "albacete",
+  // Solo el envío de paquetes puede recoger fuera de la capital (01/09).
+  origin_zone: draft.origin_zone || "albacete",
   client_name: draft.client_name || "",
   client_phone: draft.client_phone || "",
   origin_address: draft.origin_address || "",
@@ -146,6 +148,7 @@ export function useRequestForm({ user } = {}) {
       ...prev,
       service: key,
       destination_zone: next.hasZones ? prev.destination_zone : "albacete",
+      origin_zone: next.hasZones ? prev.origin_zone : "albacete",
       stops: next.hasStops ? prev.stops : [],
       extra_hours: next.hasExtraHours ? prev.extra_hours : 0,
       needs_help: next.hasHelp ? prev.needs_help : false,
@@ -160,15 +163,25 @@ export function useRequestForm({ user } = {}) {
     setAcceptPortal(false);
   }, []);
 
-  /** Villarrobledo solo tiene un tramo de peso: cambiar de zona lo reinicia. */
-  const setZone = useCallback(zone => {
+  /**
+   * Ruta del envío de paquetes: dentro de Albacete, Albacete → Villarrobledo o
+   * Villarrobledo → Albacete (01/09). Villarrobledo solo tiene un tramo de
+   * peso, así que cambiar de ruta reinicia el peso y las direcciones.
+   */
+  const setRoute = useCallback((originZone, destinationZone) => {
+    const intercity = originZone === "villarrobledo" || destinationZone === "villarrobledo";
     setForm(prev => ({
       ...prev,
-      destination_zone: zone,
-      destination_address: "",
-      package_weight: zone === "villarrobledo" ? "vr_light" : "",
+      origin_zone: originZone,
+      destination_zone: destinationZone,
+      origin_address: prev.origin_zone === originZone ? prev.origin_address : "",
+      destination_address: prev.destination_zone === destinationZone ? prev.destination_address : "",
+      package_weight: intercity ? "vr_light" : "",
     }));
   }, []);
+
+  /** Compatibilidad: solo cambia la entrega (recogida en Albacete). */
+  const setZone = useCallback(zone => setRoute("albacete", zone), [setRoute]);
 
   // --- Paradas intermedias -------------------------------------------------
   const addStop = useCallback(() => {
@@ -208,14 +221,17 @@ export function useRequestForm({ user } = {}) {
 
   // --- Direcciones y ruta --------------------------------------------------
   const destinationZoneKey = service.hasZones ? form.destination_zone : "albacete";
+  const originZoneKey = service.hasZones ? form.origin_zone : "albacete";
+  // Villarrobledo en cualquiera de los dos sentidos: un único tramo de peso.
+  const intercity = originZoneKey === "villarrobledo" || destinationZoneKey === "villarrobledo";
 
   const addressErrors = useMemo(
     () => ({
-      origin: postalCodeError(form.origin_address, "albacete"),
+      origin: postalCodeError(form.origin_address, originZoneKey),
       destination: postalCodeError(form.destination_address, destinationZoneKey),
       stops: form.stops.map(s => postalCodeError(s.address, "albacete")),
     }),
-    [form.origin_address, form.destination_address, form.stops, destinationZoneKey],
+    [form.origin_address, form.destination_address, form.stops, originZoneKey, destinationZoneKey],
   );
 
   /**
@@ -266,8 +282,12 @@ export function useRequestForm({ user } = {}) {
 
       if (step === 1) {
         if (!form.client_phone.trim()) return fail("Indica un teléfono de contacto");
-        if (!isInZone(form.origin_address, "albacete"))
-          return fail("La recogida debe estar en Albacete capital (02001–02008)");
+        if (!isInZone(form.origin_address, originZoneKey))
+          return fail(
+            originZoneKey === "villarrobledo"
+              ? "La recogida debe estar en Villarrobledo (02600)"
+              : "La recogida debe estar en Albacete capital (02001–02008)",
+          );
         if (!isInZone(form.destination_address, destinationZoneKey))
           return fail(
             destinationZoneKey === "villarrobledo"
@@ -312,7 +332,7 @@ export function useRequestForm({ user } = {}) {
 
       return { ok: true, reason: "" };
     },
-    [form, photos, service, acceptPortal, acceptTerms, destinationZoneKey],
+    [form, photos, service, acceptPortal, acceptTerms, originZoneKey, destinationZoneKey],
   );
 
   // --- Aviso de duplicado --------------------------------------------------
@@ -357,6 +377,7 @@ export function useRequestForm({ user } = {}) {
       client_phone: form.client_phone,
       service_type: form.service,
       destination_zone: destinationZoneKey,
+      origin_zone: originZoneKey,
       origin_address: form.origin_address,
       destination_address: form.destination_address,
       stops: form.stops.filter(s => s.address.trim()),
@@ -409,7 +430,7 @@ export function useRequestForm({ user } = {}) {
 
     await clearDraft();
     return data;
-  }, [form, photos, service, destinationZoneKey, computeRoute, user, clearDraft]);
+  }, [form, photos, service, originZoneKey, destinationZoneKey, computeRoute, user, clearDraft]);
 
   return {
     form,
@@ -417,6 +438,8 @@ export function useRequestForm({ user } = {}) {
     service,
     setService,
     setZone,
+    setRoute,
+    originZoneKey,
     tariffs,
     quote,
     photos,
@@ -437,7 +460,7 @@ export function useRequestForm({ user } = {}) {
     submit,
     clearDraft,
     draftLoaded,
-    weightOptions: weightsForZone(destinationZoneKey),
+    weightOptions: weightsForZone(intercity ? "villarrobledo" : "albacete"),
     destinationZoneKey,
   };
 }

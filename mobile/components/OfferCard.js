@@ -68,6 +68,15 @@ export default function OfferCard({
       </View>
 
       <View style={styles.tags}>
+        {/* Programado por el cliente: se ve ANTES de aceptar, y el servidor no
+            deja salir antes de esa hora sin su autorización. */}
+        {order.scheduled_at ? (
+          <View style={[styles.tag, { backgroundColor: colors.primarySoft }]}>
+            <Text style={[styles.tagText, { color: colors.primary }]}>
+              📅 {new Date(order.scheduled_at).toLocaleString("es-ES", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+            </Text>
+          </View>
+        ) : null}
         {distanceLabel ? (
           <View style={styles.tag}>
             <Text style={styles.tagText}>{distanceLabel}</Text>

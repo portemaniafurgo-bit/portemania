@@ -166,29 +166,33 @@ export default function RequestWizard({ authenticated = false, user = null }) {
           <motion.div key="step1" variants={stepVariants} initial="initial" animate="animate" exit="exit" className="space-y-5">
             <ServicePicker value={form.service} onChange={f.setService} />
 
+            {/* Solo Albacete y Villarrobledo, en cualquier sentido (01/09). */}
             {service.hasZones && (
               <div className="space-y-2">
-                <Label>¿Dónde se entrega?</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  {Object.values(ZONES).map((z) => (
-                    <button
-                      key={z.key}
-                      type="button"
-                      onClick={() => f.setZone(z.key)}
-                      className={`rounded-2xl border-2 p-4 text-left transition-all ${
-                        f.destinationZoneKey === z.key
-                          ? "border-primary bg-primary/5 shadow-md"
-                          : "border-border bg-card hover:border-primary/40"
-                      }`}
-                    >
-                      <p className="font-heading font-semibold text-sm text-foreground">{z.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {z.key === "villarrobledo"
-                          ? "Hasta 10 kg · entrega en 24 h"
-                          : "Hasta 30 kg · el mismo día"}
-                      </p>
-                    </button>
-                  ))}
+                <Label>Ruta del envío</Label>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    { origin: "albacete", destination: "albacete", label: "Dentro de Albacete", hint: "Hasta 30 kg · el mismo día" },
+                    { origin: "albacete", destination: "villarrobledo", label: "Albacete → Villarrobledo", hint: "Hasta 10 kg · entrega en 24 h" },
+                    { origin: "villarrobledo", destination: "albacete", label: "Villarrobledo → Albacete", hint: "Hasta 10 kg · entrega en 24 h" },
+                  ].map((r) => {
+                    const active = f.originZoneKey === r.origin && f.destinationZoneKey === r.destination;
+                    return (
+                      <button
+                        key={r.label}
+                        type="button"
+                        onClick={() => f.setRoute(r.origin, r.destination)}
+                        className={`rounded-2xl border-2 p-4 text-left transition-all ${
+                          active
+                            ? "border-primary bg-primary/5 shadow-md"
+                            : "border-border bg-card hover:border-primary/40"
+                        }`}
+                      >
+                        <p className="font-heading font-semibold text-sm text-foreground">{r.label}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{r.hint}</p>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -226,13 +230,13 @@ export default function RequestWizard({ authenticated = false, user = null }) {
                 <span className="text-destructive">*</span>
               </Label>
               <Input
-                placeholder="Calle, número, piso, puerta — Albacete"
+                placeholder={`Calle, número, piso, puerta — ${ZONES[f.originZoneKey]?.label || "Albacete"}`}
                 value={form.origin_address}
                 onChange={(e) => f.update("origin_address", e.target.value)}
                 className={`h-12 rounded-xl ${addressErrors.origin ? "border-destructive" : ""}`}
               />
               <p className={`text-xs ${addressErrors.origin ? "text-destructive" : "text-muted-foreground"}`}>
-                {addressErrors.origin || ZONES.albacete.hint}
+                {addressErrors.origin || (ZONES[f.originZoneKey] || ZONES.albacete).hint}
               </p>
             </div>
 
@@ -351,7 +355,7 @@ export default function RequestWizard({ authenticated = false, user = null }) {
                           label="En la recogida"
                           hasLift={form.origin_has_lift}
                           floors={form.origin_floors}
-                          floorPrice={tariffs.mudanza_floor}
+                          floorPrice={service.key === "porte" ? (tariffs.porte_floor ?? 7) : tariffs.mudanza_floor}
                           onChange={(patch) => {
                             if ("hasLift" in patch) f.update("origin_has_lift", patch.hasLift);
                             if ("floors" in patch) f.update("origin_floors", patch.floors);
@@ -361,7 +365,7 @@ export default function RequestWizard({ authenticated = false, user = null }) {
                           label="En la entrega"
                           hasLift={form.destination_has_lift}
                           floors={form.destination_floors}
-                          floorPrice={tariffs.mudanza_floor}
+                          floorPrice={service.key === "porte" ? (tariffs.porte_floor ?? 7) : tariffs.mudanza_floor}
                           onChange={(patch) => {
                             if ("hasLift" in patch) f.update("destination_has_lift", patch.hasLift);
                             if ("floors" in patch) f.update("destination_floors", patch.floors);

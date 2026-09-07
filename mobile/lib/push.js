@@ -36,6 +36,8 @@ Notifications.setNotificationHandler({
         "driver_cancelled",
         "service_scheduled",
         "service_reminder",
+        "schedule_response",
+        "incident_resolved",
       ].includes(mode) &&
         !prefs.status);
     return {

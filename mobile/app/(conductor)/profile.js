@@ -166,6 +166,9 @@ export default function PerfilConductor() {
         .eq("id", profile.id);
       if (err) throw err;
       setProfile(prev => ({ ...prev, [doc.field]: url }));
+      // Un documento nuevo devuelve el perfil a revisión (lo decide el
+      // servidor, migración 0026): se relee para que el estado se vea ya.
+      load();
     } catch (err) {
       setError(`No se pudo subir «${doc.label}»: ` + (err.message || "error de conexión"));
     } finally {
@@ -391,6 +394,10 @@ export default function PerfilConductor() {
               {upToDate} de {DOC_FIELDS.length} al día
             </Caption>
           </View>
+          <Caption>
+            Al subir o sustituir un documento, tu perfil pasa a revisión y la empresa vuelve a
+            aprobarlo antes de que recibas ofertas.
+          </Caption>
           <ErrorText>{error}</ErrorText>
 
           <Card style={{ gap: 0 }}>
