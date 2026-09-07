@@ -100,6 +100,45 @@ Deno.serve(async (req: Request) => {
     return json({ sent, total: recipients.length });
   }
 
+  // ---------- Modo 1b: el admin respondió a una incidencia → quien la reportó ----------
+  // Lo dispara el trigger zz_notify_incident_resolved (migración 0026). Antes
+  // el cliente reclamaba, el admin resolvía en el panel y nadie se lo decía.
+  if (body.mode === "incident_resolved") {
+    if (!body.order_id) return json({ error: "order_id requerido" }, 400);
+    const admin = serviceClient();
+    const { data: incident } = await admin
+      .from("incidents")
+      .select("id, reporter_id, description, resolution, request_id")
+      .eq("request_id", body.order_id)
+      .not("resolution", "is", null)
+      .order("updated_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!incident?.reporter_id || !incident.resolution) {
+      return json({ sent: 0, skipped: "sin incidencia respondida" });
+    }
+    const { data: reporter } = await admin
+      .from("profiles")
+      .select("email")
+      .eq("id", incident.reporter_id)
+      .maybeSingle();
+    if (!reporter?.email) return json({ sent: 0, skipped: "sin email del reportante" });
+
+    const text = [
+      `Hemos revisado la incidencia que nos enviaste sobre tu pedido:`,
+      ``,
+      `Tu mensaje: ${incident.description || "—"}`,
+      ``,
+      `Respuesta de ClicyVoy: ${incident.resolution}`,
+      ``,
+      `Puedes verla en tu pedido: https://clicyvoy.es/order/${incident.request_id}`,
+      ``,
+      `Gracias por avisarnos. — ClicyVoy`,
+    ].join("\n");
+    const result = await sendOne(apiKey, reporter.email.toLowerCase(), "Respuesta a tu incidencia — ClicyVoy", text);
+    return json({ sent: result.ok ? 1 : 0, total: 1 });
+  }
+
   // ---------- Modo 2: contenido libre con lista blanca de destinatarios ----------
   const to = (body.to || "").trim().toLowerCase();
   const subject = (body.subject || "").slice(0, 200);

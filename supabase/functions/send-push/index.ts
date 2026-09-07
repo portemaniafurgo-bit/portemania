@@ -198,7 +198,7 @@ Deno.serve(async (req: Request) => {
   const { data: order } = await admin
     .from("transport_requests")
     .select(
-      "id, status, created_by_id, driver_id, client_name, service_type, vehicle_type, origin_address, destination_address, estimated_price, proposed_price, agreed_start_at",
+      "id, status, created_by_id, driver_id, client_name, service_type, vehicle_type, origin_address, destination_address, estimated_price, proposed_price, agreed_start_at, agreed_start_status",
     )
     .eq("id", body.order_id)
     .single();
@@ -280,17 +280,67 @@ Deno.serve(async (req: Request) => {
       return json({ sent: toClient.sent + toDriver.sent, total: toClient.total + toDriver.total });
     }
 
-    // ---------- El conductor fija la fecha real del servicio → cliente ----------
+    // ---------- El conductor PROPONE la fecha del servicio → cliente ----------
+    // La autoriza el cliente (migración 0026): el aviso es para que responda.
     case "service_scheduled": {
-      // La fecha se lee del pedido, no del llamante: si no hay, no hay aviso.
-      if (!order.agreed_start_at) return json({ sent: 0, skipped: "sin fecha acordada" });
+      if (!order.agreed_start_at || order.agreed_start_status !== "proposed") {
+        return json({ sent: 0, skipped: "sin fecha propuesta pendiente" });
+      }
       const tokens = await tokensFor(admin, clientUserId(order));
       return json(
         await push(
           admin,
           tokens,
-          "Tu servicio ya tiene fecha",
-          `El conductor lo hará el ${spanishWhen(order.agreed_start_at)} (hora aproximada).`,
+          "El conductor propone una fecha",
+          `${spanishWhen(order.agreed_start_at)} (hora aproximada). Entra en tu pedido para confirmarla o rechazarla.`,
+          data,
+          CHANNEL_STATUS,
+        ),
+      );
+    }
+
+    // ---------- El cliente respondió a la fecha propuesta → conductor ----------
+    case "schedule_response": {
+      if (!order.driver_id || !order.agreed_start_at) return json({ sent: 0, skipped: "sin fecha" });
+      if (!["confirmed", "rejected"].includes(order.agreed_start_status || "")) {
+        return json({ sent: 0, skipped: "sin respuesta del cliente" });
+      }
+      const ok = order.agreed_start_status === "confirmed";
+      const tokens = await tokensFor(admin, [order.driver_id]);
+      return json(
+        await push(
+          admin,
+          tokens,
+          ok ? "Fecha confirmada por el cliente" : "El cliente no acepta la fecha",
+          ok
+            ? `Queda para el ${spanishWhen(order.agreed_start_at)}. Te avisaremos cuando quede media hora.`
+            : `No le viene bien el ${spanishWhen(order.agreed_start_at)}. Propón otra hora desde el servicio.`,
+          data,
+          CHANNEL_STATUS,
+        ),
+      );
+    }
+
+    // ---------- El admin respondió a una incidencia → quien la reportó ----------
+    case "incident_resolved": {
+      const { data: incident } = await admin
+        .from("incidents")
+        .select("id, reporter_id, resolution")
+        .eq("request_id", order.id)
+        .not("resolution", "is", null)
+        .order("updated_date", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!incident?.reporter_id || !incident.resolution) {
+        return json({ sent: 0, skipped: "sin incidencia respondida" });
+      }
+      const tokens = await tokensFor(admin, [incident.reporter_id]);
+      return json(
+        await push(
+          admin,
+          tokens,
+          "ClicyVoy ha respondido a tu incidencia",
+          String(incident.resolution).slice(0, 140),
           data,
           CHANNEL_STATUS,
         ),
@@ -298,10 +348,10 @@ Deno.serve(async (req: Request) => {
     }
 
     // ---------- El servicio acordado está al caer → cliente Y conductor ----------
-    // Lo dispara el cron remind-upcoming-services (migración 0025).
+    // Lo dispara el cron remind-upcoming-services (solo fechas CONFIRMADAS).
     case "service_reminder": {
-      if (!order.agreed_start_at || order.status !== "accepted") {
-        return json({ sent: 0, skipped: "sin fecha o ya en marcha" });
+      if (!order.agreed_start_at || order.status !== "accepted" || order.agreed_start_status !== "confirmed") {
+        return json({ sent: 0, skipped: "sin fecha confirmada o ya en marcha" });
       }
       const hora = new Intl.DateTimeFormat("es-ES", {
         timeZone: "Europe/Madrid",
