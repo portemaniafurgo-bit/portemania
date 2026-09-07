@@ -32,7 +32,7 @@ export function locationFreshness(updatedAt) {
  * revienta con «cannot add postgres_changes callbacks after subscribe()».
  * Bug real, 24/08/2026.
  */
-function uniqueChannel(prefix) {
+export function uniqueChannel(prefix) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 

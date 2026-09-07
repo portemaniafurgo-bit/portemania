@@ -1,9 +1,10 @@
 /**
- * Caza identificadores que la app USA y nunca declara ni importa.
- *
- * Es la clase de fallo que ya se ha colado dos veces en producción:
- * `bottomPad` y `PHASE_GAP_SECONDS`. Metro no los detecta —son JavaScript
- * válido— y solo revientan cuando el usuario abre esa pantalla.
+ * Caza dos clases de fallo que Metro empaqueta sin rechistar y solo revientan
+ * al abrir la pantalla en el móvil:
+ *   1. Identificadores que la app USA y nunca declara ni importa
+ *      (`bottomPad`, `PHASE_GAP_SECONDS`: dos veces en producción).
+ *   2. Imports `{ x }` de un módulo propio que NO exporta `x`: `x` llega como
+ *      undefined y estalla al llamarla (`uniqueChannel`, 07/09/2026).
  *
  *   node scripts/check-undefined.js
  *
@@ -44,14 +45,62 @@ function walkFiles(dir, out = []) {
 
 let problems = 0;
 
+const PARSE_OPTIONS = {
+  sourceType: "module",
+  plugins: ["jsx", "classProperties", "optionalChaining", "nullishCoalescingOperator"],
+};
+
+/**
+ * Nombres que EXPORTA un fichero propio (cacheado). Sirve para la segunda
+ * comprobación: importar `{ x }` de un módulo que no exporta `x` es JavaScript
+ * válido, Metro lo empaqueta sin rechistar y `x` vale undefined hasta que
+ * alguien lo llama — "undefined is not a function" en producción (bug real,
+ * 07/09/2026: `uniqueChannel` importada sin estar exportada).
+ */
+const exportsCache = new Map();
+function exportsOf(file) {
+  if (exportsCache.has(file)) return exportsCache.get(file);
+  const names = new Set();
+  let ast;
+  try {
+    ast = parser.parse(fs.readFileSync(file, "utf8"), PARSE_OPTIONS);
+  } catch {
+    exportsCache.set(file, null); // no se pudo leer: no se juzga
+    return null;
+  }
+  for (const node of ast.program.body) {
+    if (node.type === "ExportDefaultDeclaration") names.add("default");
+    if (node.type === "ExportNamedDeclaration") {
+      for (const spec of node.specifiers || []) names.add(spec.exported.name || spec.exported.value);
+      const decl = node.declaration;
+      if (decl?.id?.name) names.add(decl.id.name);
+      for (const d of decl?.declarations || []) collectPattern(d.id, names);
+    }
+    if (node.type === "ExportAllDeclaration") {
+      // `export * from` — se da todo por bueno: no compensa seguir la cadena.
+      exportsCache.set(file, null);
+      return null;
+    }
+  }
+  exportsCache.set(file, names);
+  return names;
+}
+
+/** Ruta real de un import relativo, o null si no es propio. */
+function resolveLocal(fromFile, source) {
+  if (!source.startsWith(".")) return null;
+  const base = path.resolve(path.dirname(fromFile), source);
+  for (const candidate of [base, `${base}.js`, `${base}.jsx`, path.join(base, "index.js")]) {
+    if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) return candidate;
+  }
+  return null;
+}
+
 for (const file of DIRS.flatMap(d => walkFiles(path.join(ROOT, d)))) {
   const code = fs.readFileSync(file, "utf8");
   let ast;
   try {
-    ast = parser.parse(code, {
-      sourceType: "module",
-      plugins: ["jsx", "classProperties", "optionalChaining", "nullishCoalescingOperator"],
-    });
+    ast = parser.parse(code, PARSE_OPTIONS);
   } catch (err) {
     console.log(`SINTAXIS  ${path.relative(ROOT, file)}: ${err.message}`);
     problems++;
@@ -62,6 +111,26 @@ for (const file of DIRS.flatMap(d => walkFiles(path.join(ROOT, d)))) {
   const used = new Map(); // nombre -> primera línea donde se usa
 
   traverse(ast, {
+    // Segunda comprobación: cada import de un módulo propio tiene que existir
+    // como export en ese módulo.
+    ImportDeclaration(p) {
+      const target = resolveLocal(file, p.node.source.value);
+      if (!target) return;
+      const available = exportsOf(target);
+      if (!available) return;
+      for (const spec of p.node.specifiers) {
+        const wanted =
+          spec.type === "ImportDefaultSpecifier" ? "default"
+          : spec.type === "ImportSpecifier" ? (spec.imported.name || spec.imported.value)
+          : null;
+        if (wanted && !available.has(wanted)) {
+          console.log(
+            `NO EXPORTADO  ${path.relative(ROOT, file)}:${p.node.loc?.start.line}  →  ${wanted} no existe en ${path.relative(ROOT, target)}`,
+          );
+          problems++;
+        }
+      }
+    },
     // Todo lo que crea un nombre
     "ImportDefaultSpecifier|ImportSpecifier|ImportNamespaceSpecifier"(p) {
       declared.add(p.node.local.name);
