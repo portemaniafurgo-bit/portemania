@@ -1,4 +1,5 @@
 import { getGoogleReviews, GOOGLE_PROFILE_URL } from "@/lib/reviews";
+import ReviewsSlider from "@/components/landing/ReviewsSlider";
 
 /**
  * Reseñas de Google al final de la home.
@@ -37,36 +38,9 @@ export default async function GoogleReviews() {
           )}
         </div>
 
+        {/* Carrusel: caben TODAS las reseñas buenas, en orden aleatorio. */}
         {reviews.length > 0 ? (
-          <ul className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {reviews.slice(0, 6).map((review) => (
-              <li
-                key={review.id}
-                className="bg-gray-50 border border-gray-200 rounded-3xl p-6 flex flex-col gap-4"
-              >
-                <Stars value={review.rating} />
-                <p className="text-gray-600 leading-relaxed flex-1">“{review.text}”</p>
-                <div className="flex items-center gap-3 pt-2 border-t border-gray-200">
-                  {review.photo ? (
-                    <img
-                      src={review.photo}
-                      alt=""
-                      className="w-9 h-9 rounded-full object-cover"
-                      loading="lazy"
-                    />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-[#7145d6]/10 flex items-center justify-center text-[#7145d6] font-bold text-sm">
-                      {review.author.charAt(0)}
-                    </div>
-                  )}
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{review.author}</p>
-                    {review.when && <p className="text-xs text-gray-500">{review.when}</p>}
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+          <ReviewsSlider reviews={reviews} />
         ) : (
           <div className="bg-gray-50 border border-gray-200 rounded-3xl p-8 md:p-10 text-center">
             <p className="text-gray-600 max-w-xl mx-auto">

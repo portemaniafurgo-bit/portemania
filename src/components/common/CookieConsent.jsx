@@ -11,7 +11,10 @@ import Link from "next/link";
  * el usuario acepta. Sin NEXT_PUBLIC_GA_MEASUREMENT_ID (el G-XXXX de la
  * propiedad) no se carga nada ni se enseña el banner.
  */
-const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+// El ID de medición es público por diseño (Google lo pone en el HTML de todas
+// las páginas), así que vive en el código y no depende de configurar Vercel.
+// La variable de entorno sigue mandando por si algún día cambia la propiedad.
+const GA_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-8QJ0L8BXLY";
 const STORAGE_KEY = "cookie_consent_v1";
 
 function loadAnalytics() {
