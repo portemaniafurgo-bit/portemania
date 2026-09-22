@@ -77,6 +77,9 @@ respondidos y el AAB subido a la pista de pruebas internas.
    dice `PorteManía` o `portemania`, cambiarlo a **`ClicyVoy`** y guardar. Es el
    nombre que ve el usuario al iniciar sesión.
 3. Correo de asistencia y de contacto: **portemaniafurgo@gmail.com**.
+   Página principal: `https://clicyvoy.es`. Política de privacidad:
+   `https://clicyvoy.es/privacidad`. Condiciones del servicio:
+   `https://clicyvoy.es/terminos` (Google no deja publicar sin las dos primeras).
 4. Comprobar que en *Dominios autorizados* está **`clicyvoy.es`**.
 5. En *Público* / *Audience*: si el estado de publicación es **En pruebas
    (Testing)** → **PUBLICAR APLICACIÓN** → confirmar.

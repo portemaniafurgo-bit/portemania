@@ -41,8 +41,8 @@
 | # | Bloqueo | De quién depende |
 |---|---|---|
 | 1 | **Cuenta de Play Console** (25 USD, pago único) | Luis paga; Claude Chrome rellena |
-| 2 | **Proyecto de Firebase** + `google-services.json` + clave FCM V1 | Claude Chrome |
-| 3 | **Consent screen de Google Cloud** publicada (hoy en *Testing*) | Claude Chrome |
+| 2 | ~~**Proyecto de Firebase** + `google-services.json` + clave FCM V1~~ **HECHO 22/09/2026**: proyecto `clicyvoy` (nº 81320682561), fichero en `mobile/google-services.json` y en EAS (`GOOGLE_SERVICES_JSON`, production y preview), clave FCM V1 `firebase-adminsdk-fbsvc@clicyvoy.iam.gserviceaccount.com` asignada a `com.clicyvoy.app` | — |
+| 3 | ~~**Consent screen de Google Cloud** publicada~~ **HECHO 22/09/2026**: proyecto `portemania`, nombre «ClicyVoy», estado *En producción* (falta solo el enlace a condiciones: https://clicyvoy.es/terminos) | — |
 | 4 | **Claves Stripe live** (hoy son de prueba) | Decisión de Luis |
 | 5 | **Capturas de pantalla** en un móvil real | Luis (con adb) |
 | 6 | **Cuentas de prueba** para los revisores de Google | Claude Code (SQL) |
@@ -130,7 +130,18 @@ de **ORGANIZACIÓN** ese requisito no aplica.
    # → production → "Google Service Account Key for Push Notifications (FCM V1)"
    # → "Set up a Google Service Account Key" → subir el JSON descargado
    ```
+   ⚠️ `eas credentials` es un asistente interactivo y **no funciona en una consola
+   sin TTY** (la de Claude Code). El 22/09/2026 se hizo por la **API GraphQL de
+   Expo** (`https://api.expo.dev/graphql`, `Authorization: Bearer <token robot>`):
+   `googleServiceAccountKey.createGoogleServiceAccountKey(googleServiceAccountKeyInput:{jsonKey}, accountId)`
+   y después `androidAppCredentials.setGoogleServiceAccountKeyForFcmV1(id, googleServiceAccountKeyId)`
+   con el id de `app.byId(...).androidAppCredentials(filter:{applicationIdentifier})`.
+   Verificar leyendo `googleServiceAccountKeyForFcmV1 { clientEmail projectIdentifier }`.
 6. **Recompilar**: el `google-services.json` es nativo, no viaja por OTA.
+
+> **Estado 22/09/2026: pasos 1 a 5 HECHOS** (proyecto Firebase `clicyvoy`, variable
+> `GOOGLE_SERVICES_JSON` en production y preview, clave FCM V1 asignada). Queda
+> el paso 6: la próxima build (preview o production) ya sale con push.
 
 ### Cómo comprobar que funciona
 
@@ -439,7 +450,7 @@ aparecer; **el pago con tarjeta funciona igual** y no bloquea la publicación.
 
 - [ ] Cuenta de Play Console creada y pagada (personal u organización — §2).
 - [x] Proyecto de Firebase creado, `google-services.json` en `mobile/` y en EAS. *(22/09/2026: proyecto `clicyvoy`, nº 81320682561, app `com.clicyvoy.app`, FCM V1 habilitado)*
-- [ ] Clave FCM V1 subida a EAS (`eas credentials`).
+- [x] Clave FCM V1 subida a EAS. *(22/09/2026 por la API GraphQL de Expo: `firebase-adminsdk-fbsvc@clicyvoy.iam.gserviceaccount.com`, asignada a `com.clicyvoy.app` y verificada)*
 - [x] Consent screen de Google Cloud **publicada** y con el nombre *ClicyVoy*. *(22/09/2026, proyecto `portemania`; queda el aviso «marca sin verificar», que no bloquea)*
 - [ ] Decidido qué se hace con Stripe (seguir en test = **no** cobrar de verdad).
 - [ ] Build `production` (AAB) generada con el OK de Luis y descargada.
