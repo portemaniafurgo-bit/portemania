@@ -178,7 +178,7 @@ permiso. La matriz completa de avisos está en
 
 **Prerrequisitos** (los tres, o no tiene sentido lanzarla):
 
-- [ ] `google-services.json` subido a EAS (§3, paso 4).
+- [x] `google-services.json` subido a EAS (§3, paso 4). *(22/09/2026, `production` y `preview`)*
 - [ ] `mobile/app.json` y `mobile/package.json` en **1.0.0**.
 - [ ] `cd mobile && npm run check` en verde y
       `npx expo export --platform android` sin errores.
@@ -438,9 +438,9 @@ aparecer; **el pago con tarjeta funciona igual** y no bloquea la publicación.
 **Antes de mandar a revisión**
 
 - [ ] Cuenta de Play Console creada y pagada (personal u organización — §2).
-- [ ] Proyecto de Firebase creado, `google-services.json` en `mobile/` y en EAS.
+- [x] Proyecto de Firebase creado, `google-services.json` en `mobile/` y en EAS. *(22/09/2026: proyecto `clicyvoy`, nº 81320682561, app `com.clicyvoy.app`, FCM V1 habilitado)*
 - [ ] Clave FCM V1 subida a EAS (`eas credentials`).
-- [ ] Consent screen de Google Cloud **publicada** y con el nombre *ClicyVoy*.
+- [x] Consent screen de Google Cloud **publicada** y con el nombre *ClicyVoy*. *(22/09/2026, proyecto `portemania`; queda el aviso «marca sin verificar», que no bloquea)*
 - [ ] Decidido qué se hace con Stripe (seguir en test = **no** cobrar de verdad).
 - [ ] Build `production` (AAB) generada con el OK de Luis y descargada.
 - [ ] Ficha rellena con los textos de `mobile/store/listing.es.md`.
