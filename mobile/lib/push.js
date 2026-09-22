@@ -50,18 +50,42 @@ Notifications.setNotificationHandler({
 });
 
 /** Canales de Android. "Ofertas" va aparte para que el conductor pueda dejarlo
- *  sonando fuerte sin que le suene igual cada mensaje de chat. */
+ *  sonando fuerte sin que le suene igual cada mensaje de chat.
+ *
+ *  ⚠️ Android CONGELA la configuración de un canal la primera vez que se crea
+ *  en cada instalación: a partir de ahí manda el usuario desde los ajustes del
+ *  sistema y cambiar aquí el sonido, la vibración o la importancia NO afecta a
+ *  los móviles que ya tienen la app — solo a instalaciones nuevas (o después de
+ *  borrar los datos de la app). Por eso:
+ *   - los identificadores ("ofertas", "estado", "novedades") NO se cambian: son
+ *     los que manda la Edge Function `send-push` en `channelId`;
+ *   - en los móviles de prueba que ya tengan ClicyVoy instalado hay que
+ *     DESINSTALAR y volver a instalar para oír el sonido nuevo.
+ *  El fichero `assets/sounds/oferta.wav` es un recurso nativo: entra en el
+ *  APK/AAB, no viaja por OTA (se genera con
+ *  `node scripts/generate-notification-sound.mjs`). */
 async function ensureChannels() {
   if (Platform.OS !== "android") return;
   await Notifications.setNotificationChannelAsync("ofertas", {
     name: "Pedidos disponibles",
     importance: Notifications.AndroidImportance.MAX,
-    vibrationPattern: [0, 250, 250, 250],
+    // Melodía propia: un pedido nuevo no puede sonar como un WhatsApp.
+    sound: "oferta.wav",
+    // Dos golpes y un tercero largo: se nota en el bolsillo conduciendo.
+    vibrationPattern: [0, 400, 200, 400, 200, 600],
+    enableVibrate: true,
+    enableLights: true,
+    // Visible en la pantalla de bloqueo: el conductor decide sin desbloquear.
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
     lightColor: "#7145d6",
   });
   await Notifications.setNotificationChannelAsync("estado", {
     name: "Estado del pedido y chat",
     importance: Notifications.AndroidImportance.HIGH,
+    sound: "default",
+    vibrationPattern: [0, 250, 150, 250],
+    enableVibrate: true,
+    enableLights: true,
     lightColor: "#7145d6",
   });
   // Novedades y promociones: por separado y en bajo, para que quien las apague

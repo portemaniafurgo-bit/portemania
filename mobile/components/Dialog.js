@@ -15,8 +15,13 @@ import { colors, radius, spacing } from "../theme";
  *   dialog.show({
  *     title, message,
  *     actions: [{ text, onPress, style: "cancel" | "destructive" | undefined }],
+ *     onDismiss,   // opcional: cerrado por el fondo o por el botón atrás
  *   });
  * Si no se pasa ninguna acción de estilo "cancel", se añade «Volver».
+ *
+ * `onDismiss` existe porque cerrar por el fondo NO llama a ninguna acción: quien
+ * espera una respuesta sí/no (la divulgación de ubicación de
+ * `lib/locationDisclosure.js`) se quedaría esperando para siempre.
  */
 const DialogContext = createContext({ show: () => {} });
 
@@ -24,6 +29,13 @@ export function DialogProvider({ children }) {
   const [dialog, setDialog] = useState(null);
   const show = useCallback(options => setDialog(options), []);
   const close = useCallback(() => setDialog(null), []);
+  // Cierre SIN pulsar ninguna acción: fondo, botón atrás o el «Volver» que se
+  // añade solo. Es el único caso en el que se avisa con `onDismiss`.
+  const dismiss = useCallback(() => {
+    const current = dialog;
+    close();
+    current?.onDismiss?.();
+  }, [dialog, close]);
 
   const actions = dialog?.actions?.length ? dialog.actions : [{ text: "Vale", style: "cancel" }];
   const hasCancel = actions.some(a => a.style === "cancel");
@@ -39,9 +51,9 @@ export function DialogProvider({ children }) {
         transparent
         animationType="fade"
         statusBarTranslucent
-        onRequestClose={close}
+        onRequestClose={dismiss}
       >
-        <Pressable style={styles.backdrop} onPress={close} />
+        <Pressable style={styles.backdrop} onPress={dismiss} />
         <View style={styles.sheet}>
           <View style={styles.handle} />
           {dialog?.title ? <Text style={styles.title}>{dialog.title}</Text> : null}
@@ -59,7 +71,7 @@ export function DialogProvider({ children }) {
                 }}
               />
             ))}
-            {!hasCancel ? <Button title="Volver" variant="plain" onPress={close} /> : null}
+            {!hasCancel ? <Button title="Volver" variant="plain" onPress={dismiss} /> : null}
           </View>
         </View>
       </Modal>

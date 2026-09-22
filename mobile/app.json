@@ -4,7 +4,7 @@
     "slug": "clicyvoy",
     "owner": "clicyvoys-team",
     "scheme": "clicyvoy",
-    "version": "0.1.9",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -28,19 +28,9 @@
         "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_LOCATION",
         "android.permission.CAMERA",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_BACKGROUND_LOCATION",
-        "android.permission.FOREGROUND_SERVICE",
-        "android.permission.FOREGROUND_SERVICE_LOCATION",
-        "android.permission.CAMERA",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.POST_NOTIFICATIONS"
       ],
       "blockedPermissions": [
-        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -62,13 +52,16 @@
         "expo-image-picker",
         {
           "photosPermission": "ClicyVoy necesita acceso a tus fotos para adjuntar imágenes de la carga.",
-          "cameraPermission": "ClicyVoy necesita la cámara para fotografiar la carga y los documentos."
+          "cameraPermission": "ClicyVoy necesita la cámara para fotografiar la carga y los documentos.",
+          "microphonePermission": false
         }
       ],
       [
         "expo-notifications",
         {
-          "color": "#7145d6"
+          "color": "#7145d6",
+          "icon": "./assets/notification-icon.png",
+          "sounds": ["./assets/sounds/oferta.wav"]
         }
       ],
       [

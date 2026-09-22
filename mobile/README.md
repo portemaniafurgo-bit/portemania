@@ -10,6 +10,15 @@ reglas de negocio.
 
 ## Estado
 
+**Versión 1.0.0 — lista para Google Play** (preparación del 22/09/2026). El
+runbook de publicación, con lo que falta y quién lo hace, está en
+[`../docs/PLAY-STORE.md`](../docs/PLAY-STORE.md); las tareas del agente que
+maneja el navegador, en
+[`../docs/BRIEF-CLAUDE-CHROME-PLAY.md`](../docs/BRIEF-CLAUDE-CHROME-PLAY.md).
+Los textos y gráficos de la ficha viven en [`store/`](store/). Lo que bloquea la
+publicación no es código: cuenta de Play Console, proyecto de Firebase, consent
+screen de Google, claves Stripe live y las capturas en un móvil real.
+
 **Etapas 1 a 5 construidas.** Funciona el ciclo completo: el cliente pide
 (4 servicios, fotos, precio en vivo), sigue al conductor en el mapa y chatea;
 el conductor recibe ofertas, las acepta, avanza estados y **emite posición con

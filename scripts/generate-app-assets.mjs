@@ -6,15 +6,20 @@
  *   node scripts/generate-app-assets.mjs
  *
  * Usa el sharp de node_modules de la web (rasteriza SVG). Salidas en mobile/assets/.
+ *
+ * Además EXPORTA los trazados y el ayudante de rasterizado para que
+ * `generate-store-assets.mjs` (gráficos de la ficha de Play) use exactamente el
+ * mismo logo. Importar este fichero NO escribe nada: la generación solo corre
+ * cuando se ejecuta como script principal.
  */
 import sharp from "sharp";
 import { mkdirSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 const OUT = "mobile/assets";
-mkdirSync(OUT, { recursive: true });
 
 // Los mismos trazados que Logo.jsx, con tone="dark" (wordmark #111111).
-const MARK = (fill = "#111111") => `
+export const MARK = (fill = "#111111") => `
   <g transform="translate(0 15)">
     <path fill="${fill}" d="M90 20 C55 20 28 47 28 82 V145 H58 V82 C58 64 72 50 90 50 H110 C128 50 142 64 142 82 V145 H172 V82 C172 47 145 20 110 20 Z"/>
     <path fill="#F5B400" d="M28 160 H58 V178 C58 202 76 220 100 220 C124 220 142 202 142 178 V160 H172 V178 C172 217 143 250 100 278 C57 250 28 217 28 178 Z" transform="translate(0 -60)"/>
@@ -22,7 +27,7 @@ const MARK = (fill = "#111111") => `
     <circle fill="#F5B400" cx="100" cy="102" r="16"/>
   </g>`;
 
-const WORDMARK = `
+export const WORDMARK = `
   <text x="225" y="145" font-family="'Poppins','Montserrat','Arial',sans-serif" font-weight="700" font-size="108">
     <tspan fill="#111111">Clicy</tspan><tspan fill="#F5B400">Voy</tspan>
   </text>`;
@@ -31,62 +36,80 @@ const WORDMARK = `
 // viewBox 220 de la web el rasterizado la recortaba — en la app se veía el
 // isotipo cortado (reporte del usuario, 2026-08-11). El navegador disimula el
 // recorte; sharp no.
-const fullLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -6 900 252">${MARK()}${WORDMARK}</svg>`;
-const markOnly = (fill) =>
+export const fullLogo = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -6 900 252">${MARK()}${WORDMARK}</svg>`;
+
+export const markOnly = (fill) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="6 -8 188 254">${MARK(fill)}</svg>`;
 
-const render = (svg, opts) => sharp(Buffer.from(svg), { density: 300 }).resize(opts);
+/**
+ * Isotipo en UN SOLO color, amarillo del pin incluido. Lo necesitan el icono
+ * monocromo de Android 13+ y, sobre todo, el icono de notificación: Android lo
+ * pinta como silueta y cualquier color se pierde (ver generate-store-assets).
+ */
+export const markMono = (fill) => markOnly(fill).replaceAll("#F5B400", fill);
 
-// Icono principal: símbolo centrado sobre blanco (Play lo redondea él).
-await render(markOnly(), { width: 640, height: 640, fit: "contain", background: "#FFFFFF" })
-  .extend({ top: 192, bottom: 192, left: 192, right: 192, background: "#FFFFFF" })
-  .flatten({ background: "#FFFFFF" })
-  .png()
-  .toFile(`${OUT}/icon.png`);
+export const render = (svg, opts) => sharp(Buffer.from(svg), { density: 300 }).resize(opts);
 
-// Adaptive icon: el sistema recorta hasta ~66% central, así que el símbolo va
-// pequeño sobre transparente.
-await render(markOnly(), { width: 480, height: 480, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
-  .extend({ top: 272, bottom: 272, left: 272, right: 272, background: { r: 0, g: 0, b: 0, alpha: 0 } })
-  .png()
-  .toFile(`${OUT}/android-icon-foreground.png`);
+async function generarAssetsDeLaApp() {
+  mkdirSync(OUT, { recursive: true });
 
-await sharp({ create: { width: 1024, height: 1024, channels: 4, background: "#FFFFFF" } })
-  .png()
-  .toFile(`${OUT}/android-icon-background.png`);
+  // Icono principal: símbolo centrado sobre blanco (Play lo redondea él).
+  await render(markOnly(), { width: 640, height: 640, fit: "contain", background: "#FFFFFF" })
+    .extend({ top: 192, bottom: 192, left: 192, right: 192, background: "#FFFFFF" })
+    .flatten({ background: "#FFFFFF" })
+    .png()
+    .toFile(`${OUT}/icon.png`);
 
-// Monocromo (themed icons de Android 13+): silueta en un solo color.
-await render(markOnly("#FFFFFF").replaceAll("#F5B400", "#FFFFFF"), {
-  width: 480,
-  height: 480,
-  fit: "contain",
-  background: { r: 0, g: 0, b: 0, alpha: 0 },
-})
-  .extend({ top: 272, bottom: 272, left: 272, right: 272, background: { r: 0, g: 0, b: 0, alpha: 0 } })
-  .png()
-  .toFile(`${OUT}/android-icon-monochrome.png`);
+  // Adaptive icon: el sistema recorta hasta ~66% central, así que el símbolo va
+  // pequeño sobre transparente.
+  await render(markOnly(), { width: 480, height: 480, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .extend({ top: 272, bottom: 272, left: 272, right: 272, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toFile(`${OUT}/android-icon-foreground.png`);
 
-// Splash APILADO en tono CLARO, para fondo MORADO #7145d6 (canvas 2a: «logo
-// apilado sobre morado, 900 ms»): el arco del pin en blanco, el resto amarillo,
-// y el wordmark Clicy blanco / Voy amarillo.
-const stackedLogoLight = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 430">
+  await sharp({ create: { width: 1024, height: 1024, channels: 4, background: "#FFFFFF" } })
+    .png()
+    .toFile(`${OUT}/android-icon-background.png`);
+
+  // Monocromo (themed icons de Android 13+): silueta en un solo color.
+  await render(markMono("#FFFFFF"), {
+    width: 480,
+    height: 480,
+    fit: "contain",
+    background: { r: 0, g: 0, b: 0, alpha: 0 },
+  })
+    .extend({ top: 272, bottom: 272, left: 272, right: 272, background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toFile(`${OUT}/android-icon-monochrome.png`);
+
+  // Splash APILADO en tono CLARO, para fondo MORADO #7145d6 (canvas 2a: «logo
+  // apilado sobre morado, 900 ms»): el arco del pin en blanco, el resto amarillo,
+  // y el wordmark Clicy blanco / Voy amarillo.
+  const stackedLogoLight = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 430">
   <g transform="translate(180 5)">${MARK("#FFFFFF")}</g>
   <text x="280" y="382" text-anchor="middle" font-family="'Poppins','Montserrat','Arial',sans-serif" font-weight="700" font-size="92">
     <tspan fill="#FFFFFF">Clicy</tspan><tspan fill="#F5B400">Voy</tspan>
   </text>
 </svg>`;
-await render(stackedLogoLight, { width: 840, height: 645, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
-  .png()
-  .toFile(`${OUT}/splash-icon.png`);
+  await render(stackedLogoLight, { width: 840, height: 645, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toFile(`${OUT}/splash-icon.png`);
 
-// Logo del login (@3x aprox para nitidez en pantallas densas).
-await render(fullLogo, { width: 960, height: 269, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
-  .png()
-  .toFile(`${OUT}/logo.png`);
+  // Logo del login (@3x aprox para nitidez en pantallas densas).
+  await render(fullLogo, { width: 960, height: 269, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toFile(`${OUT}/logo.png`);
 
-// Favicon del modo web de Expo (irrelevante, pero que no quede el de la plantilla).
-await render(markOnly(), { width: 48, height: 48, fit: "contain", background: "#FFFFFF" })
-  .png()
-  .toFile(`${OUT}/favicon.png`);
+  // Favicon del modo web de Expo (irrelevante, pero que no quede el de la plantilla).
+  await render(markOnly(), { width: 48, height: 48, fit: "contain", background: "#FFFFFF" })
+    .png()
+    .toFile(`${OUT}/favicon.png`);
 
-console.log("Assets generados en", OUT);
+  console.log("Assets generados en", OUT);
+}
+
+// Solo como script: importado desde otro fichero, este módulo únicamente
+// aporta los trazados y `render`, sin escribir nada en disco.
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  await generarAssetsDeLaApp();
+}

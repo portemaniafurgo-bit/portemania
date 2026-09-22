@@ -49,6 +49,10 @@ export default function AyudaConductor() {
           te vayas a Google Maps. Android solo lo permite con este permiso.
         </Body>
         <Caption>Ajustes → Permisos → Ubicación → Permitir todo el tiempo.</Caption>
+        <Caption>
+          Tu posición solo se comparte mientras tienes un servicio activo y deja de enviarse en
+          cuanto lo terminas o lo cancelas.
+        </Caption>
       </Card>
 
       <Card>

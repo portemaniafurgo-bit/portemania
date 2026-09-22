@@ -3,13 +3,11 @@ import * as Haptics from "expo-haptics";
 /**
  * Aviso de que ha entrado un pedido, con la app abierta.
  *
- * De momento suena la NOTIFICACIÓN del sistema (canal «ofertas», que ya va con
- * máxima prioridad y vibración) y aquí se añade la vibración fuerte, que es lo
- * que se nota conduciendo o cargando.
- *
- * Para una melodía propia hace falta un fichero de audio en la app —ver
- * docs/SONIDO-OFERTAS.md—: es un cambio nativo, así que entra en el siguiente
- * APK, no por OTA.
+ * La melodía propia ya existe: `assets/sounds/oferta.wav`, configurada en el
+ * canal «ofertas» (máxima prioridad, vibración y pantalla de bloqueo). Quien la
+ * reproduce es la NOTIFICACIÓN del sistema, también con la app en primer plano;
+ * aquí solo se suma la vibración háptica, que es lo que se nota conduciendo o
+ * cargando.
  */
 export async function alertNewOffer() {
   try {

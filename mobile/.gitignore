@@ -13,3 +13,10 @@ ios/
 .DS_Store
 .env
 .env.local
+
+# Credenciales: nunca al repo (Firebase, Play, firma)
+google-services.json
+play-service-account.json
+credentials.json
+*.keystore
+*.jks

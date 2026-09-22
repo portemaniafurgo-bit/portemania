@@ -14,6 +14,8 @@ export default async function sitemap() {
     { url: `${SITE_URL}/terminos`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE_URL}/privacidad`, changeFrequency: "yearly", priority: 0.3 },
     { url: `${SITE_URL}/cookies`, changeFrequency: "yearly", priority: 0.3 },
+    // Exigida por Google Play: tiene que ser pública y rastreable.
+    { url: `${SITE_URL}/eliminar-cuenta`, changeFrequency: "yearly", priority: 0.3 },
   ];
 
   // Las cuatro páginas de servicio son las que atacan las búsquedas locales.

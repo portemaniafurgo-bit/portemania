@@ -11,7 +11,7 @@ export default function PrivacidadPage() {
     <div className="max-w-3xl mx-auto px-4 py-12 space-y-8">
       <div>
         <h1 className="text-3xl font-display font-bold text-foreground">Política de Privacidad</h1>
-        <p className="text-sm text-muted-foreground mt-2">Última actualización: julio de 2026</p>
+        <p className="text-sm text-muted-foreground mt-2">Última actualización: septiembre de 2026</p>
       </div>
 
       <section className="space-y-3">
@@ -104,6 +104,9 @@ export default function PrivacidadPage() {
         <h2 className="text-xl font-heading font-semibold text-foreground">8. Derechos del usuario</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Conforme al RGPD, puede ejercer los derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad de sus datos escribiendo a <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">{CONTACT_EMAIL}</a>. También puede presentar una reclamación ante la Agencia Española de Protección de Datos (aepd.es).
+        </p>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Puede eliminar su cuenta directamente desde la app o siguiendo las instrucciones de la página <a href="/eliminar-cuenta" className="text-primary hover:underline">Eliminar tu cuenta</a>.
         </p>
       </section>
 

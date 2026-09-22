@@ -15,6 +15,7 @@ import { serviceOf } from "../../../lib/services";
 import { euro } from "../../../lib/money";
 import { geocodeAlbacete } from "../../../lib/eta";
 import { setArrivalTarget, startTracking, stopTracking } from "../../../lib/tracking";
+import { ensureBackgroundLocationDisclosure } from "../../../lib/locationDisclosure";
 import TrackingMap from "../../../components/TrackingMap";
 import ChatBubbleButton from "../../../components/ChatBubbleButton";
 import { useDialog } from "../../../components/Dialog";
@@ -301,9 +302,25 @@ export default function TrabajoActivo() {
     if (!active || !profile?.id || trackingStarted.current) return;
 
     trackingStarted.current = true;
-    startTracking(profile.id).then(result => {
+    // ANTES del permiso de segundo plano va la divulgación destacada que exige
+    // Google Play (lib/locationDisclosure.js). Si el conductor no acepta, no se
+    // pide el permiso y se explica qué se pierde.
+    // El callback del efecto NO puede ser async (devolvería una promesa donde
+    // React espera la función de limpieza), y `dialog` NO entra en las
+    // dependencias: el contexto del diálogo cambia de identidad al abrirse y
+    // cerrarse, y el efecto se reengancharía en bucle.
+    (async () => {
+      const ok = await ensureBackgroundLocationDisclosure(dialog);
+      if (!ok) {
+        setError(
+          "Sin el permiso de ubicación «todo el tiempo» el cliente no podrá seguirte. Puedes activarlo desde Ayuda.",
+        );
+        trackingStarted.current = false;
+        return;
+      }
+      const result = await startTracking(profile.id);
       if (!result.ok) setError(result.reason);
-    });
+    })();
   }, [order?.status, profile?.id]);
 
   // Destino de la fase actual, para que el seguimiento avise al cliente cuando

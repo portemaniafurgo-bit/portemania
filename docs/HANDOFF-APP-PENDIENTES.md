@@ -105,6 +105,9 @@ subir service account) → rebuild APK → probar la matriz de §6 de
 FUNCIONALIDADES-APP-ANDROID.md con dos móviles y la app CERRADA.
 **Hecho cuando**: pedido nuevo suena en el móvil del conductor de prueba con
 la app cerrada; asignación/estados/chat llegan al cliente.
+**Preparación hecha el 22/09/2026**: `mobile/app.config.js` ya engancha el
+`google-services.json` (fichero local o variable de EAS) y los canales llevan
+sonido propio y vibración — ver [PLAY-STORE.md §3](PLAY-STORE.md).
 
 ### T2 — Verificación por SMS (OTP) en el registro 🔑
 **Qué falta**: cuenta Twilio Verify del negocio.
@@ -153,6 +156,13 @@ negocio, `Sentry.init` en `app/_layout.js` y probar un error de ejemplo.
 3. Play Console (25 USD, cuenta del negocio): ficha, capturas, política de
    privacidad (ya existe en la web), **Data Safety** declarando ubicación en
    segundo plano + vídeo justificativo, build `production` (AAB) y submit.
+
+**Preparación hecha el 22/09/2026: ver [PLAY-STORE.md](PLAY-STORE.md)** — versión
+1.0.0, permisos limpios, divulgación destacada de ubicación, página pública
+`/eliminar-cuenta`, icono 512 + gráfico de cabecera + textos de la ficha en
+`mobile/store/`, y el reparto de tareas con el agente del navegador en
+[BRIEF-CLAUDE-CHROME-PLAY.md](BRIEF-CLAUDE-CHROME-PLAY.md). Queda lo que no es
+código: cuenta de Play, Firebase, consent screen, Stripe live y las capturas.
 
 ### T10 — Opcionales acordados como mejoras
 Escaneo de bordes de documentos (react-native-vision-camera, módulo nativo),

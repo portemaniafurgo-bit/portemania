@@ -1,7 +1,7 @@
 # Avisos push de ClicyVoy
 
 Qué se avisa, a quién, quién lo dispara y qué falta para que lleguen de verdad
-al móvil. Actualizado el 18/08/2026.
+al móvil. Actualizado el 22/09/2026.
 
 > **Estado hoy:** todo el código está escrito y desplegable, pero **ningún aviso
 > sale del servidor todavía**: falta el proyecto de Firebase (§4). Mientras
@@ -80,12 +80,26 @@ Pasos, en orden:
 
 1. **Crear el proyecto en Firebase** (console.firebase.google.com) con el
    paquete `com.clicyvoy.app`. Sale gratis.
-2. Descargar **`google-services.json`** y dejarlo en `mobile/`.
+2. Descargar **`google-services.json`** y dejarlo en `mobile/` (está en el
+   `.gitignore`). Quien lo engancha a la build es **`mobile/app.config.js`**: usa
+   el fichero local si existe y, si no, la **variable de entorno de tipo fichero
+   `GOOGLE_SERVICES_JSON` de EAS** — que es la que hace falta para las builds en
+   la nube (`eas env:create --type file`, receta exacta en
+   [PLAY-STORE.md §3](PLAY-STORE.md)). Sin ninguna de las dos, la build sale
+   igual pero no hay push.
 3. En Firebase → Configuración → Cuentas de servicio: **generar una clave
    privada** (JSON).
 4. Subirla a Expo: `eas credentials` → Android → *Google Service Account Key for
    Push Notifications (FCM V1)*.
 5. **Recompilar el APK** (el `google-services.json` es nativo, no viaja por OTA).
+
+**Sonido y vibración ya están hechos** (22/09/2026): el canal `ofertas` suena con
+la melodía propia `mobile/assets/sounds/oferta.wav` (se genera con
+`node scripts/generate-notification-sound.mjs`), vibra con patrón largo y se ve
+en la pantalla de bloqueo; `estado` usa el sonido por defecto con vibración
+corta. Ojo: **Android congela la configuración del canal en la primera
+instalación**, así que un móvil que ya tenga ClicyVoy hay que desinstalarlo y
+volver a instalarlo para oír el sonido nuevo.
 6. ~~Crear los dos secretos en Vault~~ **HECHO** (25/08/2026): `project_url` y
    `service_role_key` ya están guardados.
 7. ~~Aplicar `0015_avisos_push.sql`~~ **HECHO**: los triggers y el cron están
