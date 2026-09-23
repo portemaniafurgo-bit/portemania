@@ -239,9 +239,14 @@ gráficos de la ficha los sube `scripts/play-upload.mjs`.
 > clasificador de Claude Code la bloqueaba): versión **1.0.0 (versionCode 2)** en
 > la pista **internal** como **borrador**, más icono y gráfico de cabecera.
 > Verificado por lectura con `--validate`: `Pista internal: 1.0.0 [draft] codes=2`.
-> Queda para la consola: *Revisar versión* → *Iniciar lanzamiento en pruebas
-> internas*, el formulario de ubicación en segundo plano (§7.7) y el enlace de
-> participación. Capturas: pendientes (`--screenshots mobile/store/screenshots`).
+> **Publicada en pruebas internas el 23/09/2026 a las 18:56** («Disponible para
+> testers internos»). Enlace de participación:
+> **https://play.google.com/apps/internaltest/4700861035178357384**. Lista de
+> testers «ClicyVoy internos»: portemaniafurgo@gmail.com, rodriguezmartinezlw@gmail.com
+> y renato.0550.calero@gmail.com (solo esas cuentas de Google ven la prueba).
+> Aviso de Play (no bloquea): sin fichero de desofuscación R8/ProGuard; la build
+> de Expo no ofusca, así que no aplica. Pendientes: formulario de ubicación en
+> segundo plano (§7.7) con vídeo, y capturas (`--screenshots mobile/store/screenshots`).
 
 **Requisitos** (una sola vez; el paso a paso con clics está en
 [BRIEF-CLAUDE-CHROME-PLAY.md §T7](BRIEF-CLAUDE-CHROME-PLAY.md)):
