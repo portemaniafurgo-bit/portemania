@@ -17,6 +17,10 @@ El icono de notificación de Android (`../assets/notification-icon.png`, silueta
 blanca de 96×96) se genera con el mismo script, aunque no se sube a Play: va
 dentro del APK.
 
+Las imágenes y las capturas se suben con `node scripts/play-upload.mjs` desde la
+raíz del repo (ver [`../../docs/PLAY-STORE.md` §6](../../docs/PLAY-STORE.md)).
+No hace falta subirlas a mano en Play Console.
+
 ## Cómo regenerar los gráficos
 
 ```bash

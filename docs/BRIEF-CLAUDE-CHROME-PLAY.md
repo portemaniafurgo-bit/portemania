@@ -142,6 +142,12 @@ reescribir.** Claude Code los tendrá abiertos; si no se ven, pedírselos.
 | Gráfico de cabecera | fichero **`mobile/store/feature-graphic-1024x500.png`** |
 | Capturas de teléfono | ficheros de **`mobile/store/screenshots/`** (mínimo 2, mejor 6–8, en orden 01→08) |
 
+> **Desde el 23/09/2026**, las tres últimas filas (icono, gráfico de cabecera y
+> capturas) **las sube Claude Code por API** con `scripts/play-upload.mjs` en
+> cuanto exista la cuenta de servicio de **T7**. Claude Chrome solo rellena los
+> textos y la configuración; si las imágenes ya están puestas, se dejan como
+> están.
+
 En *Configuración de la tienda* → **Categoría**: `Mapas y navegación`.
 Etiquetas: portes, mudanzas, transporte, furgoneta, mensajería, envíos.
 
@@ -194,17 +200,27 @@ faltan, con el motivo exacto de cada uno que falte.
 
 ## T6 — Prueba interna
 
+> **Desde el 23/09/2026 el AAB y las imágenes los sube Claude Code por API**
+> (hay que hacer **T7 primero**). Lo que queda para Claude Chrome en T6 es:
+> descartar la versión sin guardar que quedó abierta en «Crear versión de prueba
+> interna» (si Play la conserva), esperar el aviso de Claude Code, entrar en
+> *Pruebas internas* → la versión **1.0.0** aparece como **borrador** → *Revisar
+> versión* → **Iniciar lanzamiento en pruebas internas** → rellenar el formulario
+> **5.9** → copiar el **enlace de participación**.
+
 **Dónde**: Play Console → la app → *Pruebas* → **Pruebas internas**.
 
 1. Pestaña **Testers** → *Crear lista de correos electrónicos* → añadir el correo
    de Luis y `portemaniafurgo@gmail.com` → guardar y marcar la lista.
-2. Pestaña **Versiones** → *Crear versión*.
+2. Pestaña **Versiones**: si quedó abierta una versión sin guardar de un intento
+   anterior, **descartarla**. No crear ninguna versión nueva a mano.
 3. Aceptar **Play App Signing** cuando lo proponga (es obligatorio y no hay nada
    que configurar).
-4. Subir el **`.aab`** que entrega Claude Code (`clicyvoy-1.0.0.aab` o el nombre
-   que tenga). ⚠️ Es un `.aab`, no un `.apk`.
-5. Nombre de la versión: `1.0.0`. **Notas de la versión**: copiar *Novedades de la
-   versión 1.0.0* de `listing.es.md`.
+4. Esperar el aviso de Claude Code de que la versión está subida. El bundle y las
+   **notas de la versión** (`1.0.0`, el texto de `listing.es.md`) ya van dentro:
+   no hay que subir ni escribir nada.
+5. La versión **1.0.0** aparece en la pista como **borrador** (Google no permite
+   otra cosa mientras la app no se ha publicado nunca).
 6. *Revisar versión* → **Iniciar lanzamiento en pruebas internas** → confirmar.
 7. Volver a *Testers* → copiar el **enlace de participación** («Copiar enlace»).
 
@@ -213,20 +229,66 @@ versión (en revisión / disponible).
 
 ---
 
-## T7 — (Opcional) Cuenta de servicio de Play para `eas submit`
+## T7 — Cuenta de servicio de Google Play (para que Claude Code suba el AAB y las imágenes por API)
 
-Solo si Luis quiere que las siguientes versiones suban solas desde la terminal.
+**No es opcional y va ANTES de T6.** Nadie puede usar el selector de ficheros del
+navegador, así que el AAB (100 MB), el icono, el gráfico de cabecera y las
+capturas los sube Claude Code con `scripts/play-upload.mjs` por la Google Play
+Developer API. Para eso hace falta esta cuenta de servicio.
 
-1. https://console.cloud.google.com → *IAM y administración* → **Cuentas de
-   servicio** → *Crear cuenta de servicio* → nombre `eas-submit-clicyvoy`.
-2. Dentro de la cuenta → pestaña **Claves** → *Añadir clave* → *Crear clave nueva*
-   → **JSON** → se descarga.
-3. Play Console → *Usuarios y permisos* → **Invitar usuario** → el correo de esa
-   cuenta de servicio → permisos de aplicación: **ClicyVoy**, con *Publicar
-   versiones en pruebas* y *Ver información de la app*.
+### 1. Habilitar la API en Google Cloud
 
-**ENTREGABLE**: nombre exacto del JSON descargado y confirmación de la
-invitación aceptada en Play Console.
+1. Ir a https://console.cloud.google.com
+2. Arriba, en el selector de proyecto, elegir el proyecto **`clicyvoy`** (el
+   mismo de Firebase de T1). ⚠️ No crear otro.
+3. Menú (☰) → **APIs y servicios** → **Biblioteca**.
+4. Buscar **«Google Play Android Developer API»** → abrirla → **Habilitar**.
+   (Si ya pone *Administrar*, es que está habilitada: seguir.)
+
+### 2. Crear la cuenta de servicio
+
+1. Menú (☰) → **IAM y administración** → **Cuentas de servicio**.
+2. **Crear cuenta de servicio**.
+3. Nombre de la cuenta de servicio: **`play-publisher-clicyvoy`** (el ID se
+   rellena solo) → **Crear y continuar**.
+4. *Conceder acceso a esta cuenta de servicio al proyecto*: **sin roles**, dejarlo
+   vacío → **Continuar**.
+5. *Conceder acceso a los usuarios*: vacío → **Listo**.
+
+### 3. Descargar la clave JSON
+
+1. En la lista, abrir **`play-publisher-clicyvoy`**.
+2. Pestaña **Claves** → **Añadir clave** → **Crear clave nueva** → tipo **JSON**
+   → **Crear**. El fichero se descarga a la carpeta **Descargas**.
+3. **Anotar el nombre exacto del fichero** (tiene la forma
+   `clicyvoy-xxxxxxxxxxxx.json`) y el **correo de la cuenta de servicio**, que
+   tiene la forma **`play-publisher-clicyvoy@clicyvoy.iam.gserviceaccount.com`**
+   y se ve en la pestaña *Detalles*.
+   ⚠️ El JSON es una credencial: no pegarlo en ningún chat ni captura; se queda
+   en Descargas y Claude Code lo mueve a su sitio.
+
+### 4. Dar permisos en Play Console
+
+1. Ir a https://play.google.com/console → **Usuarios y permisos** (menú de la
+   izquierda, abajo).
+2. **Invitar usuarios nuevos**.
+3. En *Dirección de correo electrónico*, pegar el correo de la cuenta de servicio
+   del paso 3.3.
+4. Pestaña **Permisos de la app** → **Añadir aplicación** → **ClicyVoy**.
+5. Marcar estos cinco permisos, y solo estos:
+   - **Ver información de la app** (y descargar informes masivos)
+   - **Editar y eliminar borradores de versiones**
+   - **Publicar versiones en pistas de prueba**
+   - **Gestionar pistas de prueba y editar listas de testers**
+   - **Editar información de la ficha de Play Store, precios y distribución**
+6. **Invitar usuario** → confirmar.
+   ⚠️ Las cuentas de servicio **no aceptan la invitación** ni reciben correo:
+   quedan activas en cuanto se invitan. No hay que esperar nada.
+
+**ENTREGABLE**: el **nombre exacto del JSON** que ha quedado en Descargas y el
+**correo de la cuenta de servicio**. Con eso Claude Code lo guarda como
+`mobile/play-service-account.json`, comprueba los permisos con
+`node scripts/play-upload.mjs --validate` y sube el AAB y los gráficos.
 
 ---
 
@@ -237,14 +299,17 @@ invitación aceptada en Play Console.
 | `google-services.json` | T1 | Lo mueve a `mobile/google-services.json` y lo sube a EAS (`env:create`) |
 | JSON de cuenta de servicio de Firebase | T1 | `eas credentials -p android` → clave FCM V1 |
 | Confirmación de consent screen publicada | T2 | Cierra el pendiente T3 del handoff |
+| **JSON de la cuenta de servicio de Play** (nombre del fichero en Descargas) | **T7** | Lo guarda como `mobile/play-service-account.json` y sube el AAB, el icono, la cabecera y las capturas con `node scripts/play-upload.mjs` |
+| **Correo de la cuenta de servicio** (`play-publisher-…@…gserviceaccount.com`) | **T7** | Comprueba con él los permisos (`--validate`) antes de subir nada |
 | Enlace de participación de la prueba interna | T6 | Se lo pasa a Luis para instalar |
-| JSON de cuenta de servicio de Play (opcional) | T7 | Lo guarda como `mobile/play-service-account.json` para `eas submit` |
 
 ## Qué necesita Claude Chrome de Claude Code
 
 | Necesita | Cuándo | Nota |
 |---|---|---|
-| El **`.aab`** de la build `production` | Antes de T6 | Solo se genera con el OK explícito de Luis |
-| Las **capturas** de `mobile/store/screenshots/` | Antes de T4 | Las hace Luis en su móvil con `adb` |
+| El **aviso de que la versión ya está subida** | Antes de T6 | El `.aab` lo sube Claude Code por API: Claude Chrome **no** necesita el fichero |
 | Las **credenciales de las cuentas de prueba** | Antes de T5.2 | Se crean para la revisión y se borran al terminar |
 | El **enlace del vídeo** de ubicación en segundo plano | Antes de T5.9 | Lo graba Luis; YouTube, no listado, ≤30 s |
+
+> El icono, el gráfico de cabecera y las **capturas** ya no se le piden a Claude
+> Chrome: los sube Claude Code por API en cuanto Luis las haya hecho con `adb`.

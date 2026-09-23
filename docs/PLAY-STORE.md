@@ -223,31 +223,86 @@ npx eas-cli@latest build -p android --profile production
 
 ## 6. Primera subida y pistas de publicación
 
-**La primera subida de una app nueva se hace A MANO en Play Console.** Google no
-habilita la API de publicación hasta que existe al menos una versión subida por
-la consola, así que `eas submit` **no funciona la primera vez** (falla con un
-error de permisos que despista mucho).
+**La primera subida se hace por API.** La primera versión de este runbook daba
+por hecho que Google no habilita `androidpublisher` hasta que hay un bundle
+subido a mano por la consola: **no es así**. Expo y Google admiten la primera
+subida por API en una app nueva. La restricción real es otra: mientras la app
+**nunca ha sido publicada**, la versión solo puede quedar en estado **`draft`**
+(borrador), y el botón **«Iniciar lanzamiento»** se pulsa una vez en la consola.
 
-1. Play Console → **Pruebas** → **Pruebas internas** → *Crear versión*.
-2. Subir el `.aab`, poner las **novedades** (el texto de `listing.es.md`).
-3. **Testers**: crear una lista con el correo de Luis y el del negocio (y los
-   conductores que vayan a probar). Hasta 100.
-4. *Revisar versión* → **Publicar**. La prueba interna suele estar disponible en
-   minutos; copiar el **enlace de participación** y abrirlo en el móvil.
+Como aquí nadie puede usar el selector de ficheros del navegador, el AAB y los
+gráficos de la ficha los sube `scripts/play-upload.mjs`.
+
+### Subida por API con scripts/play-upload.mjs
+
+**Requisitos** (una sola vez; el paso a paso con clics está en
+[BRIEF-CLAUDE-CHROME-PLAY.md §T7](BRIEF-CLAUDE-CHROME-PLAY.md)):
+
+1. En el proyecto de Google Cloud de la cuenta de servicio — el mismo de
+   Firebase, **`clicyvoy`** — *APIs y servicios* → **Biblioteca** → «Google Play
+   Android Developer API» → **Habilitar**. Sin esto la API responde 403 aunque
+   los permisos de Play estén bien puestos.
+2. Una **cuenta de servicio** (`play-publisher-clicyvoy`) con su **clave JSON**.
+   No necesita ningún rol de IAM: los permisos los da Play, no Cloud.
+3. Play Console → **Usuarios y permisos** → *Invitar usuarios nuevos* → el correo
+   de esa cuenta de servicio → **Permisos de la app** → ClicyVoy, marcando:
+   - *Ver información de la app*
+   - *Editar y eliminar borradores de versiones*
+   - *Publicar versiones en pistas de prueba*
+   - *Gestionar pistas de prueba y editar listas de testers*
+   - *Editar información de la ficha de Play Store, precios y distribución*
+
+   Las cuentas de servicio **no tienen que aceptar la invitación**: quedan
+   activas en cuanto se invitan.
+4. El JSON descargado, guardado como **`mobile/play-service-account.json`**
+   (ignorado por git — no se commitea nunca).
+
+**Comandos**, desde la RAÍZ del repo:
+
+```bash
+node scripts/play-upload.mjs --validate
+node scripts/play-upload.mjs --aab "C:/Users/PROPIETARIO/Downloads/clicyvoy-1.0.0-vc2.aab" --icon mobile/store/icon-512.png --feature mobile/store/feature-graphic-1024x500.png
+node scripts/play-upload.mjs --screenshots mobile/store/screenshots
+```
+
+- `--validate` autentica, abre un *edit*, lista las pistas y lo descarta:
+  comprueba credenciales y permisos **sin cambiar nada**. Si falla, el fallo está
+  en los requisitos de arriba.
+- El segundo comando sube el bundle, pone las **novedades** (las saca del bloque
+  de `mobile/store/listing.es.md` bajo *Novedades de la versión*), deja la
+  versión en la pista `internal` como **`draft`** y sube icono y gráfico de
+  cabecera (borra antes los que hubiera de ese tipo).
+- El tercero sube las capturas cuando existan. Con el directorio vacío avisa y no
+  toca nada.
+- `--dry-run` hace el ensayo sin red: valida ficheros, dimensiones y notas y
+  enseña el plan de llamadas. Conviene pasarlo antes de la subida de verdad.
+- El commit se hace con `changesNotSentForReview=true`: **no envía a revisión**.
+
+**Lo que queda para la consola**, a mano:
+
+1. Play Console → **Pruebas** → **Pruebas internas**: la versión 1.0.0 aparece
+   como **borrador**.
+2. *Revisar versión* → **Iniciar lanzamiento en pruebas internas** → confirmar.
+3. **Testers**: lista con el correo de Luis y el del negocio (y los conductores
+   que vayan a probar; hasta 100). Copiar el **enlace de participación** y
+   abrirlo en el móvil.
+4. El formulario de **permisos sensibles** con el vídeo de la ubicación en
+   segundo plano (§7.7 de este runbook; *5.9* del brief de Chrome): eso no va por
+   API.
 5. Solo después: pruebas cerradas (si la cuenta es personal, aquí van los 12
    testers / 14 días) y producción.
 
-A partir de la **segunda** versión ya se puede automatizar:
+### Alternativa: eas submit
 
-1. Google Cloud → *IAM y administración* → **Cuentas de servicio** → crear una →
-   **Claves** → *Añadir clave* → JSON → guardarla como
-   **`mobile/play-service-account.json`** (ignorada por git).
-2. Play Console → **Usuarios y permisos** → *Invitar usuario* → el correo de esa
-   cuenta de servicio → permisos de *Publicar versiones* en la app.
-3. ```bash
-   cd mobile
-   npx eas-cli@latest submit -p android --profile production --latest
-   ```
+Sigue siendo válido, y usa la misma cuenta de servicio y la misma API:
+
+```bash
+cd mobile
+npx eas-cli@latest submit -p android --profile production --latest
+```
+
+Se queda corto para lo que hace falta ahora (no sube icono, ni cabecera, ni
+capturas), pero va bien para las versiones siguientes.
 
 ---
 
