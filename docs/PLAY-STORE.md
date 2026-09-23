@@ -187,10 +187,21 @@ permiso. La matriz completa de avisos está en
 
 ## 5. Build de producción
 
+> **HECHA el 23/09/2026 con OK explícito de Luis**: build EAS
+> `a5e1879c-672e-4a81-ad97-afacd41598f8`, versión **1.0.0**, **versionCode 2**,
+> keystore de EAS (Build Credentials 92z97r4xvw). AAB descargado en
+> `C:\Users\PROPIETARIO\Downloads\clicyvoy-1.0.0-vc2.aab` (99,8 MB, 4 ABIs) y
+> **verificado**: `google_app_id` de Firebase en `resources.pb` (push OK),
+> `res/raw/oferta` (melodía), icono de notificación, `ACCESS_BACKGROUND_LOCATION`
+> presente, `RECORD_AUDIO` y `AD_ID` ausentes, paquete `com.clicyvoy.app`.
+> Comprobación reutilizable: `unzip -p x.aab base/resources.pb | grep -a -c google_app_id`.
+> Nota: el clasificador de Claude Code bloquea `eas build` en la consola Bash;
+> por la consola PowerShell pasó con la autorización de Luis en la descripción.
+
 **Prerrequisitos** (los tres, o no tiene sentido lanzarla):
 
 - [x] `google-services.json` subido a EAS (§3, paso 4). *(22/09/2026, `production` y `preview`)*
-- [ ] `mobile/app.json` y `mobile/package.json` en **1.0.0**.
+- [x] `mobile/app.json` y `mobile/package.json` en **1.0.0**.
 - [ ] `cd mobile && npm run check` en verde y
       `npx expo export --platform android` sin errores.
 
@@ -477,20 +488,20 @@ aparecer; **el pago con tarjeta funciona igual** y no bloquea la publicación.
 
 **Antes de mandar a revisión**
 
-- [ ] Cuenta de Play Console creada y pagada (personal u organización — §2).
+- [x] Cuenta de Play Console creada y pagada (personal u organización — §2).
 - [x] Proyecto de Firebase creado, `google-services.json` en `mobile/` y en EAS. *(22/09/2026: proyecto `clicyvoy`, nº 81320682561, app `com.clicyvoy.app`, FCM V1 habilitado)*
 - [x] Clave FCM V1 subida a EAS. *(22/09/2026 por la API GraphQL de Expo: `firebase-adminsdk-fbsvc@clicyvoy.iam.gserviceaccount.com`, asignada a `com.clicyvoy.app` y verificada)*
 - [x] Consent screen de Google Cloud **publicada** y con el nombre *ClicyVoy*. *(22/09/2026, proyecto `portemania`; queda el aviso «marca sin verificar», que no bloquea)*
 - [ ] Decidido qué se hace con Stripe (seguir en test = **no** cobrar de verdad).
-- [ ] Build `production` (AAB) generada con el OK de Luis y descargada.
-- [ ] Ficha rellena con los textos de `mobile/store/listing.es.md`.
+- [x] Build `production` (AAB) generada con el OK de Luis y descargada.
+- [x] Ficha rellena con los textos de `mobile/store/listing.es.md`.
 - [ ] Icono 512, gráfico de cabecera y **al menos 2 capturas** subidos.
 - [ ] Formularios de *Contenido de la aplicación* completos (§7).
 - [ ] Vídeo de la ubicación en segundo plano subido a YouTube (no listado) y
       enlazado.
 - [ ] Cuentas de prueba creadas, conductor **verificado**, credenciales en el
       formulario de acceso.
-- [ ] `https://clicyvoy.es/privacidad` y `https://clicyvoy.es/eliminar-cuenta`
+- [x] `https://clicyvoy.es/privacidad` y `https://clicyvoy.es/eliminar-cuenta`
       responden 200 en producción.
 
 **Después de publicar**
