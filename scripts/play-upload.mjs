@@ -610,11 +610,29 @@ async function modoSubida(ctx, opciones, plan) {
       aviso(`Directorio de capturas vacío (${plan.dirCapturas}): no se han tocado las capturas de Play.`);
     }
 
-    const sufijo = opciones.enviarARevision ? "" : "?changesNotSentForReview=true";
-    const confirmado = await api(ctx, "POST", `/edits/${edit.id}:commit${sufijo}`, undefined);
+    // Google solo admite `changesNotSentForReview=true` en apps con
+    // «publicación gestionada» activada. En ClicyVoy (23/09/2026) respondió
+    // 400 «Changes are sent for review automatically. The query parameter
+    // changesNotSentForReview must not be set»: es el mismo comportamiento que
+    // pulsar Guardar en la consola (la ficha pasa a la cola de revisión de
+    // Google; la versión sigue en borrador y nada llega a los usuarios). Se
+    // reintenta sin el parámetro para no tirar la subida entera por eso.
+    let sufijo = opciones.enviarARevision ? "" : "?changesNotSentForReview=true";
+    let confirmado;
+    try {
+      confirmado = await api(ctx, "POST", `/edits/${edit.id}:commit${sufijo}`, undefined);
+    } catch (e) {
+      if (sufijo && /changesNotSentForReview must not be set/i.test(e.message)) {
+        aviso("Google no admite retener la revisión en esta app: confirmo como lo haría Guardar en la consola.");
+        sufijo = "";
+        confirmado = await api(ctx, "POST", `/edits/${edit.id}:commit`, undefined);
+      } else {
+        throw e;
+      }
+    }
     ok(
       `Edit ${confirmado.id ?? edit.id} confirmado ` +
-        `(${opciones.enviarARevision ? "ENVIADO a revisión" : "sin enviar a revisión"}).`,
+        `(${sufijo ? "sin enviar a revisión" : "los cambios de ficha entran en la cola de revisión de Google"}).`,
     );
 
     console.log(`\nResumen: ${hechos.join("; ") || "nada que subir"}.`);

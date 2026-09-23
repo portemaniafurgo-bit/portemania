@@ -276,7 +276,16 @@ node scripts/play-upload.mjs --screenshots mobile/store/screenshots
   toca nada.
 - `--dry-run` hace el ensayo sin red: valida ficheros, dimensiones y notas y
   enseña el plan de llamadas. Conviene pasarlo antes de la subida de verdad.
-- El commit se hace con `changesNotSentForReview=true`: **no envía a revisión**.
+- El commit intenta primero `changesNotSentForReview=true`; **en ClicyVoy Google
+  lo rechaza** (400 «Changes are sent for review automatically»: solo vale con
+  «publicación gestionada» activada) y el script reintenta sin el parámetro. Es
+  lo mismo que pulsar *Guardar* en la consola: la ficha entra en la cola de
+  revisión de Google, la versión sigue en **borrador** y nada llega a usuarios.
+- ⚠️ El clasificador de permisos de Claude Code bloquea esta subida (la toma por
+  un despliegue a producción) desde Bash y desde PowerShell. Comprobado el
+  23/09/2026: `--validate` pasa, la subida se paró en el commit. La línea la
+  ejecuta Luis en PowerShell, o se añade una regla de permiso en
+  `~/.claude/settings.json` para `node scripts/play-upload.mjs`.
 
 **Lo que queda para la consola**, a mano:
 
