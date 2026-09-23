@@ -40,7 +40,7 @@
 
 | # | Bloqueo | De quién depende |
 |---|---|---|
-| 1 | **Cuenta de Play Console** (25 USD, pago único) | Luis paga; Claude Chrome rellena |
+| 1 | ~~**Cuenta de Play Console**~~ **HECHO 22/09/2026**: ya existía una cuenta **PERSONAL** del negocio (sin pago); app creada, id `4974795009233332224`. ⚠️ Por ser personal: **12 testers × 14 días en prueba cerrada antes de producción** (§2) | — |
 | 2 | ~~**Proyecto de Firebase** + `google-services.json` + clave FCM V1~~ **HECHO 22/09/2026**: proyecto `clicyvoy` (nº 81320682561), fichero en `mobile/google-services.json` y en EAS (`GOOGLE_SERVICES_JSON`, production y preview), clave FCM V1 `firebase-adminsdk-fbsvc@clicyvoy.iam.gserviceaccount.com` asignada a `com.clicyvoy.app` | — |
 | 3 | ~~**Consent screen de Google Cloud** publicada~~ **HECHO 22/09/2026**: proyecto `portemania`, nombre «ClicyVoy», estado *En producción* (falta solo el enlace a condiciones: https://clicyvoy.es/terminos) | — |
 | 4 | **Claves Stripe live** (hoy son de prueba) | Decisión de Luis |
@@ -288,8 +288,37 @@ ninguna oferta y el revisor pensará que la app está vacía.
   transporte, pagados con tarjeta a través de Stripe; no hay compras dentro de
   la app de contenido digital).
 
+Preguntas adicionales del cuestionario (respondidas el 23/09/2026 según lo que
+la app hace de verdad):
+
+- ¿Los usuarios pueden **bloquear** a otros usuarios? **No** (no hay bloqueo; el
+  conductor solo descarta pedidos con «No me interesa»).
+- ¿Los usuarios pueden **denunciar** a otros usuarios o su contenido? **Sí**: el
+  cliente abre una **incidencia** sobre el servicio desde la app y la revisa el
+  negocio.
+- ¿La interacción está **moderada**? **No** (el chat no se filtra ni se revisa en
+  tiempo real; el administrador puede leerlo si hay una incidencia).
+- ¿Se puede limitar la interacción a **amigos invitados**? **No** (la interacción
+  es solo entre el cliente y el conductor asignado a su servicio).
+- ¿Contenido descargable sujeto a clasificación? **No**. ¿Contenido generado por
+  los usuarios como fuente principal? **No**. ¿Desnudos? **No**. ¿Violencia real?
+  **No**.
+
 Resultado esperado: **PEGI 3 / apta para todos** con avisos de interacción entre
 usuarios y de compartir ubicación.
+
+### 7.3 bis Identificador de publicidad (Advertising ID)
+
+> **Respuesta: No**, la app no usa el identificador de publicidad.
+
+La build **no declara** `com.google.android.gms.permission.AD_ID`: desde el
+23/09/2026 está en `android.blockedPermissions` de `mobile/app.json`, así que
+aunque alguna dependencia lo arrastre, el manifiesto final lo elimina. Play
+comprueba el manifiesto del AAB contra esta declaración: tienen que coincidir.
+
+Otras dos respuestas del formulario de seguridad de datos que no estaban en la
+tabla: **creación de cuenta** = «nombre de usuario y contraseña» + «OAuth»
+(Google); **tratamiento efímero** = No para todos los tipos.
 
 ### 7.4 Público objetivo y contenido
 
