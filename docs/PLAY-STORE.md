@@ -235,6 +235,14 @@ gráficos de la ficha los sube `scripts/play-upload.mjs`.
 
 ### Subida por API con scripts/play-upload.mjs
 
+> **HECHA el 23/09/2026** (Luis ejecutó la línea en PowerShell porque el
+> clasificador de Claude Code la bloqueaba): versión **1.0.0 (versionCode 2)** en
+> la pista **internal** como **borrador**, más icono y gráfico de cabecera.
+> Verificado por lectura con `--validate`: `Pista internal: 1.0.0 [draft] codes=2`.
+> Queda para la consola: *Revisar versión* → *Iniciar lanzamiento en pruebas
+> internas*, el formulario de ubicación en segundo plano (§7.7) y el enlace de
+> participación. Capturas: pendientes (`--screenshots mobile/store/screenshots`).
+
 **Requisitos** (una sola vez; el paso a paso con clics está en
 [BRIEF-CLAUDE-CHROME-PLAY.md §T7](BRIEF-CLAUDE-CHROME-PLAY.md)):
 
