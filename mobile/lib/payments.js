@@ -14,11 +14,12 @@ import { supabase } from "./supabase";
  * trae Google Pay y el 3DS nativo.
  */
 
-// Clave PUBLICABLE (de prueba, igual que la web hoy): es pública por diseño.
-// Al lanzar, cambiar a la pk_live a la vez que la web.
+// Clave PUBLICABLE REAL (cobros reales desde oct-2026): es pública por diseño.
+// Va a la par con la sk_live del secreto STRIPE_SECRET_KEY de Supabase y con
+// NEXT_PUBLIC_STRIPE_PUBLIC_KEY de Vercel: si una no casa, el pago falla.
 export const STRIPE_PUBLISHABLE_KEY =
   process.env.EXPO_PUBLIC_STRIPE_PUBLIC_KEY ||
-  "pk_test_51ToqiV0CdR56sVIhFufXDcekZbDuW8xrQXuvqtzep1EC7KJE2bfyLhqBqGxd4WtB2BayPc4bvjuAYHF3RL4cH5uW001A0gC2qo";
+  "pk_live_51ToqiV0CdR56sVIhbj0VfKa8mMi0EoQIJUENpcMPBJycbVxzYpxRgeLi3MGCULDhvo4ZnCYwHqnpGZLMK7riIq7J00NkSun8NR";
 
 export const STRIPE_MERCHANT_ID = "merchant.com.clicyvoy.app";
 
