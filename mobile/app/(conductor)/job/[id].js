@@ -17,6 +17,7 @@ import { geocodeAlbacete } from "../../../lib/eta";
 import { setArrivalTarget, startTracking, stopTracking } from "../../../lib/tracking";
 import { ensureBackgroundLocationDisclosure } from "../../../lib/locationDisclosure";
 import TrackingMap from "../../../components/TrackingMap";
+import { isStillRepeat, pickFix } from "../../../lib/geo";
 import ChatBubbleButton from "../../../components/ChatBubbleButton";
 import { useDialog } from "../../../components/Dialog";
 import { uploadProofPhoto, uploadSignature } from "../../../lib/deliveryProof";
@@ -132,6 +133,10 @@ export default function TrabajoActivo() {
   const { order, loading, patchOrder } = useOrder(id);
 
   const [profile, setProfile] = useState(null);
+  // La última lectura del perfil falló (no es "sin perfil"). profileRetry
+  // fuerza una nueva lectura.
+  const [profileError, setProfileError] = useState(false);
+  const [profileRetry, setProfileRetry] = useState(0);
   const [unreadCount, setUnreadCount] = useState(0);
   const [error, setError] = useState("");
   // ETA hacia el destino de ahora, que pinta la banda de estado (canvas 1k).
@@ -159,6 +164,8 @@ export default function TrabajoActivo() {
   const [myPos, setMyPos] = useState(null);
   const [fallbackTarget, setFallbackTarget] = useState(null);
   const trackingStarted = useRef(false);
+  // Último fix aceptado para el mapa propio (filtro de lib/geo.js).
+  const lastFixRef = useRef(null);
 
   useEffect(() => {
     let active = true;
@@ -182,16 +189,19 @@ export default function TrabajoActivo() {
             );
           }
         }).catch(() => {});
+        // Misma calidad que lo que ve el cliente (lib/tracking.js): GPS de
+        // alta precisión, cada ~3 s, y el mismo filtro de fixes malos, para
+        // que las dos pantallas pinten la furgoneta en la misma calle. Parado,
+        // el ruido del GPS no la mueve (isStillRepeat) y cada 20 s se refresca.
         subscription = await Location.watchPositionAsync(
-          { accuracy: Location.Accuracy.Balanced, timeInterval: 5000, distanceInterval: 20 },
+          { accuracy: Location.Accuracy.High, timeInterval: 3000, distanceInterval: 0 },
           pos => {
-            if (active) {
-              setMyPos({
-                lat: pos.coords.latitude,
-                lng: pos.coords.longitude,
-                updatedAt: new Date().toISOString(),
-              });
-            }
+            if (!active) return;
+            const fix = pickFix([pos], lastFixRef.current, Date.now());
+            if (!fix || isStillRepeat(lastFixRef.current, fix)) return;
+            const ts = Math.min(fix.ts, Date.now());
+            lastFixRef.current = { lat: fix.lat, lng: fix.lng, ts, acc: fix.acc };
+            setMyPos({ lat: fix.lat, lng: fix.lng, updatedAt: new Date(ts).toISOString() });
           },
         );
       } catch {
@@ -223,9 +233,30 @@ export default function TrabajoActivo() {
     }
   };
 
+  // El id del perfil hace falta para arrancar el seguimiento GPS: sin él el
+  // cliente no ve la furgoneta. Si la lectura falla se conserva el último
+  // perfil bueno y se reintenta solo cada 5 s mientras la pantalla esté abierta.
   useEffect(() => {
-    fetchMyDriverProfile(user).then(setProfile);
-  }, [user]);
+    if (!user) return;
+    let active = true;
+    let timer = null;
+    (async () => {
+      try {
+        const prof = await fetchMyDriverProfile(user);
+        if (!active) return;
+        setProfile(prof);
+        setProfileError(false);
+      } catch {
+        if (!active) return;
+        setProfileError(true);
+        timer = setTimeout(() => setProfileRetry(n => n + 1), 5000);
+      }
+    })();
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [user, profileRetry]);
 
   // Cuánto falta para la siguiente fase, según el SERVIDOR. Se pregunta al
   // entrar, tras cada cambio y al volver a la pantalla.
@@ -997,6 +1028,16 @@ export default function TrabajoActivo() {
         ) : null}
 
         <ErrorText>{error}</ErrorText>
+
+        {profileError && !profile && !finished ? (
+          <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
+            <Body style={{ fontFamily: "DMSans_700Bold" }}>No se pudo cargar tu perfil.</Body>
+            <Caption>
+              Hasta que cargue no se envía tu posición al cliente. Lo seguimos intentando solos.
+            </Caption>
+            <Button title="Reintentar" icon="refresh" onPress={() => setProfileRetry(n => n + 1)} />
+          </Card>
+        ) : null}
 
         {/* Prueba de entrega: foto de lo entregado + firma del receptor.
             Obligatoria en paquetes y compras en tienda; opcional en el resto. */}

@@ -33,10 +33,19 @@ export default function DriverRequests() {
     refetchInterval: 10000,
   });
 
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  // fetchMyDriverProfile LANZA si la consulta falla: un fallo no es "sin
+  // perfil". isPending = aún sin respuesta buena ni mala.
+  const {
+    data: profile,
+    isPending: profileLoading,
+    isError: profileError,
+    isFetching: profileFetching,
+    refetch: refetchProfile,
+  } = useQuery({
     queryKey: ["driver-profile", user?.id],
     queryFn: () => fetchMyDriverProfile(user),
     enabled: !!user?.id,
+    retry: 2,
   });
 
   // Pedidos que este conductor descartó («No me interesa»): fuera de SU lista,
@@ -212,6 +221,23 @@ export default function DriverRequests() {
     return (
       <div className="flex justify-center py-20">
         <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // La lectura del perfil falló y no hay uno anterior: reintentar en vez de
+  // pedirle que complete un perfil que ya tiene.
+  if (profileError && profile === undefined) {
+    return (
+      <div className="text-center py-16 space-y-4 max-w-md mx-auto">
+        <div className="text-6xl">📡</div>
+        <h2 className="text-xl font-display font-bold text-foreground">No se pudo cargar tu perfil</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          Revisa tu conexión e inténtalo de nuevo. Tus datos siguen guardados.
+        </p>
+        <Button className="rounded-xl h-12 gap-2 px-6" onClick={() => refetchProfile()} disabled={profileFetching}>
+          {profileFetching ? "Reintentando…" : "Reintentar"}
+        </Button>
       </div>
     );
   }

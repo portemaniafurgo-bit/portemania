@@ -20,7 +20,7 @@ const CHUNK_SIZE = 1800;
 // ClicyVoy…" para siempre (pasó de verdad en el móvil del usuario, 2026-08-11).
 // Un almacenamiento ilegible se trata como "sin sesión": lo peor que ve el
 // usuario es volver a iniciar sesión.
-const SecureStoreAdapter = {
+export const SecureStoreAdapter = {
   async getItem(key) {
     try {
       const head = await SecureStore.getItemAsync(key);

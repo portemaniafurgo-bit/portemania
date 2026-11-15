@@ -48,23 +48,33 @@ export async function geocodeAlbacete(address) {
 
 export async function fetchRouteEta(from, to) {
   if (!from?.lat || !from?.lng || !to?.lat || !to?.lng) return null;
+  // React Native no pone tiempo límite a fetch: un servidor de demo colgado
+  // dejaría la petición abierta para siempre. A los 10 s se corta y va la
+  // estimación en línea recta (el catch de abajo).
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10_000);
   try {
     // overview=full + geojson: además de duración/distancia, la GEOMETRÍA de la
     // ruta para dibujarla en el mapa (estilo Uber).
     const url = `https://router.project-osrm.org/route/v1/driving/${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&alternatives=false`;
-    const res = await fetch(url);
-    if (!res.ok) return haversineEta(from, to);
+    const res = await fetch(url, { signal: controller.signal });
+    if (!res.ok) return straightLineEta(from, to);
     const data = await res.json();
     const route = data?.routes?.[0];
-    if (!route) return haversineEta(from, to);
+    if (!route) return straightLineEta(from, to);
     return {
       minutes: Math.max(1, Math.round(route.duration / 60)),
       km: Math.round(route.distance / 100) / 10,
+      // Sin redondear, para recalcular lo que queda sobre la misma ruta.
+      seconds: route.duration,
+      meters: route.distance,
       // GeoJSON viene [lng, lat]; Leaflet quiere [lat, lng]
       coords: (route.geometry?.coordinates || []).map(([lng, lat]) => [lat, lng]),
     };
   } catch {
-    return haversineEta(from, to);
+    return straightLineEta(from, to);
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -82,7 +92,9 @@ export function distanceKm(from, to) {
 
 // Fallback si el router público no responde: distancia en línea recta ×1.3
 // (factor urbano) a ~20 km/h; la "ruta" es la línea recta entre ambos puntos.
-function haversineEta(from, to) {
+// Va marcada como `approximate`: el mapa no debe confundirla con una ruta de
+// verdad ni sustituir con ella una buena que ya tenga.
+export function straightLineEta(from, to) {
   const km = distanceKm(from, to) * 1.3;
   return {
     minutes: Math.max(1, Math.round((km / 20) * 60)),
@@ -91,5 +103,6 @@ function haversineEta(from, to) {
       [from.lat, from.lng],
       [to.lat, to.lng],
     ],
+    approximate: true,
   };
 }

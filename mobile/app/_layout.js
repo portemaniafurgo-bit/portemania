@@ -19,8 +19,59 @@ import { STRIPE_MERCHANT_ID, STRIPE_PUBLISHABLE_KEY } from "../lib/payments";
 import { AuthProvider, useAuth } from "../lib/auth";
 import { usePushNotifications } from "../lib/push";
 import { DialogProvider } from "../components/Dialog";
-import { Loading } from "../components/ui";
+import { Button, Loading } from "../components/ui";
 import { colors } from "../theme";
+
+/**
+ * Con sesión pero sin rol CONFIRMADO (sin red, o el servidor aún no acepta el
+ * token) no se sabe si es conductor o cliente. Adivinar «cliente» era justo lo
+ * que echaba a conductores verificados a la app de cliente (bug real, nov
+ * 2026). Se espera con la pantalla de siempre y, si tarda, se ofrece reintentar
+ * o cerrar sesión: nunca una espera sin salida.
+ */
+function EsperandoRol({ onRetry, signOut }) {
+  const [stalled, setStalled] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setStalled(true), 10000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!stalled) return <Loading label="Abriendo ClicyVoy…" />;
+
+  const retry = async () => {
+    setRetrying(true);
+    try {
+      await onRetry();
+    } finally {
+      setRetrying(false);
+    }
+  };
+
+  const leave = async () => {
+    setLeaving(true);
+    try {
+      await signOut();
+    } finally {
+      setLeaving(false);
+    }
+  };
+
+  return (
+    <View style={errorStyles.screen}>
+      <Ionicons name="cloud-offline-outline" size={44} color={colors.mutedForeground} />
+      <Text style={errorStyles.title}>Sin conexión</Text>
+      <Text style={errorStyles.hint}>
+        No hemos podido comprobar tu cuenta. Revisa la cobertura y vuelve a intentarlo: seguimos
+        probando solos.
+      </Text>
+      <Button title="Reintentar" icon="refresh" onPress={retry} loading={retrying} disabled={leaving} />
+      <Button title="Cerrar sesión" variant="plain" onPress={leave} loading={leaving} disabled={retrying} />
+    </View>
+  );
+}
 
 /**
  * Guardia de navegación: decide, según la sesión y el rol, en qué grupo de
@@ -29,7 +80,7 @@ import { colors } from "../theme";
  * de cliente.
  */
 function RootNavigation() {
-  const { session, role, mode, loading } = useAuth();
+  const { session, role, mode, loading, refreshRole, retrySession, signOut } = useAuth();
   const segments = useSegments();
   const router = useRouter();
   // null = aún leyendo el flag; true/false = decidido. Sin esperar a saberlo,
@@ -104,19 +155,35 @@ function RootNavigation() {
     // reportado el 2026-08-18: "nunca vi las pantallas de introducción").
   }, [session, mode, loading, segments, router, onboardingSeen]);
 
-  if (loading) return <Loading label="Abriendo ClicyVoy…" />;
+  // Arrancando, o con sesión y sin rol confirmado: la pantalla de espera
+  // TAPA la app, pero el Stack sigue montado debajo (navegar sin él revienta,
+  // p. ej. al tocar un aviso). El guardia no redirige mientras tanto. La key
+  // reinicia la espera por cuenta.
+  const waiting = loading || (session && !role);
+  const waitKey = loading ? "arranque" : session?.user?.id;
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
-      <Stack.Screen name="index" />
-      <Stack.Screen name="(auth)" />
-      <Stack.Screen name="(cliente)" />
-      <Stack.Screen name="(conductor)" />
-      {/* El chat es pantalla completa, no una pestaña (canvas 2g). */}
-      <Stack.Screen name="chat/[id]" />
-      {/* El teléfono que Google no trae, una sola vez tras el alta. */}
-      <Stack.Screen name="completar-perfil" />
-    </Stack>
+    <View style={{ flex: 1 }}>
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
+        <Stack.Screen name="index" />
+        <Stack.Screen name="(auth)" />
+        <Stack.Screen name="(cliente)" />
+        <Stack.Screen name="(conductor)" />
+        {/* El chat es pantalla completa, no una pestaña (canvas 2g). */}
+        <Stack.Screen name="chat/[id]" />
+        {/* El teléfono que Google no trae, una sola vez tras el alta. */}
+        <Stack.Screen name="completar-perfil" />
+      </Stack>
+      {waiting ? (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]}>
+          <EsperandoRol
+            key={waitKey}
+            onRetry={loading ? retrySession : refreshRole}
+            signOut={signOut}
+          />
+        </View>
+      ) : null}
+    </View>
   );
 }
 

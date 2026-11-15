@@ -97,7 +97,7 @@ export function isDriverProfileIncomplete(profile) {
   );
 }
 
-export async function fetchMyDriverProfile(user) {
+export async function fetchMyDriverProfile(user, { isStaff = false } = {}) {
   if (!user?.id) return null;
   const loginEmail = (user.email || "").trim().toLowerCase();
 
@@ -106,12 +106,16 @@ export async function fetchMyDriverProfile(user) {
   if (loginEmail) {
     // Escapar comodines de LIKE: un email con "_" no debe hacer match difuso.
     const emailPattern = loginEmail.replace(/([\\%_])/g, "\\$1");
-    const { data: byEmail } = await supabase
+    const { data: byEmail, error: emailError } = await supabase
       .from("driver_profiles")
       .select("*")
       .ilike("email", emailPattern)
       .order("created_date", { ascending: true })
       .limit(1);
+    // Un fallo de red o de permisos NO es "no tienes perfil": se lanza para que
+    // la pantalla diga "no se pudo cargar" y conserve el perfil que ya tenía
+    // (bug real, nov 2026: conductores verificados veían "sin perfil").
+    if (emailError) throw emailError;
     if (byEmail?.[0]) {
       if (byEmail[0].created_by_id !== user.id) {
         // Self-heal: re-vincular al uid real. Si la RLS lo impide, no pasa
@@ -127,11 +131,17 @@ export async function fetchMyDriverProfile(user) {
 
   // 2) Respaldo por created_by_id (perfiles antiguos sin email), descartando
   //    filas con email de OTRA persona: son perfiles que este usuario creó
-  //    para terceros siendo admin.
-  const { data: own } = await supabase
+  //    para terceros siendo admin. Con isStaff (admin/staff, como en la web)
+  //    las filas SIN email tampoco valen: pudo crearlas para otros.
+  const { data: own, error: ownError } = await supabase
     .from("driver_profiles")
     .select("*")
     .eq("created_by_id", user.id)
     .order("created_date", { ascending: true });
-  return (own || []).find(p => !p.email || p.email.trim().toLowerCase() === loginEmail) || null;
+  if (ownError) throw ownError;
+  return (
+    (own || []).find(p =>
+      p.email ? p.email.trim().toLowerCase() === loginEmail : !isStaff,
+    ) || null
+  );
 }

@@ -47,10 +47,21 @@ export default function DriverProfilePage() {
   // Lookup ROBUSTO (created_by_id + email): si se buscara solo por created_by_id,
   // un conductor dado de alta por el admin vería el perfil vacío y se le pediría
   // toda la documentación otra vez (bug histórico). Ver src/lib/driverProfile.js.
-  const { data: existingProfile, isLoading: cargandoPerfil } = useQuery({
+  // fetchMyDriverProfile LANZA si la consulta falla. Aquí importa el doble:
+  // con el perfil sin cargar, «Completar perfil» CREARÍA un perfil duplicado
+  // para un conductor que ya lo tiene. Mientras no haya respuesta buena, no
+  // hay formulario.
+  const {
+    data: existingProfile,
+    isPending: cargandoPerfil,
+    isError: errorPerfil,
+    isFetching: releyendoPerfil,
+    refetch: releerPerfil,
+  } = useQuery({
     queryKey: ["driver-profile", user?.id],
     queryFn: () => fetchMyDriverProfile(user),
     enabled: !!user?.id,
+    retry: 2,
   });
 
   const [form, setForm] = useState({
@@ -146,6 +157,10 @@ export default function DriverProfilePage() {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Sin saber si ya tiene perfil no se guarda: se crearía otro.
+      if (existingProfile === undefined) {
+        throw new Error("No se pudo cargar tu perfil. Recarga la página e inténtalo de nuevo.");
+      }
       const data = {
         ...form,
         ...pendingFiles,
@@ -223,6 +238,29 @@ export default function DriverProfilePage() {
       </div>
     );
   };
+
+  if (cargandoPerfil) {
+    return (
+      <div className="flex justify-center py-20">
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (errorPerfil && existingProfile === undefined) {
+    return (
+      <div className="text-center py-16 space-y-4 max-w-md mx-auto">
+        <div className="text-6xl">📡</div>
+        <h2 className="text-xl font-display font-bold text-foreground">No se pudo cargar tu perfil</h2>
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          Revisa tu conexión e inténtalo de nuevo. Tus datos siguen guardados.
+        </p>
+        <Button className="rounded-xl h-12 gap-2 px-6" onClick={() => releerPerfil()} disabled={releyendoPerfil}>
+          {releyendoPerfil ? "Reintentando…" : "Reintentar"}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-lg mx-auto space-y-6">

@@ -58,6 +58,8 @@ export default function PerfilConductor() {
   const router = useRouter();
   const dialog = useDialog();
   const [profile, setProfile] = useState(undefined);
+  // La última lectura del perfil FALLÓ (red, permisos): no es "sin perfil".
+  const [profileError, setProfileError] = useState(false);
   const [jobCount, setJobCount] = useState(null);
   const [uploading, setUploading] = useState(null);
   const [error, setError] = useState("");
@@ -66,7 +68,17 @@ export default function PerfilConductor() {
   const [savingFiscal, setSavingFiscal] = useState(false);
   const [fiscalSaved, setFiscalSaved] = useState(false);
 
-  const load = useCallback(() => fetchMyDriverProfile(user).then(setProfile), [user]);
+  // Si la lectura falla se conserva el perfil que hubiera y se avisa con
+  // reintentar; nunca se pisa con "no tienes perfil".
+  const load = useCallback(async () => {
+    try {
+      const prof = await fetchMyDriverProfile(user);
+      setProfile(prof);
+      setProfileError(false);
+    } catch {
+      setProfileError(true);
+    }
+  }, [user]);
 
   /** Volver a ver la introducción: baja el flag y abre las tres pantallas. */
   const replayOnboarding = async () => {
@@ -209,7 +221,9 @@ export default function PerfilConductor() {
     });
   };
 
-  if (profile === undefined) return <Loading label="Cargando tu perfil…" />;
+  // Primera lectura fallida: se pinta la pantalla (con «Cerrar sesión» y el
+  // aviso de reintentar) en vez de quedarse cargando para siempre.
+  if (profile === undefined && !profileError) return <Loading label="Cargando tu perfil…" />;
 
   // «9 de 10 al día»: un documento cuenta si está subido y no vencido.
   const upToDate = profile
@@ -273,11 +287,19 @@ export default function PerfilConductor() {
               {profile.vehicle_brand || (profile.vehicle_type === "large" ? "Furgoneta grande" : "Furgoneta pequeña")}
               {profile.vehicle_plate ? ` · ${profile.vehicle_plate}` : ""}
             </Caption>
-          ) : (
+          ) : profileError ? null : (
             <Caption>Aún no tienes perfil de conductor asociado a este email.</Caption>
           )}
         </View>
       </View>
+
+      {profileError && (
+        <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
+          <Body style={{ fontFamily: "DMSans_700Bold" }}>No se pudo cargar tu perfil.</Body>
+          <Caption>Revisa la conexión y vuelve a intentarlo.</Caption>
+          <Button title="Reintentar" icon="refresh" onPress={load} />
+        </Card>
+      )}
 
       {/* Lo que le corta el trabajo, arriba del todo (canvas 2j) */}
       {expired.length > 0 && (

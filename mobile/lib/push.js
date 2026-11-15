@@ -165,6 +165,10 @@ export function usePushNotifications({ userId, role }) {
   }, [userId]);
 
   const coldStartHandled = useRef(false);
+  // Aviso tocado antes de saber la cara (rol aún sin confirmar): se guarda y
+  // se abre en cuanto se sepa, para no llevar a un conductor al pedido de
+  // cliente ni navegar sin la pantalla montada.
+  const pending = useRef(null);
 
   useEffect(() => {
     /**
@@ -198,8 +202,23 @@ export function usePushNotifications({ userId, role }) {
 
     const subscription = Notifications.addNotificationResponseReceivedListener(response => {
       const payload = response.notification.request.content.data || {};
+      if (!role) {
+        pending.current = payload;
+        return;
+      }
       open(payload.order_id, payload.mode);
     });
+
+    // Con la cara ya conocida, se abre el aviso que quedó pendiente. Después
+    // del guardia (setTimeout): su redirección al grupo no debe pisarlo.
+    let pendingTimer = null;
+    if (role && pending.current) {
+      const payload = pending.current;
+      pending.current = null;
+      // Ya se abre aquí: que la rama de arranque en frío no la abra otra vez.
+      coldStartHandled.current = true;
+      pendingTimer = setTimeout(() => open(payload.order_id, payload.mode), 0);
+    }
 
     // Arranque en frío: si la app se abrió TOCANDO una notificación, el
     // listener de arriba ya no ve esa respuesta — hay que pedirla aparte.
@@ -213,6 +232,9 @@ export function usePushNotifications({ userId, role }) {
       });
     }
 
-    return () => subscription.remove();
+    return () => {
+      subscription.remove();
+      clearTimeout(pendingTimer);
+    };
   }, [router, role]);
 }

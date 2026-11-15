@@ -19,7 +19,7 @@ import { colors, radius, spacing } from "../../theme";
  * cuenta al final — esta última la exige Google Play en toda app con registro.
  */
 export default function Perfil() {
-  const { user, role, signOut, setMode } = useAuth();
+  const { user, role, isDriver, signOut, setMode } = useAuth();
   const router = useRouter();
   const [payment, setPayment] = useState("cash");
   // Resumen de los datos fiscales, para que se vea de un vistazo si hay factura.
@@ -81,7 +81,7 @@ export default function Perfil() {
       <SettingsGroup>
         {/* Un conductor real que está pidiendo como cliente vuelve a su cara
             desde aquí; quien no lo es puede empezar el alta en la web. */}
-        {role === "driver" ? (
+        {isDriver ? (
           <SettingsRow
             icon="swap-horizontal-outline"
             label="Volver al modo conductor"

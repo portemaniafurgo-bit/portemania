@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "./supabase";
 import { uploadPhoto } from "./photos";
 
@@ -11,7 +11,13 @@ import { uploadPhoto } from "./photos";
  * con la pantalla apagada se quedara sin enterarse de nada.
  */
 
-/** Una posición del conductor se considera actual si se escribió hace <1 min. */
+/**
+ * Una posición del conductor se considera actual si es de hace <1 min.
+ * `location_updated_at` es la hora en que el GPS tomó el fix (no la de
+ * escritura en la BD), así que la etiqueta dice de cuándo es la posición.
+ * Con el conductor parado el GPS apenas emite (10 m de distancia mínima) y
+ * la etiqueta acabará en «hace N min» aunque siga allí.
+ */
 export const FRESH_LOCATION_MS = 60_000;
 
 export function locationFreshness(updatedAt) {
@@ -111,47 +117,111 @@ export function useOrder(orderId) {
   return { order, driver, loading, patchOrder };
 }
 
+/** Milisegundos de una marca ISO, o null. */
+function timeOf(iso) {
+  const ms = iso ? Date.parse(iso) : NaN;
+  return Number.isFinite(ms) ? ms : null;
+}
+
+// Sin eventos Realtime durante 20 s se sospecha que el socket se cayó (MIUI y
+// compañía los congelan) y se pregunta la fila directamente cada 15 s.
+const LIVE_SILENCE_MS = 20_000;
+const SAFETY_POLL_MS = 15_000;
+
 /**
  * Posición del conductor en vivo. Se suscribe a SU fila de driver_profiles, así
  * que cada movimiento llega solo, sin sondear cada 10 segundos como la web.
+ *
+ * UN canal por conductor durante todo el viaje: antes el canal dependía de la
+ * posición del objeto `driver` del padre y se tiraba y rehacía cada vez que
+ * este cambiaba, perdiendo eventos en el hueco. Las tres fuentes (fila
+ * inicial, eventos y sondeo de rescate) pasan por `accept`, que descarta una
+ * posición algo más vieja que la que ya se enseña: un evento atrasado no
+ * puede hacer retroceder a la furgoneta.
+ *
+ * `active`: solo con el pedido en curso se sondea de rescate; en el historial
+ * (entregado, cancelado) no hay nada que vigilar.
  */
-export function useDriverLocation(driver) {
+export function useDriverLocation(driver, { active = true } = {}) {
   const [location, setLocation] = useState(null);
+  const shownRef = useRef(null);
+  // En ref: cambiar de fase no debe rehacer la suscripción.
+  const pollEnabledRef = useRef(active);
+  pollEnabledRef.current = active;
 
+  const accept = useCallback(row => {
+    const lat = Number(row?.current_lat);
+    const lng = Number(row?.current_lng);
+    if (!lat || !lng || !Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const updatedAt = row.location_updated_at || null;
+    const prev = shownRef.current;
+    if (prev) {
+      const prevMs = timeOf(prev.updatedAt);
+      const nextMs = timeOf(updatedAt);
+      // Solo si es más vieja por menos de 60 s. Una diferencia mayor huele a
+      // relojes distintos (marcas de la versión anterior o de la web del
+      // conductor, con la hora de escritura) y se acepta.
+      if (prevMs != null && nextMs != null && nextMs < prevMs && prevMs - nextMs < 60_000) return;
+      // La misma posición otra vez (fila inicial repetida, sondeo): nada que pintar.
+      if (prev.lat === lat && prev.lng === lng && prev.updatedAt === updatedAt) return;
+    }
+    const next = { lat, lng, updatedAt };
+    shownRef.current = next;
+    setLocation(next);
+  }, []);
+
+  // Canal + sondeo de rescate: dependen SOLO del id del conductor.
   useEffect(() => {
-    if (!driver?.id) {
-      setLocation(null);
-      return;
-    }
+    shownRef.current = null;
+    setLocation(null);
+    const driverId = driver?.id;
+    if (!driverId) return;
 
-    if (driver.current_lat && driver.current_lng) {
-      setLocation({
-        lat: driver.current_lat,
-        lng: driver.current_lng,
-        updatedAt: driver.location_updated_at,
-      });
-    }
+    let active = true;
+    let lastEventAt = Date.now();
 
     const channel = supabase
-      .channel(uniqueChannel(`driver-${driver.id}`))
+      .channel(uniqueChannel(`driver-${driverId}`))
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "driver_profiles", filter: `id=eq.${driver.id}` },
+        { event: "UPDATE", schema: "public", table: "driver_profiles", filter: `id=eq.${driverId}` },
         payload => {
-          const next = payload.new;
-          if (next?.current_lat && next?.current_lng) {
-            setLocation({
-              lat: next.current_lat,
-              lng: next.current_lng,
-              updatedAt: next.location_updated_at,
-            });
-          }
+          if (!active) return;
+          // Solo los eventos cuentan como "el socket vive": así el sondeo
+          // sigue mientras el canal esté mudo.
+          lastEventAt = Date.now();
+          accept(payload.new);
         },
       )
       .subscribe();
 
-    return () => supabase.removeChannel(channel);
-  }, [driver?.id, driver?.current_lat, driver?.current_lng, driver?.location_updated_at]);
+    const poll = setInterval(async () => {
+      if (!active || !pollEnabledRef.current || Date.now() - lastEventAt < LIVE_SILENCE_MS) return;
+      try {
+        const { data } = await supabase
+          .from("driver_profiles")
+          .select("current_lat, current_lng, location_updated_at")
+          .eq("id", driverId)
+          .maybeSingle();
+        if (active && data) accept(data);
+      } catch {
+        /* sin red: se reintenta en el siguiente turno */
+      }
+    }, SAFETY_POLL_MS);
+
+    return () => {
+      active = false;
+      clearInterval(poll);
+      supabase.removeChannel(channel);
+    };
+  }, [driver?.id, accept]);
+
+  // Fila inicial (y las que el padre recargue después): se aceptan si son más
+  // nuevas que lo pintado, sin tocar la suscripción. Va DESPUÉS del efecto del
+  // canal para que, al cambiar de conductor, el reinicio no borre la semilla.
+  useEffect(() => {
+    if (driver?.id) accept(driver);
+  }, [driver?.id, driver?.current_lat, driver?.current_lng, driver?.location_updated_at, accept]);
 
   return location;
 }

@@ -37,7 +37,7 @@ const { width } = Dimensions.get("window");
 
 export default function Onboarding() {
   const router = useRouter();
-  const { session, role } = useAuth();
+  const { session, isDriver } = useAuth();
   const scrollRef = useRef(null);
   const [page, setPage] = useState(0);
 
@@ -46,7 +46,7 @@ export default function Onboarding() {
     // Al verla desde Perfil ya hay sesión: devolver al login sería echar a
     // alguien que estaba dentro.
     if (session) {
-      router.replace(role === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir");
+      router.replace(isDriver ? "/(conductor)/ofertas" : "/(cliente)/pedir");
       return;
     }
     router.replace("/(auth)/login");

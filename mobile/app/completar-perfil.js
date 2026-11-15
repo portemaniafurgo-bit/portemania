@@ -15,7 +15,7 @@ import { spacing } from "../theme";
  */
 export default function CompletarPerfil() {
   const router = useRouter();
-  const { user, role } = useAuth();
+  const { user, isDriver } = useAuth();
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
   const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
@@ -39,7 +39,7 @@ export default function CompletarPerfil() {
         data: { full_name: fullName.trim(), phone: cleanPhone },
       });
       if (err) throw err;
-      router.replace(role === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir");
+      router.replace(isDriver ? "/(conductor)/ofertas" : "/(cliente)/pedir");
     } catch (err) {
       setError("No se pudieron guardar los datos: " + (err.message || "error de conexión"));
       setSaving(false);

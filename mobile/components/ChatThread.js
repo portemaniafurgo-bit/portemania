@@ -49,9 +49,14 @@ function messageDate(message) {
 export default function ChatThread({ orderId, partnerRole }) {
   const router = useRouter();
   const dialog = useDialog();
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const { order, driver, loading } = useOrder(orderId);
-  const { messages, send, sending } = useChat(orderId, { user, role });
+  // Firma de los mensajes: el papel que tengo en ESTE pedido (el contrario
+  // del de la otra parte), como en app/chat/[id].js.
+  const { messages, send, sending } = useChat(orderId, {
+    user,
+    role: partnerRole === "client" ? "driver" : "client",
+  });
   const { partnerTyping, notifyTyping } = useTyping(orderId, { user });
   const [draft, setDraft] = useState("");
   const [error, setError] = useState("");

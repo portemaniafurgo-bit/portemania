@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import { Camera, GeoJSONSource, Layer, Map, Marker } from "@maplibre/maplibre-react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { fetchRouteEta } from "../lib/eta";
+import { useIsFocused } from "expo-router";
+import { fetchRouteEta, straightLineEta } from "../lib/eta";
+import { distanceToPolyline, glidePlan, lerpPoint } from "../lib/geo";
 import { locationFreshness } from "../lib/orders";
 import { Caption } from "./ui";
 import { colors, radius, spacing } from "../theme";
@@ -46,6 +48,130 @@ function fitTwoPoints(a, b, widthPx, heightPx) {
   return { center: [(a.lng + b.lng) / 2, mercatorLat(midY)], zoom };
 }
 
+/**
+ * Cuándo se vuelve a pedir la ruta a OSRM (servidor público de demo: no se le
+ * puede pedir en cada posición, y antes cada respuesta redibujaba la línea):
+ * - al cambiar el destino (de la recogida a la entrega);
+ * - si el conductor se aparta más de 150 m de la línea dibujada;
+ * - y, aunque vaya por ella, cada 45 s, para recalibrar el tiempo.
+ * Nunca dos peticiones a la vez ni con menos de 10 s entre ellas. Mientras
+ * llega la nueva, o si OSRM falla, se sigue viendo la anterior.
+ */
+const OFF_ROUTE_M = 150;
+const ROUTE_REFRESH_MS = 45_000;
+const ROUTE_MIN_GAP_MS = 10_000;
+// Sin ninguna ruta buena todavía (OSRM caído), se reintenta cada 15 s.
+const ROUTE_RETRY_MS = 15_000;
+// Una petición sin respuesta en 20 s se da por muerta (eta.js la corta a los
+// 10 s, esto es la red de seguridad) y no bloquea las siguientes.
+const ROUTE_DEAD_MS = 20_000;
+// La etiqueta «en vivo / hace N min» se recalcula sola cada 15 s: si dejan de
+// llegar posiciones, tiene que acabar diciéndolo.
+const FRESHNESS_TICK_MS = 15_000;
+
+function timeOf(iso) {
+  const ms = iso ? Date.parse(iso) : NaN;
+  return Number.isFinite(ms) ? ms : null;
+}
+
+/**
+ * La furgoneta, deslizándose de una posición a la siguiente en vez de saltar.
+ *
+ * Va en su propio componente para que cada fotograma de la animación
+ * re-renderice SOLO este marcador, no el mapa entero ni la ruta (cuya fuente
+ * GeoJSON se serializa en cada render). En Android el Marker de MapLibre es
+ * una vista nativa: cambiarle `lngLat` solo la recoloca sobre el mapa
+ * (MLRNMarkerView.setLngLat). Como mucho ~30 repintados por segundo: de sobra
+ * para el ojo y la mitad de trabajo en móviles modestos.
+ *
+ * Sin pegarla a la ruta a propósito: si el GPS dice que va por otra calle, se
+ * enseña por donde va.
+ */
+const DriverMarker = memo(function DriverMarker({ position, stale }) {
+  const [shown, setShown] = useState(() => ({ lat: position.lat, lng: position.lng }));
+  const shownRef = useRef(shown);
+  const prevFixRef = useRef({
+    lat: position.lat,
+    lng: position.lng,
+    ms: timeOf(position.updatedAt),
+    receivedAt: Date.now(),
+  });
+  const frameRef = useRef(null);
+  // Con otra pantalla encima (el chat), sin animación: se coloca de golpe y
+  // no corre ningún fotograma que nadie ve.
+  const focused = useIsFocused();
+  const focusedRef = useRef(focused);
+  focusedRef.current = focused;
+
+  const stop = () => {
+    if (frameRef.current != null) globalThis.cancelAnimationFrame(frameRef.current);
+    frameRef.current = null;
+  };
+
+  useEffect(() => {
+    const prev = prevFixRef.current;
+    const to = { lat: position.lat, lng: position.lng };
+    if (prev.lat === to.lat && prev.lng === to.lng) return;
+    const nextMs = timeOf(position.updatedAt);
+    const receivedAt = Date.now();
+    // Tiempo entre los dos fixes según el GPS; si falta alguna marca, el que
+    // pasó entre que llegaron.
+    const gapMs = prev.ms != null && nextMs != null ? nextMs - prev.ms : receivedAt - prev.receivedAt;
+    prevFixRef.current = { ...to, ms: nextMs, receivedAt };
+
+    // Siempre desde donde está pintada AHORA (quizá a mitad de un
+    // deslizamiento), no desde el fix anterior: así no hay tirones.
+    stop();
+    const from = shownRef.current;
+    const plan = glidePlan(from, to, gapMs);
+    const paint = point => {
+      shownRef.current = point;
+      setShown(point);
+    };
+    if (plan.instant || !focusedRef.current) {
+      paint(to);
+      return;
+    }
+    const start = Date.now();
+    let lastPaint = 0;
+    const step = () => {
+      const now = Date.now();
+      const t = (now - start) / plan.durationMs;
+      if (t >= 1) {
+        frameRef.current = null;
+        paint(to);
+        return;
+      }
+      if (now - lastPaint >= 33) {
+        lastPaint = now;
+        paint(lerpPoint(from, to, t));
+      }
+      frameRef.current = globalThis.requestAnimationFrame(step);
+    };
+    frameRef.current = globalThis.requestAnimationFrame(step);
+  }, [position.lat, position.lng, position.updatedAt]);
+
+  // Al perder el foco a mitad de deslizamiento, a su sitio y sin fotogramas.
+  useEffect(() => {
+    if (focused || frameRef.current == null) return;
+    stop();
+    const { lat, lng } = prevFixRef.current;
+    shownRef.current = { lat, lng };
+    setShown({ lat, lng });
+  }, [focused]);
+
+  // Al desmontar, ni un fotograma más.
+  useEffect(() => stop, []);
+
+  return (
+    <Marker id="driver" lngLat={[shown.lng, shown.lat]}>
+      <View style={[styles.driverPin, stale && { backgroundColor: colors.warning }]}>
+        <Ionicons name="car" size={18} color="#FFFFFF" />
+      </View>
+    </Marker>
+  );
+});
+
 const OSM_STYLE = {
   version: 8,
   sources: {
@@ -72,7 +198,12 @@ export default function TrackingMap({
   bare = false,
   onInfo,
 }) {
+  // Última ruta BUENA de OSRM hacia el destino actual (null si aún no hay):
+  // { coords: [[lat, lng]...], points: [{ lat, lng }...], minutes, km, seconds, meters }.
   const [route, setRoute] = useState(null);
+  // Ya se preguntó al menos una vez por este destino: distingue «calculando»
+  // de «OSRM no responde, va la estimación en línea recta».
+  const [routeTried, setRouteTried] = useState(false);
   /**
    * Cámara, con la API REAL de MapLibre v11: la colocación inicial va en
    * `initialViewState` (se aplica UNA vez al montar) y los reencuadres
@@ -90,26 +221,172 @@ export default function TrackingMap({
   // de la pantalla, que es su caso habitual.
   const [mapWidth, setMapWidth] = useState(Dimensions.get("window").width);
 
+  // Lo último conocido, en refs: decidir si toca pedir ruta no debe rehacer
+  // efectos ni cerrar sobre valores viejos.
+  const driverRef = useRef(driverLocation);
+  driverRef.current = driverLocation;
+  const targetRef = useRef(target);
+  targetRef.current = target;
+  const routeRef = useRef(null);
+  const fetchRef = useRef({ inFlight: false, lastAt: 0, reqId: 0 });
+  const mountedRef = useRef(true);
   useEffect(() => {
-    if (!driverLocation || !target?.lat) {
-      setRoute(null);
-      onInfo?.({ route: null, freshness: driverLocation ? locationFreshness(driverLocation.updatedAt) : null });
-      return;
-    }
-    let active = true;
-    fetchRouteEta(driverLocation, target).then(result => {
-      if (active) {
-        setRoute(result || null);
-        onInfo?.({
-          route: result || null,
-          freshness: locationFreshness(driverLocation.updatedAt),
-        });
-      }
-    });
+    mountedRef.current = true;
     return () => {
-      active = false;
+      mountedRef.current = false;
     };
-  }, [driverLocation?.lat, driverLocation?.lng, driverLocation?.updatedAt, target?.lat, target?.lng]);
+  }, []);
+
+  const maybeFetchRoute = () => {
+    const from = driverRef.current;
+    const to = targetRef.current;
+    if (!from?.lat || !to?.lat) return;
+    const st = fetchRef.current;
+    const now = Date.now();
+    const sinceLast = now - st.lastAt;
+    if (st.inFlight && sinceLast < ROUTE_DEAD_MS) return;
+    const current = routeRef.current;
+    let due;
+    if (!current) {
+      due = st.lastAt === 0 || sinceLast >= ROUTE_RETRY_MS;
+    } else {
+      const off = distanceToPolyline(from, current.points)?.distanceM ?? Infinity;
+      due = sinceLast >= ROUTE_REFRESH_MS || (off > OFF_ROUTE_M && sinceLast >= ROUTE_MIN_GAP_MS);
+    }
+    if (!due) return;
+
+    st.inFlight = true;
+    st.lastAt = now;
+    st.reqId += 1;
+    const id = st.reqId;
+    fetchRouteEta(from, to)
+      .then(result => {
+        // Respuesta para un destino anterior, o pantalla cerrada: se tira.
+        if (!mountedRef.current || id !== st.reqId) return;
+        st.inFlight = false;
+        setRouteTried(true);
+        // La recta de respaldo (OSRM caído) nunca sustituye a una ruta buena.
+        if (result && !result.approximate && result.coords?.length > 1) {
+          const next = { ...result, points: result.coords.map(([lat, lng]) => ({ lat, lng })) };
+          routeRef.current = next;
+          setRoute(next);
+        }
+      })
+      .catch(() => {
+        if (id === st.reqId) st.inFlight = false;
+      });
+  };
+
+  // Destino nuevo (o el primero): la línea vieja lleva a otro sitio, fuera.
+  const targetKey = target?.lat ? `${target.lat},${target.lng}` : "";
+  useEffect(() => {
+    const st = fetchRef.current;
+    st.reqId += 1; // invalida la petición en vuelo hacia el destino anterior
+    st.inFlight = false;
+    st.lastAt = 0;
+    routeRef.current = null;
+    setRoute(null);
+    setRouteTried(false);
+    maybeFetchRoute();
+  }, [targetKey]);
+
+  // Cada posición nueva solo COMPRUEBA si toca pedir ruta; casi nunca toca.
+  useEffect(() => {
+    maybeFetchRoute();
+  }, [driverLocation?.lat, driverLocation?.lng, driverLocation?.updatedAt]);
+
+  // Reloj de la etiqueta de frescura, solo si hay conductor que vigilar (el
+  // mini-mapa de las ofertas no tiene y no gasta temporizador).
+  const hasDriver = !!driverLocation;
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    if (!hasDriver) return;
+    // El mismo tic reintenta la ruta: con el conductor parado no llegan
+    // posiciones nuevas y un primer intento fallido no se repetiría.
+    // (maybeFetchRoute solo lee refs, así que vale la de este render.)
+    const timer = setInterval(() => {
+      setTick(n => n + 1);
+      maybeFetchRoute();
+    }, FRESHNESS_TICK_MS);
+    return () => clearInterval(timer);
+  }, [hasDriver]);
+
+  // `tick` no se usa dentro: está en las dependencias para recalcular la
+  // antigüedad aunque no llegue posición nueva.
+  const freshness = useMemo(
+    () => (driverLocation ? locationFreshness(driverLocation.updatedAt) : null),
+    [hasDriver, driverLocation?.updatedAt, tick],
+  );
+
+  /**
+   * Tiempo y distancia que QUEDAN. Con ruta buena, se proyecta la posición
+   * sobre ella y se descuenta lo ya recorrido (en proporción a lo que dijo
+   * OSRM): el texto baja con cada posición sin volver a preguntar. Sin ruta
+   * tras haberlo intentado, la estimación en línea recta de siempre; y antes
+   * del primer intento, nada («Calculando ruta…»).
+   */
+  const routeInfo = useMemo(() => {
+    if (!driverLocation?.lat || !target?.lat) return null;
+    if (route) {
+      const proj = distanceToPolyline(driverLocation, route.points);
+      const total = proj?.totalM || 0;
+      const frac = proj && total > 0 ? Math.max(0, total - proj.alongM) / total : 1;
+      const seconds = (Number.isFinite(route.seconds) ? route.seconds : route.minutes * 60) * frac;
+      const meters = (Number.isFinite(route.meters) ? route.meters : route.km * 1000) * frac;
+      return {
+        minutes: Math.max(1, Math.round(seconds / 60)),
+        km: Math.round(meters / 100) / 10,
+        coords: route.coords,
+      };
+    }
+    if (!routeTried) return null;
+    return straightLineEta(driverLocation, target);
+  }, [route, routeTried, driverLocation?.lat, driverLocation?.lng, target?.lat, target?.lng]);
+
+  // ETA y frescura para la hoja de encima, en cada posición y cada tic (antes
+  // solo al responder OSRM: con peticiones espaciadas se quedarían viejas).
+  useEffect(() => {
+    onInfo?.({ route: routeInfo, freshness });
+  }, [routeInfo, freshness]);
+
+  /**
+   * Línea de la ruta. `eta.js` devuelve [lat, lng] porque la web usa Leaflet;
+   * GeoJSON (y por tanto MapLibre) las quiere al revés. Sin ruta buena
+   * todavía, una recta a trazos de la furgoneta al destino: ver solo el
+   * vehículo suelto no dice nada, y una línea aproximada ya orienta. La ruta
+   * buena no se recorta por detrás: la furgoneta se desliza con unos segundos
+   * de retraso y un recorte al último fix la dejaría fuera de su línea.
+   */
+  const routedFeature = useMemo(
+    () =>
+      route
+        ? {
+            type: "Feature",
+            properties: {},
+            geometry: { type: "LineString", coordinates: route.coords.map(([lat, lng]) => [lng, lat]) },
+          }
+        : null,
+    [route],
+  );
+  const straightFeature = useMemo(
+    () =>
+      !route && driverLocation?.lat && target?.lat
+        ? {
+            type: "Feature",
+            properties: {},
+            geometry: {
+              type: "LineString",
+              coordinates: [
+                [driverLocation.lng, driverLocation.lat],
+                [target.lng, target.lat],
+              ],
+            },
+          }
+        : null,
+    [route, driverLocation?.lat, driverLocation?.lng, target?.lat, target?.lng],
+  );
+  const routeFeature = routedFeature || straightFeature;
+  const approximate = !routedFeature;
 
   const center = driverLocation || target;
 
@@ -158,24 +435,6 @@ export default function TrackingMap({
     );
   }
 
-  const freshness = driverLocation ? locationFreshness(driverLocation.updatedAt) : null;
-  // `eta.js` devuelve las coordenadas en orden [lat, lng] porque la web usa
-  // Leaflet; GeoJSON (y por tanto MapLibre) las quiere al revés.
-  // Si el servicio de rutas no responde (o aún no ha contestado), se une la
-  // furgoneta con el destino en línea recta: ver solo el vehículo suelto no
-  // dice nada, y una línea aproximada ya orienta.
-  const routed = (route?.coords || []).map(([lat, lng]) => [lng, lat]);
-  const routeLine =
-    routed.length > 1
-      ? routed
-      : driverLocation && target?.lat
-        ? [
-            [driverLocation.lng, driverLocation.lat],
-            [target.lng, target.lat],
-          ]
-        : [];
-  const approximate = routed.length <= 1;
-
   return (
     <View style={{ gap: spacing.sm }}>
       <View
@@ -199,15 +458,8 @@ export default function TrackingMap({
               (o la llegada del segundo punto) la mueve, por ref. */}
           <Camera ref={cameraRef} initialViewState={initialFrame} />
 
-          {routeLine.length > 1 ? (
-            <GeoJSONSource
-              id="route"
-              data={{
-                type: "Feature",
-                properties: {},
-                geometry: { type: "LineString", coordinates: routeLine },
-              }}
-            >
+          {routeFeature ? (
+            <GeoJSONSource id="route" data={routeFeature}>
               <Layer
                 id="routeLine"
                 type="line"
@@ -235,13 +487,7 @@ export default function TrackingMap({
             </Marker>
           ) : null}
 
-          {driverLocation ? (
-            <Marker id="driver" lngLat={[driverLocation.lng, driverLocation.lat]}>
-              <View style={[styles.driverPin, !freshness?.fresh && { backgroundColor: colors.warning }]}>
-                <Ionicons name="car" size={18} color="#FFFFFF" />
-              </View>
-            </Marker>
-          ) : null}
+          {driverLocation ? <DriverMarker position={driverLocation} stale={!freshness?.fresh} /> : null}
         </Map>
         )}
 
@@ -273,9 +519,9 @@ export default function TrackingMap({
         </View>
       ) : null}
 
-      {route && !bare ? (
+      {routeInfo && !bare ? (
         <Caption>
-          {route.km} km por carretera · unos {route.minutes} min
+          {routeInfo.km} km por carretera · unos {routeInfo.minutes} min
         </Caption>
       ) : null}
     </View>

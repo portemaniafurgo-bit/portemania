@@ -52,6 +52,9 @@ export default function Ofertas() {
   const router = useRouter();
   const dialog = useDialog();
   const [profile, setProfile] = useState(null);
+  // true = la última lectura del perfil FALLÓ (red, permisos). No es lo mismo
+  // que no tener perfil: se conserva el último bueno y se ofrece reintentar.
+  const [profileError, setProfileError] = useState(false);
   const [orders, setOrders] = useState(null);
   const [activeJob, setActiveJob] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -193,7 +196,16 @@ export default function Ofertas() {
   };
 
   const load = useCallback(async () => {
-    const prof = await fetchMyDriverProfile(user);
+    let prof;
+    try {
+      prof = await fetchMyDriverProfile(user);
+    } catch {
+      // Sin tocar perfil, pedidos ni servicio en curso: un fallo de red no
+      // puede hacer creer al conductor que no tiene perfil ni trabajo.
+      setProfileError(true);
+      return;
+    }
+    setProfileError(false);
     setProfile(prof);
 
     if (!prof || prof.status !== "verified") {
@@ -204,17 +216,18 @@ export default function Ofertas() {
 
     // Un trabajo en curso manda sobre todo lo demás: es lo primero que el
     // conductor necesita ver al abrir la app.
-    const { data: mine } = await supabase
+    const { data: mine, error: mineError } = await supabase
       .from("transport_requests")
       .select("id, status, service_type, origin_address, destination_address, estimated_price, final_price")
       .eq("driver_id", user.id)
       .in("status", ["accepted", "in_transit", "picked_up"])
       .order("created_date", { ascending: false })
       .limit(1);
-    setActiveJob(mine?.[0] || null);
+    // Si la consulta falla se conserva el servicio en curso que ya se veía.
+    if (!mineError) setActiveJob(mine?.[0] || null);
 
     // Mis descartes van en la misma tanda: la RLS ya limita a los míos.
-    const [{ data }, { data: dis }] = await Promise.all([
+    const [{ data, error: ordersError }, { data: dis, error: disError }] = await Promise.all([
       supabase
         .from("transport_requests")
         .select("id, status, service_type, vehicle_type, origin_address, destination_address, origin_lat, origin_lng, origin_floors, origin_has_lift, destination_floors, destination_has_lift, estimated_price, proposed_price, needs_help, package_weight, distance_km, payment_method, cargo_description, cargo_photos, items_count, extra_hours, help_description, notes, scheduled_at, created_date")
@@ -223,6 +236,13 @@ export default function Ofertas() {
         .limit(50),
       supabase.from("driver_dismissals").select("request_id"),
     ]);
+
+    // Lectura fallida: se queda la lista que había (o vacía si es la primera),
+    // en vez de borrarla o de quedarse en "Buscando pedidos…" para siempre.
+    if (ordersError || disError) {
+      setOrders(prev => prev ?? []);
+      return;
+    }
 
     const hidden = new Set((dis || []).map(d => d.request_id));
     setDismissed(hidden);
@@ -357,11 +377,14 @@ export default function Ofertas() {
     setRefreshing(false);
   };
 
-  if (orders === null) return <Loading label="Buscando pedidos…" />;
+  // Primera carga fallida: se pinta la pantalla con el aviso de reintentar en
+  // vez de dejar "Buscando pedidos…" para siempre.
+  if (orders === null && !profileError) return <Loading label="Buscando pedidos…" />;
+  const offers = orders || [];
 
   const incomplete = profile && isDriverProfileIncomplete(profile);
   const blocked = !!activeJob || incomplete || profile?.docs_expired || !profile?.is_available;
-  const counterOrder = orders.find(o => o.id === counterFor);
+  const counterOrder = offers.find(o => o.id === counterFor);
   const counterService = counterOrder ? serviceOf(counterOrder) : null;
   const counterBase = counterOrder ? Number(counterOrder.proposed_price) : 0;
   const counterDelta = counterAmount - counterBase;
@@ -429,7 +452,16 @@ export default function Ofertas() {
 
         <ErrorText>{error}</ErrorText>
 
-        {!profile && (
+        {profileError && (
+          <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
+            <Body style={{ fontFamily: "DMSans_700Bold" }}>No se pudo cargar tu perfil.</Body>
+            <Caption>Revisa la conexión y vuelve a intentarlo.</Caption>
+            <Button title="Reintentar" icon="refresh" onPress={onRefresh} loading={refreshing} />
+          </Card>
+        )}
+
+        {/* "Sin perfil" SOLO cuando la consulta salió bien y no encontró nada. */}
+        {!profile && !profileError && (
           <Card style={{ backgroundColor: colors.warningBg, borderColor: colors.warning }}>
             <Body>Todavía no tienes perfil de conductor.</Body>
             <Caption>Completa tu alta en clicyvoy.es/ser-conductor o pídelo a la empresa.</Caption>
@@ -487,10 +519,10 @@ export default function Ofertas() {
         )}
 
         {/* Cabecera de la lista: cuántas y en vivo (canvas 1i) */}
-        {orders.length > 0 && (
+        {offers.length > 0 && (
           <View style={styles.sectionHeader}>
             <Text style={styles.overline}>
-              {orders.length} {orders.length === 1 ? "oferta cerca de ti" : "ofertas cerca de ti"}
+              {offers.length} {offers.length === 1 ? "oferta cerca de ti" : "ofertas cerca de ti"}
             </Text>
             <View style={styles.liveBadge}>
               <View style={styles.liveDot} />
@@ -499,13 +531,17 @@ export default function Ofertas() {
           </View>
         )}
 
-        {orders.length === 0 ? (
-          <EmptyState
-            title="Aún no hay ofertas"
-            hint="Te avisamos en cuanto entre un porte cerca. Mantén el GPS activo para aparecer primero."
-          />
+        {offers.length === 0 ? (
+          // Sin datos por un fallo no se dice "no hay ofertas": ya lo explica
+          // el aviso de arriba.
+          profileError && orders === null ? null : (
+            <EmptyState
+              title="Aún no hay ofertas"
+              hint="Te avisamos en cuanto entre un porte cerca. Mantén el GPS activo para aparecer primero."
+            />
+          )
         ) : (
-          orders.map(order => {
+          offers.map(order => {
             const service = serviceOf(order);
             const pickup =
               order.origin_lat && order.origin_lng
@@ -550,7 +586,7 @@ export default function Ofertas() {
       </ScrollView>
       {/* Todo lo que pidió el cliente, ANTES de aceptar */}
       {(() => {
-        const order = orders.find(o => o.id === detailFor);
+        const order = offers.find(o => o.id === detailFor);
         if (!order) return null;
         const negotiable = order.proposed_price != null;
         return (

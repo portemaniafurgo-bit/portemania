@@ -76,7 +76,10 @@ export default function OrderDetail() {
   const dialog = useDialog();
   const { user } = useAuth();
   const { order, driver, loading, patchOrder } = useOrder(id);
-  const driverLocation = useDriverLocation(driver);
+  // Sondeo de rescate solo con el pedido en curso; el historial no sondea.
+  const driverLocation = useDriverLocation(driver, {
+    active: ["accepted", "in_transit", "picked_up"].includes(order?.status),
+  });
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState("");
   const [savingReview, setSavingReview] = useState(false);

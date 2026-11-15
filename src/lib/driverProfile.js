@@ -87,12 +87,16 @@ export async function fetchMyDriverProfile(user) {
   if (loginEmail) {
     // Escapar comodines de LIKE: un email con "_" no debe hacer match difuso.
     const emailPattern = loginEmail.replace(/([\\%_])/g, "\\$1");
-    const { data: byEmail } = await supabase
+    const { data: byEmail, error: emailError } = await supabase
       .from("driver_profiles")
       .select("*")
       .ilike("email", emailPattern)
       .order("created_date", { ascending: true })
       .limit(1);
+    // Un fallo de red o de permisos NO es "no tienes perfil": se lanza para que
+    // la pantalla diga "no se pudo cargar" y conserve el perfil que ya tenía
+    // (bug real, nov 2026: conductores verificados veían "sin perfil").
+    if (emailError) throw emailError;
     if (byEmail?.[0]) {
       if (byEmail[0].created_by_id !== user.id) {
         // Self-heal: re-vincular al uid real. Si RLS impidiera el update
@@ -112,11 +116,12 @@ export async function fetchMyDriverProfile(user) {
   //    para otros conductores siendo admin, no el suyo. Las filas SIN email
   //    solo se aceptan si el usuario no es staff (un admin pudo crearlas para
   //    terceros y las "heredaría").
-  const { data: own } = await supabase
+  const { data: own, error: ownError } = await supabase
     .from("driver_profiles")
     .select("*")
     .eq("created_by_id", user.id)
     .order("created_date", { ascending: true });
+  if (ownError) throw ownError;
   const isStaff = user.role === "admin" || user.role === "staff";
   const mine = (own || []).find(
     p => (p.email ? p.email.trim().toLowerCase() === loginEmail : !isStaff)
