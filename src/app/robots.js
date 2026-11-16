@@ -6,7 +6,7 @@ export default function robots() {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/admin", "/driver", "/dashboard", "/my-orders", "/order/", "/payment/", "/new-request", "/profile", "/login", "/login-clientes", "/login-conductores", "/register", "/forgot-password", "/reset-password", "/bienvenida"],
+      disallow: ["/admin", "/driver", "/dashboard", "/my-orders", "/order/", "/payment/", "/new-request", "/profile", "/login", "/login-clientes", "/login-conductores", "/register", "/forgot-password", "/reset-password", "/bienvenida", "/partner"],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
   };

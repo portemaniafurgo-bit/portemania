@@ -9,6 +9,7 @@ import { supabase } from "../../lib/supabase";
 import { getDefaultPayment, PAYMENT_LABELS } from "../../lib/payment";
 import DeleteAccount from "../../components/DeleteAccount";
 import NotificationPrefs from "../../components/NotificationPrefs";
+import PartnerEntryRow from "../../components/partners/PartnerEntryRow";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRow";
 import { Caption, Heading, Screen, Title } from "../../components/ui";
 import { colors, radius, spacing } from "../../theme";
@@ -99,6 +100,8 @@ export default function Perfil() {
             onPress={() => Linking.openURL("https://clicyvoy.es/ser-conductor")}
           />
         )}
+        {/* Comerciales: solo si el programa existe en la base de datos. */}
+        <PartnerEntryRow />
         <SettingsRow
           icon="card-outline"
           label="Métodos de pago"

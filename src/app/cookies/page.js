@@ -41,6 +41,11 @@ export default function CookiesPage() {
                 <td className="py-3">7 días</td>
               </tr>
               <tr className="border-b border-border/50">
+                <td className="py-3 pr-4 font-medium text-foreground">Código de invitación</td>
+                <td className="py-3 pr-4">No es una cookie: almacenamiento local del navegador (clave «clicyvoy_ref_v1»). Si llegas por el enlace de un comercial, recuerda su código hasta que inicias sesión, para atribuirle tu cuenta. Se borra al usarse.</td>
+                <td className="py-3">30 días</td>
+              </tr>
+              <tr className="border-b border-border/50">
                 <td className="py-3 pr-4 font-medium text-foreground">Preferencias</td>
                 <td className="py-3 pr-4">Guardar ajustes de visualización y preferencias del usuario.</td>
                 <td className="py-3">1 año</td>

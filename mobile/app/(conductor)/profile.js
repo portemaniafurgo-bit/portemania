@@ -18,6 +18,7 @@ import { SERVICE_LIST } from "../../lib/services";
 import { pickPhotos, takePhoto, uploadPhoto } from "../../lib/photos";
 import DeleteAccount from "../../components/DeleteAccount";
 import { useDialog } from "../../components/Dialog";
+import PartnerEntryRow from "../../components/partners/PartnerEntryRow";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRow";
 import { Body, Button, Caption, Card, ErrorText, Field, Heading, Loading, Screen, Title } from "../../components/ui";
 import { colors, radius, spacing } from "../../theme";
@@ -490,6 +491,8 @@ export default function PerfilConductor() {
             router.replace("/(cliente)/pedir");
           }}
         />
+        {/* Comerciales: solo si el programa existe en la base de datos. */}
+        <PartnerEntryRow />
         <SettingsRow
           icon="receipt-outline"
           label="Mis facturas"

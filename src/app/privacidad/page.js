@@ -41,6 +41,15 @@ export default function PrivacidadPage() {
           <li>Documento de identidad, seguro del vehículo, recibo de autónomo y situación censal</li>
           <li>Historial de servicios, valoraciones y ganancias</li>
         </ul>
+        <p className="text-sm font-medium text-foreground mt-2">Comerciales (programa ClicyVoy Partners):</p>
+        <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+          <li>Nombre público y nombre del enlace</li>
+          <li>Titular e IBAN de la cuenta para el pago de comisiones</li>
+          <li>Clientes atribuidos, comisiones generadas y solicitudes de cobro</li>
+        </ul>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Si crea su cuenta a través del enlace de un comercial, guardamos qué comercial le invitó. Ese comercial ve su nombre de pila, la fecha de alta y el número de servicios que ha hecho, y de cada comisión que le genera, la fecha, el porcentaje y el importe (con los que se puede deducir el precio de ese servicio); nunca su apellido, sus datos de contacto ni sus direcciones. Hasta que inicia sesión, el código de invitación se guarda en el almacenamiento local de su navegador (ver la Política de Cookies).
+        </p>
       </section>
 
       <section className="space-y-3">
@@ -67,6 +76,7 @@ export default function PrivacidadPage() {
           <li>Notificar a conductores de nuevos trabajos disponibles por correo electrónico</li>
           <li>Procesar pagos de forma segura</li>
           <li>Gestionar incidencias y resolución de conflictos</li>
+          <li>Gestionar el programa de comerciales: atribuir clientes, calcular y pagar comisiones y prevenir el fraude</li>
           <li>Mejorar el servicio mediante análisis internos</li>
           <li>Cumplir con obligaciones legales</li>
         </ul>
@@ -75,7 +85,7 @@ export default function PrivacidadPage() {
       <section className="space-y-3">
         <h2 className="text-xl font-heading font-semibold text-foreground">5. Base jurídica</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
-          El tratamiento de los datos se basa en la ejecución del contrato de servicio (Art. 6.1.b RGPD), el cumplimiento de obligaciones legales (Art. 6.1.c RGPD) y, cuando corresponda, el consentimiento del usuario (Art. 6.1.a RGPD). El inicio de sesión con Google se basa en su consentimiento, otorgado en la pantalla de autorización de Google.
+          El tratamiento de los datos se basa en la ejecución del contrato de servicio (Art. 6.1.b RGPD), el cumplimiento de obligaciones legales (Art. 6.1.c RGPD) y, cuando corresponda, el consentimiento del usuario (Art. 6.1.a RGPD). El inicio de sesión con Google se basa en su consentimiento, otorgado en la pantalla de autorización de Google. El programa de comerciales se basa en la ejecución de sus condiciones, aceptadas al activar el perfil (Art. 6.1.b RGPD), y la revisión antifraude y la atribución de clientes invitados, en el interés legítimo de ClicyVoy en un programa justo (Art. 6.1.f RGPD). Los datos de comisiones y pagos se conservan durante los plazos que exige la normativa fiscal.
         </p>
       </section>
 

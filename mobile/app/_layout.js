@@ -18,6 +18,7 @@ import { StripeProvider } from "@stripe/stripe-react-native";
 import { STRIPE_MERCHANT_ID, STRIPE_PUBLISHABLE_KEY } from "../lib/payments";
 import { AuthProvider, useAuth } from "../lib/auth";
 import { usePushNotifications } from "../lib/push";
+import { retryPendingReferral } from "../lib/partners";
 import { DialogProvider } from "../components/Dialog";
 import { Button, Loading } from "../components/ui";
 import { colors } from "../theme";
@@ -99,6 +100,13 @@ function RootNavigation() {
   // un conductor en modo cliente debe aterrizar en pantallas de cliente.
   usePushNotifications({ userId: session?.user?.id, role: mode });
 
+  // Código de invitación que no se pudo enviar al completar el perfil (sin
+  // red): un reintento silencioso por arranque. Nunca bloquea nada.
+  const sessionUserId = session?.user?.id;
+  useEffect(() => {
+    if (sessionUserId) retryPendingReferral(sessionUserId);
+  }, [sessionUserId]);
+
   useEffect(() => {
     if (loading || onboardingSeen === null) return;
 
@@ -140,6 +148,11 @@ function RootNavigation() {
       return;
     }
 
+    // «Gana con ClicyVoy» (comerciales): como el chat, una pantalla del stack
+    // raíz que sirve a las dos caras. Va DESPUÉS del teléfono: sin él, un
+    // enlace clicyvoy://partner no puede saltarse «Un último dato».
+    if (group === "partner") return;
+
     // Redirigir SIEMPRE que no se esté ya en el grupo correcto — incluido el
     // arranque en la raíz (group undefined): no redirigir ahí dejaba al usuario
     // con sesión mirando "Abriendo ClicyVoy…" para siempre (bug real, 0.1.1).
@@ -173,6 +186,8 @@ function RootNavigation() {
         <Stack.Screen name="chat/[id]" />
         {/* El teléfono que Google no trae, una sola vez tras el alta. */}
         <Stack.Screen name="completar-perfil" />
+        {/* «Gana con ClicyVoy»: panel del comercial, para cliente y conductor. */}
+        <Stack.Screen name="partner" />
       </Stack>
       {waiting ? (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]}>

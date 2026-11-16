@@ -13,6 +13,7 @@
  */
 
 import { supabase, createEntity } from "@/lib/entities";
+import { withRef } from "@/lib/referral";
 
 // --- Entidades (nombre Base44 -> tabla Supabase) ---
 const transportRequestsBase = createEntity("transport_requests");
@@ -159,7 +160,9 @@ async function loginViaEmailPassword(email, password) {
 async function loginWithProvider(provider, redirectTo) {
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
-    options: { redirectTo: absoluteUrl(redirectTo || "/dashboard") },
+    // Si el visitante llegó invitado por un comercial, el código vuelve en la
+    // URL de regreso (por si el navegador bloquea el almacenamiento local).
+    options: { redirectTo: absoluteUrl(withRef(redirectTo || "/dashboard")) },
   });
   if (error) throw error;
   return data;
