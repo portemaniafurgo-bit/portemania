@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { getDefaultPayment, setDefaultPayment } from "../../lib/payment";
+import { CARD_LABEL, getDefaultPayment, setDefaultPayment } from "../../lib/payment";
 import { Caption, Card, Heading, Screen, Title } from "../../components/ui";
 import { colors, spacing } from "../../theme";
+import { iosBackHeader } from "../../components/HeaderBack";
 
 /**
  * Métodos de pago (canvas 2i). Aquí solo se elige el PREFERIDO, que es el que
@@ -15,7 +16,7 @@ const OPTIONS = [
   {
     key: "card",
     icon: "card-outline",
-    label: "Tarjeta o Google Pay",
+    label: CARD_LABEL,
     hint: "Se cobra al terminar el servicio, con el importe pactado.",
   },
   {
@@ -46,7 +47,7 @@ export default function MetodosDePago() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ headerShown: true, title: "Métodos de pago" }} />
+      <Stack.Screen options={{ headerShown: true, title: "Métodos de pago", ...iosBackHeader("/(cliente)/profile") }} />
       <Heading>¿Cómo prefieres pagar?</Heading>
       <Caption>
         Es solo tu opción por defecto: en cada pedido puedes cambiarla antes de publicar.

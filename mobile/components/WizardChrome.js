@@ -63,6 +63,8 @@ export default function WizardChrome({
         style={{ flex: 1 }}
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
+        // Solo iPhone (Android lo ignora): sitio para el teclado.
+        automaticallyAdjustKeyboardInsets
       >
         {children}
       </ScrollView>

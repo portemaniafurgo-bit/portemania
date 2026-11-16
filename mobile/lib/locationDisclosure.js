@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -45,6 +46,13 @@ export async function ensureBackgroundLocationDisclosure(dialog) {
     // Almacenamiento no disponible: se vuelve a preguntar, no se bloquea.
   }
 
+  // iPhone: otras reglas. Apple no pide esta divulgación, pero rechaza (guía
+  // 5.1.1) un aviso previo con un botón para saltarse el permiso: el aviso
+  // solo explica, tiene un único «Continuar» y SIEMPRE sigue al diálogo del
+  // sistema. Allí el orden es otro: primero «Al usar la app» y después el
+  // iPhone ofrece pasar a «Siempre» (ver startTracking en lib/tracking.js).
+  if (Platform.OS === "ios") return showIosExplanation(dialog);
+
   // 3. Sin diálogo no hay divulgación posible, y sin divulgación NO se pide el
   // permiso: es justo lo que prohíbe la política.
   if (!dialog?.show) return false;
@@ -76,6 +84,37 @@ export async function ensureBackgroundLocationDisclosure(dialog) {
       // atrás, y en ese caso no se llama a ninguna acción: sin esto, la promesa
       // se quedaría colgada y el seguimiento no arrancaría nunca.
       onDismiss: () => answer(false),
+    });
+  });
+}
+
+/**
+ * Versión iPhone del aviso: mismo contenido, un único botón y siempre
+ * continúa (cerrarlo tocando fuera también). Devuelve `true` siempre: en iOS
+ * quien decide es el diálogo del sistema que viene detrás.
+ */
+function showIosExplanation(dialog) {
+  if (!dialog?.show) return Promise.resolve(true);
+  return new Promise(resolve => {
+    let answered = false;
+    const go = async () => {
+      if (answered) return;
+      answered = true;
+      try {
+        await AsyncStorage.setItem(DISCLOSURE_KEY, "accepted");
+      } catch {
+        /* que no se guarde solo significa volver a explicarlo */
+      }
+      resolve(true);
+    };
+
+    dialog.show({
+      title: "Tu ubicación durante el servicio",
+      message:
+        "ClicyVoy recoge tu ubicación para que el cliente pueda seguirte en el mapa y saber cuándo llegas, también con la pantalla bloqueada o mientras usas otra app para navegar. Solo se comparte mientras tienes un servicio activo y se detiene al terminarlo o al cancelarlo.\n\nEl iPhone te lo preguntará ahora: permite la ubicación al usar la app y, si te ofrece cambiarla a «Siempre», acéptalo.",
+      actions: [{ text: "Continuar", onPress: go }],
+      hideBack: true,
+      onDismiss: go,
     });
   });
 }

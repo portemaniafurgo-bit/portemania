@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /**
@@ -13,4 +14,19 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 export function useBottomPadding(extra = 0) {
   const insets = useSafeAreaInsets();
   return insets.bottom + 32 + extra;
+}
+
+/**
+ * Relleno inferior de una hoja que sale desde abajo (diálogos, contraoferta,
+ * detalle de oferta). En iPhone la barra de inicio ocupa ~34 px al pie de la
+ * pantalla y el último botón quedaba debajo de ella; en Android se devuelve
+ * `base` tal cual, para no mover nada de lo que ya funciona allí.
+ *
+ * @param base el relleno que la hoja ya tenía.
+ * @returns el estilo `{ paddingBottom }` a añadir, o null si no cambia nada.
+ */
+export function useSheetBottomPadding(base) {
+  const insets = useSafeAreaInsets();
+  if (Platform.OS !== "ios" || !insets.bottom) return null;
+  return { paddingBottom: Math.max(base, insets.bottom + 12) };
 }

@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -63,6 +64,21 @@ const CAPTURE_OPTIONS = {
     notificationBody: "Compartiendo tu posición con el cliente",
     notificationColor: "#7145d6",
   },
+  // iPhone: sin servicio en primer plano ni notificación. Lo equivalente es
+  // decirle al sistema que es navegación en coche (filtra mejor y no corta en
+  // los semáforos), enseñar el indicador azul de «usando tu ubicación» (con él
+  // iOS sigue enviando posiciones en segundo plano aunque solo haya permiso
+  // «Al usar la app») y no pausar nunca. Con la app en segundo plano iOS da
+  // una posición por segundo: se juntan en lotes de 4 s, como en Android.
+  // Solo se añade en iOS: las opciones de Android no cambian (ni su versión).
+  ...(Platform.OS === "ios"
+    ? {
+        activityType: Location.ActivityType.AutomotiveNavigation,
+        showsBackgroundLocationIndicator: true,
+        pausesUpdatesAutomatically: false,
+        deferredUpdatesInterval: 4000,
+      }
+    : {}),
 };
 
 let lastFixCache = null;
@@ -296,8 +312,19 @@ export async function startTracking(profileId) {
 
   // Android pide el permiso de segundo plano por separado y solo después del de
   // primer plano. Sin él, la posición se congela al bloquear la pantalla.
-  const background = await Location.requestBackgroundPermissionsAsync();
-  if (!background.granted) {
+  //
+  // iPhone: se pide «Siempre» como mejora (el sistema ofrece el cambio una sola
+  // vez), pero NO es imprescindible: con «Al usar la app», el modo de fondo
+  // «location» y el indicador azul, el seguimiento arrancado aquí, con la app
+  // delante, sigue enviando posiciones con la pantalla bloqueada o en Google
+  // Maps (expo-location en iOS solo exige el permiso de primer plano para
+  // startLocationUpdatesAsync). Lo que sin «Siempre» no hay es relanzar la app
+  // si el sistema la cierra. Por eso en iOS un «no» aquí no bloquea.
+  const background =
+    Platform.OS === "ios"
+      ? await Location.requestBackgroundPermissionsAsync().catch(() => ({ granted: false }))
+      : await Location.requestBackgroundPermissionsAsync();
+  if (!background.granted && Platform.OS !== "ios") {
     return {
       ok: false,
       reason:

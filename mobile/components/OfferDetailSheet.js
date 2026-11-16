@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { euro } from "../lib/money";
+import { useSheetBottomPadding } from "../lib/layout";
 import { Body, Button, Caption, Overline, Title } from "./ui";
 import { colors, radius, spacing } from "../theme";
 
@@ -14,6 +15,8 @@ import { colors, radius, spacing } from "../theme";
  */
 export default function OfferDetailSheet({ order, service, visible, onClose, onAccept, onCounter, busy, blocked }) {
   const [zoom, setZoom] = useState(null);
+  // iPhone: que los botones no queden bajo la barra de inicio.
+  const sheetPad = useSheetBottomPadding(spacing.xl);
   if (!order) return null;
 
   const negotiable = order.proposed_price != null;
@@ -24,7 +27,7 @@ export default function OfferDetailSheet({ order, service, visible, onClose, onA
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <Pressable style={styles.backdrop} onPress={onClose} />
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, sheetPad]}>
         <View style={styles.handle} />
 
         <View style={styles.head}>

@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import { decode } from "base64-arraybuffer";
@@ -52,10 +53,18 @@ export async function takePhoto() {
   return result.canceled ? [] : result.assets.map(a => a.uri);
 }
 
-/** Abre la galería con selección múltiple. */
+/**
+ * Abre la galería con selección múltiple.
+ *
+ * En iPhone el selector de fotos del sistema no necesita permiso (la app solo
+ * recibe lo que se elige): pedirlo antes sacaba un aviso de más y, si se
+ * negaba, dejaba la galería bloqueada sin motivo. En Android, como siempre.
+ */
 export async function pickPhotos(limit = 6) {
-  const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-  if (!permission.granted) return [];
+  if (Platform.OS !== "ios") {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) return [];
+  }
   const result = await ImagePicker.launchImageLibraryAsync({
     quality: 1,
     mediaTypes: ["images"],

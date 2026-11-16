@@ -46,7 +46,12 @@ export default function CompletarPerfil() {
   const programEnabled = useProgramEnabled();
   const programPublic = useProgramPublic();
   const showInvite = programEnabled && (programPublic || isStaffRole(role, user?.email));
-  const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
+  // Apple solo da el nombre la primera vez (y a veces ni eso): si no llega, el
+  // campo sale vacío y se pide aquí, igual que el teléfono.
+  const fromApple = user?.app_metadata?.provider === "apple";
+  const [fullName, setFullName] = useState(
+    user?.user_metadata?.full_name || user?.user_metadata?.name || "",
+  );
   const [phone, setPhone] = useState("");
   const [inviteText, setInviteText] = useState("");
   const [inviteHint, setInviteHint] = useState("");
@@ -152,10 +157,17 @@ export default function CompletarPerfil() {
     <Screen>
       <View style={{ gap: spacing.xs, marginTop: spacing.xl }}>
         <Heading>Un último dato</Heading>
-        <Caption>
-          Tu cuenta de Google ya nos dio el email. Solo falta el teléfono, para que el conductor y
-          tú podáis llamaros durante el servicio.
-        </Caption>
+        {fromApple ? (
+          <Caption>
+            Tu cuenta de Apple ya nos dio el email. Solo falta tu nombre y el teléfono, para que el
+            conductor y tú sepáis con quién habláis y podáis llamaros durante el servicio.
+          </Caption>
+        ) : (
+          <Caption>
+            Tu cuenta de Google ya nos dio el email. Solo falta el teléfono, para que el conductor y
+            tú podáis llamaros durante el servicio.
+          </Caption>
+        )}
       </View>
 
       <View style={{ gap: spacing.lg }}>

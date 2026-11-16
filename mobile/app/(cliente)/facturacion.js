@@ -6,6 +6,7 @@ import { useAuth } from "../../lib/auth";
 import { Button, Caption, Card, ErrorText, Field, Heading, Loading, Screen } from "../../components/ui";
 import { Toggle } from "../../components/wizard";
 import { spacing } from "../../theme";
+import { iosBackHeader } from "../../components/HeaderBack";
 
 /**
  * Datos de facturación del cliente.
@@ -138,7 +139,7 @@ export default function Facturacion({ embedded = false, onSaved }) {
 
   return (
     <Screen>
-      <Stack.Screen options={{ headerShown: true, title: "Datos de facturación" }} />
+      <Stack.Screen options={{ headerShown: true, title: "Datos de facturación", ...iosBackHeader("/(cliente)/profile") }} />
       <Heading>¿A nombre de quién facturamos?</Heading>
       <Caption>
         El servicio lo presta el conductor, que es transportista autónomo: la factura la emite él

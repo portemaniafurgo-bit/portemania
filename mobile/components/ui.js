@@ -30,6 +30,10 @@ export function Screen({ children, scroll = true, style }) {
         style={{ flex: 1 }}
         contentContainerStyle={scroll ? [styles.screenContent, { paddingBottom: bottomPad }, style] : undefined}
         keyboardShouldPersistTaps="handled"
+        // iPhone: la ventana no se encoge con el teclado (Android sí), así que
+        // la lista deja sitio y el campo con el foco queda a la vista.
+        // Android ignora esta propiedad.
+        automaticallyAdjustKeyboardInsets
       >
         {!scroll ? <View style={[styles.screenContent, { flex: 1 }, style]}>{children}</View> : children}
       </Body>

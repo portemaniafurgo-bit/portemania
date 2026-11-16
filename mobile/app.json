@@ -10,8 +10,16 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.clicyvoy.app"
+      "supportsTablet": false,
+      "bundleIdentifier": "com.clicyvoy.app",
+      "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "CFBundleDevelopmentRegion": "es",
+        "CFBundleLocalizations": ["es"]
+      }
     },
     "android": {
       "package": "com.clicyvoy.app",
@@ -40,13 +48,21 @@
     },
     "plugins": [
       "expo-router",
-      "expo-secure-store",
+      [
+        "expo-secure-store",
+        {
+          "faceIDPermission": "ClicyVoy guarda tu sesión de forma protegida en este iPhone. No usa Face ID para nada más."
+        }
+      ],
       [
         "expo-location",
         {
           "isAndroidBackgroundLocationEnabled": true,
-          "locationAlwaysAndWhenInUsePermission": "ClicyVoy comparte tu posición con el cliente mientras tienes un servicio en curso, también con la pantalla bloqueada o mientras navegas con Google Maps.",
-          "locationWhenInUsePermission": "ClicyVoy usa tu posición para calcular rutas y tiempos de llegada."
+          "isIosBackgroundLocationEnabled": true,
+          "locationAlwaysAndWhenInUsePermission": "ClicyVoy recoge tu ubicación para que el cliente pueda seguirte en el mapa y saber cuándo llegas, también con la pantalla bloqueada o mientras navegas con otra app. Solo se comparte mientras tienes un servicio activo y se detiene al terminarlo o al cancelarlo.",
+          "locationWhenInUsePermission": "ClicyVoy usa tu ubicación para rellenar la dirección de recogida y, si eres conductor, para que el cliente te siga en el mapa mientras tienes un servicio activo.",
+          "locationAlwaysPermission": "ClicyVoy recoge tu ubicación para que el cliente pueda seguirte en el mapa y saber cuándo llegas, también con la pantalla bloqueada o mientras navegas con otra app. Solo se comparte mientras tienes un servicio activo y se detiene al terminarlo o al cancelarlo.",
+          "motionUsagePermission": "ClicyVoy no utiliza los datos de movimiento de tu iPhone."
         }
       ],
       [

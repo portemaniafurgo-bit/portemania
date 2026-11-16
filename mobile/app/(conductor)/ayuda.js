@@ -4,6 +4,7 @@ import * as IntentLauncher from "expo-intent-launcher";
 import { Ionicons } from "@expo/vector-icons";
 import { Body, Button, Caption, Card, Heading, Screen, Title } from "../../components/ui";
 import { colors, radius, spacing } from "../../theme";
+import { iosBackHeader } from "../../components/HeaderBack";
 
 /**
  * Guía del conductor: los dos ajustes de Android sin los cuales la app no puede
@@ -12,11 +13,20 @@ import { colors, radius, spacing } from "../../theme";
  * No es documentación de relleno: en Xiaomi, el ahorro de batería mata el
  * servicio en segundo plano y la posición del conductor se congela sin que él
  * se entere. Es la causa número uno de "el cliente dice que no me ve moverme".
+ *
+ * En iPhone los ajustes son otros (Ubicación «Siempre» o «Al usar la app» y
+ * Notificaciones) y no hay ahorro de batería que mate la app: se explica lo
+ * suyo, sin nombrar Android, y el botón abre los ajustes de ClicyVoy.
  */
+const IOS = Platform.OS === "ios";
 const EMAIL = "portemaniafurgo@gmail.com";
 
 export default function AyudaConductor() {
   const abrirAjustes = async () => {
+    if (IOS) {
+      Linking.openSettings().catch(() => {});
+      return;
+    }
     if (Platform.OS !== "android") return;
     try {
       await IntentLauncher.startActivityAsync(
@@ -30,44 +40,92 @@ export default function AyudaConductor() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ headerShown: true, title: "Ayuda" }} />
+      <Stack.Screen options={{ headerShown: true, title: "Ayuda", ...iosBackHeader("/(conductor)/profile") }} />
       <Heading>Para que todo funcione</Heading>
-      <Caption>
-        Dos ajustes del móvil. Sin ellos la app parece que va bien, pero el cliente deja de verte
-        moverte y tú dejas de recibir avisos.
-      </Caption>
-
-      <Card>
-        <View style={styles.head}>
-          <View style={styles.number}>
-            <Text style={styles.numberText}>1</Text>
-          </View>
-          <Title style={{ flex: 1 }}>Ubicación: «Permitir todo el tiempo»</Title>
-        </View>
-        <Body>
-          Mientras tienes un servicio, tu posición viaja al cliente aunque bloquees la pantalla o
-          te vayas a Google Maps. Android solo lo permite con este permiso.
-        </Body>
-        <Caption>Ajustes → Permisos → Ubicación → Permitir todo el tiempo.</Caption>
+      {IOS ? (
         <Caption>
-          Tu posición solo se comparte mientras tienes un servicio activo y deja de enviarse en
-          cuanto lo terminas o lo cancelas.
+          Dos ajustes del iPhone. Sin ellos la app parece que va bien, pero el cliente deja de verte
+          moverte y tú dejas de recibir avisos.
         </Caption>
-      </Card>
+      ) : (
+        <Caption>
+          Dos ajustes del móvil. Sin ellos la app parece que va bien, pero el cliente deja de verte
+          moverte y tú dejas de recibir avisos.
+        </Caption>
+      )}
 
-      <Card>
-        <View style={styles.head}>
-          <View style={styles.number}>
-            <Text style={styles.numberText}>2</Text>
-          </View>
-          <Title style={{ flex: 1 }}>Batería: «Sin restricciones»</Title>
-        </View>
-        <Body>
-          Xiaomi, Samsung y Huawei cierran las apps en segundo plano para ahorrar batería. Si lo
-          hacen con ClicyVoy, tu posición se congela y el cliente cree que no te has movido.
-        </Body>
-        <Caption>Ajustes → Batería → Sin restricciones (o «Sin límites»).</Caption>
-      </Card>
+      {IOS ? (
+        <>
+          <Card>
+            <View style={styles.head}>
+              <View style={styles.number}>
+                <Text style={styles.numberText}>1</Text>
+              </View>
+              <Title style={{ flex: 1 }}>Ubicación: «Siempre»</Title>
+            </View>
+            <Body>
+              Mientras tienes un servicio, tu posición viaja al cliente aunque bloquees la pantalla o
+              navegues con otra app. Verás el indicador azul de ubicación arriba: es ClicyVoy
+              compartiendo tu posición.
+            </Body>
+            <Caption>Ajustes → ClicyVoy → Ubicación → Siempre, con «Ubicación exacta» activada.</Caption>
+            <Caption>
+              Con «Al usar la app» también funciona mientras no cierres ClicyVoy deslizándola hacia
+              arriba en el selector de apps. Tu posición solo se comparte con un servicio activo.
+            </Caption>
+          </Card>
+
+          <Card>
+            <View style={styles.head}>
+              <View style={styles.number}>
+                <Text style={styles.numberText}>2</Text>
+              </View>
+              <Title style={{ flex: 1 }}>Notificaciones activadas</Title>
+            </View>
+            <Body>
+              Los pedidos nuevos y los mensajes del cliente llegan como notificación. Si las
+              desactivas, te enterarás tarde de las ofertas.
+            </Body>
+            <Caption>Ajustes → ClicyVoy → Notificaciones → Permitir notificaciones.</Caption>
+          </Card>
+        </>
+      ) : null}
+
+      {IOS ? null : (
+        <>
+          <Card>
+            <View style={styles.head}>
+              <View style={styles.number}>
+                <Text style={styles.numberText}>1</Text>
+              </View>
+              <Title style={{ flex: 1 }}>Ubicación: «Permitir todo el tiempo»</Title>
+            </View>
+            <Body>
+              Mientras tienes un servicio, tu posición viaja al cliente aunque bloquees la pantalla o
+              te vayas a Google Maps. Android solo lo permite con este permiso.
+            </Body>
+            <Caption>Ajustes → Permisos → Ubicación → Permitir todo el tiempo.</Caption>
+            <Caption>
+              Tu posición solo se comparte mientras tienes un servicio activo y deja de enviarse en
+              cuanto lo terminas o lo cancelas.
+            </Caption>
+          </Card>
+
+          <Card>
+            <View style={styles.head}>
+              <View style={styles.number}>
+                <Text style={styles.numberText}>2</Text>
+              </View>
+              <Title style={{ flex: 1 }}>Batería: «Sin restricciones»</Title>
+            </View>
+            <Body>
+              Xiaomi, Samsung y Huawei cierran las apps en segundo plano para ahorrar batería. Si lo
+              hacen con ClicyVoy, tu posición se congela y el cliente cree que no te has movido.
+            </Body>
+            <Caption>Ajustes → Batería → Sin restricciones (o «Sin límites»).</Caption>
+          </Card>
+        </>
+      )}
 
       <Button title="Abrir los ajustes de la app" icon="settings-outline" onPress={abrirAjustes} />
 

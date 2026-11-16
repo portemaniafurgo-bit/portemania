@@ -10,6 +10,9 @@
       "android": {
         "buildType": "apk"
       },
+      "ios": {
+        "simulator": false
+      },
       "channel": "development"
     },
     "preview": {
@@ -17,12 +20,18 @@
       "android": {
         "buildType": "apk"
       },
+      "ios": {
+        "simulator": false
+      },
       "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
       "android": {
         "buildType": "app-bundle"
+      },
+      "ios": {
+        "simulator": false
       },
       "channel": "production"
     }
@@ -33,6 +42,11 @@
         "serviceAccountKeyPath": "./play-service-account.json",
         "track": "internal",
         "releaseStatus": "draft"
+      },
+      "ios": {
+        "appleId": "APPLE_ID_EMAIL_DEL_TITULAR",
+        "ascAppId": "ID_NUMERICO_DE_LA_APP_EN_APP_STORE_CONNECT",
+        "appleTeamId": "TEAM_ID_DE_10_CARACTERES"
       }
     }
   }

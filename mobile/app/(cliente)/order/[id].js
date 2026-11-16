@@ -35,6 +35,7 @@ import ChatBubbleButton from "../../../components/ChatBubbleButton";
 import { downloadReceipt } from "../../../lib/receipt";
 import { useBottomPadding } from "../../../lib/layout";
 import { colors, radius, spacing } from "../../../theme";
+import { iosBackHeader } from "../../../components/HeaderBack";
 
 /**
  * Detalle del pedido para el cliente. Tres modos, calcados del canvas:
@@ -373,8 +374,12 @@ export default function OrderDetail() {
 
   return (
     <SafeAreaView style={styles.screen} edges={["top", "left", "right"]}>
-      <Stack.Screen options={{ headerShown: true, title: "Tu pedido" }} />
-      <ScrollView contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg, paddingBottom: bottomPad }}>
+      <Stack.Screen options={{ headerShown: true, title: "Tu pedido", ...iosBackHeader("/(cliente)/orders") }} />
+      <ScrollView
+        contentContainerStyle={{ padding: spacing.screen, gap: spacing.lg, paddingBottom: bottomPad }}
+        // Solo iPhone (Android lo ignora): sitio para el teclado.
+        automaticallyAdjustKeyboardInsets
+      >
         {/* Canvas 1h — pedido EN CURSO: el mapa llena la parte alta a sangre
             y la hoja monta encima con asa; ETA y frescura viven en la hoja. */}
         {active && (

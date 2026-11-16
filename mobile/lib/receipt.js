@@ -161,7 +161,7 @@ async function gatherInvoiceData(order) {
   return { issuer, billing, vatRate: Number(tariffs.vat_rate ?? 21), number };
 }
 
-/** Genera el PDF y abre el diálogo de compartir/guardar de Android. */
+/** Genera el PDF y abre el diálogo de compartir/guardar del sistema. */
 export async function downloadReceipt(order, service) {
   const extra = await gatherInvoiceData(order);
   const { uri } = await Print.printToFileAsync({
@@ -170,6 +170,9 @@ export async function downloadReceipt(order, service) {
   if (await Sharing.isAvailableAsync()) {
     await Sharing.shareAsync(uri, {
       mimeType: "application/pdf",
+      // iPhone: el tipo de fichero va por UTI (con él la hoja ofrece «Guardar
+      // en Archivos» y abrir con lectores de PDF). Android lo ignora.
+      UTI: "com.adobe.pdf",
       dialogTitle: `ClicyVoy ${extra.number || String(order.id).slice(0, 8)}`,
     });
   }

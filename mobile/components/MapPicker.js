@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
-import { Modal, StyleSheet, Text, View } from "react-native";
+import { Modal, Platform, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Camera, Map } from "@maplibre/maplibre-react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { addressFromCoords } from "../lib/addresses";
@@ -31,6 +32,12 @@ export default function MapPicker({ visible, initial, zone = "albacete", onConfi
   const center = useRef(initial?.lng ? [initial.lng, initial.lat] : ALBACETE);
   const [resolving, setResolving] = useState(false);
   const [hint, setHint] = useState("");
+  // iPhone: la ventana a pantalla completa empieza bajo la muesca y acaba bajo
+  // la barra de inicio; sin esto el título quedaba tapado. En Android, igual
+  // que antes (sin relleno extra).
+  const insets = useSafeAreaInsets();
+  const iosSafe =
+    Platform.OS === "ios" ? { paddingTop: insets.top, paddingBottom: insets.bottom } : null;
 
   const confirm = async () => {
     setResolving(true);
@@ -50,7 +57,7 @@ export default function MapPicker({ visible, initial, zone = "albacete", onConfi
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.container}>
+      <View style={[styles.container, iosSafe]}>
         <View style={styles.header}>
           <Title>Coloca el punto exacto</Title>
           <Caption>Mueve el mapa hasta dejar el pin sobre el portal.</Caption>

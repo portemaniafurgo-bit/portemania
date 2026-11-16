@@ -1,9 +1,11 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { signInWithGoogle } from "../../lib/googleAuth";
+import { signInWithApple } from "../../lib/oauth";
 import GoogleButton from "../../components/GoogleButton";
+import AppleButton from "../../components/AppleButton";
 import { Caption, ErrorText, Heading, Screen } from "../../components/ui";
 import { colors, radius, spacing } from "../../theme";
 
@@ -16,6 +18,10 @@ import { colors, radius, spacing } from "../../theme";
  * justo después de entrar, en la pantalla de completar perfil.
  *
  * El login con contraseña sigue existiendo para las cuentas antiguas.
+ *
+ * En iPhone se añade «Continuar con Apple» (Apple lo exige a toda app que
+ * ofrezca acceso con Google), encima del de Google y del mismo tamaño. Apple
+ * puede no dar el nombre: también se pide al completar el perfil.
  */
 const VENTAJAS = [
   { icon: "flash-outline", text: "Entras en un toque, sin formularios" },
@@ -26,12 +32,17 @@ const VENTAJAS = [
 export default function Register() {
   const router = useRouter();
   const [error, setError] = useState("");
+  const [appleLoading, setAppleLoading] = useState(false);
 
   return (
     <Screen>
       <View style={{ gap: spacing.xs, marginTop: spacing.xl }}>
         <Heading>Crea tu cuenta</Heading>
-        <Caption>El registro es con tu cuenta de Google. Rápido y sin contraseñas.</Caption>
+        <Caption>
+          {Platform.OS === "ios"
+            ? "El registro es con tu cuenta de Apple o de Google. Rápido y sin contraseñas."
+            : "El registro es con tu cuenta de Google. Rápido y sin contraseñas."}
+        </Caption>
       </View>
 
       <View style={{ gap: spacing.md }}>
@@ -45,6 +56,16 @@ export default function Register() {
         ))}
       </View>
 
+      <AppleButton
+        loading={appleLoading}
+        onPress={async () => {
+          setError("");
+          setAppleLoading(true);
+          const result = await signInWithApple();
+          setAppleLoading(false);
+          if (!result.ok && result.reason) setError(result.reason);
+        }}
+      />
       <GoogleButton
         onPress={async () => {
           setError("");

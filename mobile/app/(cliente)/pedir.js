@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import * as Location from "expo-location";
@@ -13,11 +13,13 @@ import { parseScheduledAt, useRequestForm } from "../../lib/useRequestForm";
 import { SERVICE_KEYS, SERVICES } from "../../lib/services";
 import { INCLUDED_HOURS, offerFloor, servicePriceFrom } from "../../lib/tariffs";
 import { pickPhotos, takePhoto } from "../../lib/photos";
+import { CARD_LABEL } from "../../lib/payment";
 import { euro } from "../../lib/money";
 import { useBottomPadding } from "../../lib/layout";
 import { Body, Button, Caption, ErrorText, Field, Heading, Overline, Title } from "../../components/ui";
 import { Counter, Option, Toggle } from "../../components/wizard";
 import WizardChrome from "../../components/WizardChrome";
+import DateTimeSheet from "../../components/DateTimeSheet";
 import OfferControl from "../../components/OfferControl";
 import { useDialog } from "../../components/Dialog";
 import AddressField from "../../components/AddressField";
@@ -88,6 +90,8 @@ export default function Pedir() {
   // El cliente eligió "Programar" (aunque aún no haya escrito el día): un
   // borrador recuperado con fecha también lo activa.
   const [wantSchedule, setWantSchedule] = useState(false);
+  // iPhone: hoja propia para el día y la hora (ver components/DateTimeSheet).
+  const [iosScheduleOpen, setIosScheduleOpen] = useState(false);
   const scheduling = wantSchedule || !!form.scheduled_date;
   // Aire al final de la hoja de direcciones, para que el botón no quede bajo
   // la barra de gestos del móvil.
@@ -171,6 +175,10 @@ export default function Pedir() {
    * campos era pedirle al cliente que hiciera de teclado numérico.
    */
   const pickSchedule = () => {
+    if (Platform.OS === "ios") {
+      setIosScheduleOpen(true);
+      return;
+    }
     const now = new Date();
     const current = parseScheduledAt(form.scheduled_date, form.scheduled_time) || now;
     DateTimePickerAndroid.open({
@@ -194,6 +202,16 @@ export default function Pedir() {
         });
       },
     });
+  };
+
+  /** iPhone: lo elegido en la hoja, con el mismo formato que en Android. */
+  const confirmIosSchedule = chosen => {
+    setIosScheduleOpen(false);
+    const picked = new Date(chosen);
+    picked.setSeconds(0, 0);
+    setWantSchedule(true);
+    update("scheduled_date", format(picked, "dd/MM"));
+    update("scheduled_time", format(picked, "HH:mm"));
   };
 
   const scheduledAt = parseScheduledAt(form.scheduled_date, form.scheduled_time);
@@ -328,6 +346,8 @@ export default function Pedir() {
           style={styles.addressSheet}
           contentContainerStyle={{ gap: spacing.md, paddingBottom: bottomPad }}
           keyboardShouldPersistTaps="handled"
+          // Solo iPhone (Android lo ignora): sitio para el teclado.
+          automaticallyAdjustKeyboardInsets
         >
           <View style={styles.sheetHandle} />
           <View style={styles.bars}>
@@ -848,7 +868,7 @@ export default function Pedir() {
           <View style={styles.plainCard}>
             <Overline>PAGO</Overline>
             <Option
-              label="Tarjeta o Google Pay"
+              label={CARD_LABEL}
               description="Se paga desde la app, con el importe pactado"
               selected={form.payment_method === "card"}
               onPress={() => update("payment_method", "card")}
@@ -898,6 +918,14 @@ export default function Pedir() {
           </Pressable>
         </>
       )}
+      <DateTimeSheet
+        visible={iosScheduleOpen}
+        title="¿Cuándo lo necesitas?"
+        value={scheduledAt || new Date()}
+        minimumDate={new Date()}
+        onConfirm={confirmIosSchedule}
+        onCancel={() => setIosScheduleOpen(false)}
+      />
     </WizardChrome>
   );
 }

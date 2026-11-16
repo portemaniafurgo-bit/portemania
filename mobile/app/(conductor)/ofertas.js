@@ -1,5 +1,17 @@
 import { useCallback, useEffect, useState } from "react";
-import { Modal, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, TextInput, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect, useRouter } from "expo-router";
 import * as Location from "expo-location";
@@ -17,7 +29,7 @@ import { useDialog } from "../../components/Dialog";
 import OfferCard from "../../components/OfferCard";
 import OfferDetailSheet from "../../components/OfferDetailSheet";
 import { Body, Button, Caption, Card, ErrorText, Heading, Loading, Title } from "../../components/ui";
-import { useBottomPadding } from "../../lib/layout";
+import { useBottomPadding, useSheetBottomPadding } from "../../lib/layout";
 import { colors, radius, spacing } from "../../theme";
 
 /**
@@ -48,6 +60,7 @@ const COUNTER_REASONS = ["Sin ascensor", "Carga voluminosa", "Hora punta"];
 export default function Ofertas() {
   // Aire al final para que ningun boton quede bajo la barra del sistema.
   const bottomPad = useBottomPadding();
+  const counterSheetPad = useSheetBottomPadding(spacing.xl);
   const { user } = useAuth();
   const router = useRouter();
   const dialog = useDialog();
@@ -618,116 +631,132 @@ export default function Ofertas() {
         animationType="slide"
         onRequestClose={() => !negotiating && setCounterFor(null)}
       >
-        <Pressable style={styles.backdrop} onPress={() => !negotiating && setCounterFor(null)} />
-        <View style={styles.counterSheet}>
-          <View style={styles.sheetHandle} />
+        <IosKeyboardAvoid>
+          <Pressable style={styles.backdrop} onPress={() => !negotiating && setCounterFor(null)} />
+          <View style={[styles.counterSheet, counterSheetPad]}>
+            <View style={styles.sheetHandle} />
 
-          {counterOrder ? (
-            <View style={styles.header}>
-              <Caption>
-                {counterService?.label || "Servicio"}
-                {counterOrder.needs_help ? " · con ayuda" : ""}
-              </Caption>
-              <Text style={styles.counterClientPrice}>{euro(counterBase)}</Text>
-            </View>
-          ) : null}
-
-          <Title>Tu contraoferta</Title>
-          <Caption>
-            El cliente pide {euro(counterBase)}. Di tu precio y por qué: con motivo se acepta el
-            doble de veces.
-          </Caption>
-
-          {/* Importe grande con +/−, y cuánto sube sobre lo que pide el cliente */}
-          <View style={styles.counterRow}>
-            <Pressable
-              onPress={() => setCounterAmount(a => Math.max(5, a - 1))}
-              style={styles.stepper}
-              hitSlop={6}
-            >
-              <Ionicons name="remove" size={22} color={colors.primary} />
-            </Pressable>
-            <View style={{ alignItems: "center", flex: 1 }}>
-              <Text style={styles.counterBig}>{euro(counterAmount)}</Text>
-              {counterDelta !== 0 ? (
+            {counterOrder ? (
+              <View style={styles.header}>
                 <Caption>
-                  {counterDelta > 0 ? "+" : "−"}
-                  {euro(Math.abs(counterDelta))} sobre su oferta
+                  {counterService?.label || "Servicio"}
+                  {counterOrder.needs_help ? " · con ayuda" : ""}
                 </Caption>
-              ) : (
-                <Caption>igual que su oferta</Caption>
-              )}
+                <Text style={styles.counterClientPrice}>{euro(counterBase)}</Text>
+              </View>
+            ) : null}
+
+            <Title>Tu contraoferta</Title>
+            <Caption>
+              El cliente pide {euro(counterBase)}. Di tu precio y por qué: con motivo se acepta el
+              doble de veces.
+            </Caption>
+
+            {/* Importe grande con +/−, y cuánto sube sobre lo que pide el cliente */}
+            <View style={styles.counterRow}>
+              <Pressable
+                onPress={() => setCounterAmount(a => Math.max(5, a - 1))}
+                style={styles.stepper}
+                hitSlop={6}
+              >
+                <Ionicons name="remove" size={22} color={colors.primary} />
+              </Pressable>
+              <View style={{ alignItems: "center", flex: 1 }}>
+                <Text style={styles.counterBig}>{euro(counterAmount)}</Text>
+                {counterDelta !== 0 ? (
+                  <Caption>
+                    {counterDelta > 0 ? "+" : "−"}
+                    {euro(Math.abs(counterDelta))} sobre su oferta
+                  </Caption>
+                ) : (
+                  <Caption>igual que su oferta</Caption>
+                )}
+              </View>
+              <Pressable
+                onPress={() => setCounterAmount(a => Math.min(500, a + 1))}
+                style={styles.stepper}
+                hitSlop={6}
+              >
+                <Ionicons name="add" size={22} color={colors.primary} />
+              </Pressable>
             </View>
-            <Pressable
-              onPress={() => setCounterAmount(a => Math.min(500, a + 1))}
-              style={styles.stepper}
-              hitSlop={6}
-            >
-              <Ionicons name="add" size={22} color={colors.primary} />
-            </Pressable>
-          </View>
 
-          {/* Atajos: la tarifa y dos escalones por encima */}
-          <View style={styles.chips}>
-            {[0, 2, 5].map(extra => {
-              const value = Math.round((counterOrder?.estimated_price || counterBase) + extra);
-              const active = counterAmount === value;
-              return (
-                <Pressable
-                  key={extra}
-                  onPress={() => setCounterAmount(value)}
-                  style={[styles.chip, active && styles.chipOn]}
-                >
-                  <Text style={[styles.chipText, active && { color: colors.primary }]}>
-                    {euro(value)}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+            {/* Atajos: la tarifa y dos escalones por encima */}
+            <View style={styles.chips}>
+              {[0, 2, 5].map(extra => {
+                const value = Math.round((counterOrder?.estimated_price || counterBase) + extra);
+                const active = counterAmount === value;
+                return (
+                  <Pressable
+                    key={extra}
+                    onPress={() => setCounterAmount(value)}
+                    style={[styles.chip, active && styles.chipOn]}
+                  >
+                    <Text style={[styles.chipText, active && { color: colors.primary }]}>
+                      {euro(value)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
 
-          <Text style={styles.overline}>Motivo (opcional)</Text>
-          <View style={styles.chips}>
-            {COUNTER_REASONS.map(reason => {
-              const active = counterMessage.includes(reason);
-              return (
-                <Pressable
-                  key={reason}
-                  onPress={() =>
-                    setCounterMessage(prev =>
-                      prev.includes(reason)
-                        ? prev.replace(reason, "").replace(/\s*·\s*$/, "").trim()
-                        : prev
-                          ? `${prev} · ${reason}`
-                          : reason,
-                    )
-                  }
-                  style={[styles.chip, active && styles.chipOn]}
-                >
-                  <Text style={[styles.chipText, active && { color: colors.primary }]}>{reason}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <TextInput
-            value={counterMessage}
-            onChangeText={setCounterMessage}
-            placeholder="Y si quieres, cuéntaselo con tus palabras…"
-            placeholderTextColor={colors.subtle}
-            style={styles.counterInput}
-            multiline
-          />
+            <Text style={styles.overline}>Motivo (opcional)</Text>
+            <View style={styles.chips}>
+              {COUNTER_REASONS.map(reason => {
+                const active = counterMessage.includes(reason);
+                return (
+                  <Pressable
+                    key={reason}
+                    onPress={() =>
+                      setCounterMessage(prev =>
+                        prev.includes(reason)
+                          ? prev.replace(reason, "").replace(/\s*·\s*$/, "").trim()
+                          : prev
+                            ? `${prev} · ${reason}`
+                            : reason,
+                      )
+                    }
+                    style={[styles.chip, active && styles.chipOn]}
+                  >
+                    <Text style={[styles.chipText, active && { color: colors.primary }]}>{reason}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <TextInput
+              value={counterMessage}
+              onChangeText={setCounterMessage}
+              placeholder="Y si quieres, cuéntaselo con tus palabras…"
+              placeholderTextColor={colors.subtle}
+              style={styles.counterInput}
+              multiline
+            />
 
-          <Button
-            title={`Enviar ${euro(counterAmount)}`}
-            loading={negotiating}
-            disabled={counterAmount < 5}
-            onPress={() => counterOrder && sendCounterOffer(counterOrder)}
-          />
-          <Button title="Cancelar" variant="plain" disabled={negotiating} onPress={() => setCounterFor(null)} />
-        </View>
+            <Button
+              title={`Enviar ${euro(counterAmount)}`}
+              loading={negotiating}
+              disabled={counterAmount < 5}
+              onPress={() => counterOrder && sendCounterOffer(counterOrder)}
+            />
+            <Button title="Cancelar" variant="plain" disabled={negotiating} onPress={() => setCounterFor(null)} />
+          </View>
+        </IosKeyboardAvoid>
       </Modal>
     </SafeAreaView>
+  );
+}
+
+/**
+ * iPhone: la hoja de contraoferta tiene un campo de texto abajo del todo y el
+ * teclado la tapaba (en Android la ventana se encoge sola). En Android no
+ * envuelve nada: devuelve los hijos tal cual.
+ */
+function IosKeyboardAvoid({ children }) {
+  if (Platform.OS !== "ios") return children;
+  return (
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
+      {children}
+    </KeyboardAvoidingView>
   );
 }
 

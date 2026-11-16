@@ -2,6 +2,7 @@ import { Linking } from "react-native";
 import { Stack } from "expo-router";
 import { SettingsGroup, SettingsRow } from "../../components/SettingsRow";
 import { Caption, Heading, Screen } from "../../components/ui";
+import { iosBackHeader } from "../../components/HeaderBack";
 
 /**
  * Ayuda y contacto (canvas 2i). Nada de formularios que van a un buzón que
@@ -12,7 +13,7 @@ const EMAIL = "portemaniafurgo@gmail.com";
 export default function Ayuda() {
   return (
     <Screen>
-      <Stack.Screen options={{ headerShown: true, title: "Ayuda y contacto" }} />
+      <Stack.Screen options={{ headerShown: true, title: "Ayuda y contacto", ...iosBackHeader("/(cliente)/profile") }} />
       <Heading>¿Te echamos una mano?</Heading>
       <Caption>
         Para algo urgente de un servicio en curso, escribe por el chat del pedido: el conductor lo

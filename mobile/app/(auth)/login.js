@@ -3,7 +3,9 @@ import { Image, Pressable, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { supabase } from "../../lib/supabase";
 import { signInWithGoogle } from "../../lib/googleAuth";
+import { signInWithApple } from "../../lib/oauth";
 import GoogleButton from "../../components/GoogleButton";
+import AppleButton from "../../components/AppleButton";
 import { Button, Caption, ErrorText, Field, Heading, PasswordField, Screen } from "../../components/ui";
 import { colors, spacing } from "../../theme";
 
@@ -21,6 +23,16 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [appleLoading, setAppleLoading] = useState(false);
+
+  // Solo en iPhone (el botón no se pinta en Android). Cancelar no es un error.
+  const withApple = async () => {
+    setError("");
+    setAppleLoading(true);
+    const result = await signInWithApple();
+    setAppleLoading(false);
+    if (!result.ok && result.reason) setError(result.reason);
+  };
 
   const submit = async () => {
     const mail = email.trim().toLowerCase();
@@ -96,6 +108,8 @@ export default function Login() {
           <View style={styles.dividerLine} />
         </View>
 
+        {/* Apple primero y del mismo tamaño que Google (guía 4.8 de Apple). */}
+        <AppleButton onPress={withApple} loading={appleLoading} />
         <GoogleButton
           onPress={async () => {
             const result = await signInWithGoogle();

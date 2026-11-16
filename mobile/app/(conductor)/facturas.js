@@ -12,6 +12,7 @@ import { downloadReceipt } from "../../lib/receipt";
 import { Caption, Card, Heading, Loading, Overline, Screen, Title } from "../../components/ui";
 import EmptyState from "../../components/EmptyState";
 import { colors, radius, spacing } from "../../theme";
+import { iosBackHeader } from "../../components/HeaderBack";
 
 /**
  * Las facturas del conductor: las que ÉL ha emitido, agrupadas por mes.
@@ -61,7 +62,7 @@ export default function MisFacturas() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ headerShown: true, title: "Mis facturas" }} />
+      <Stack.Screen options={{ headerShown: true, title: "Mis facturas", ...iosBackHeader("/(conductor)/profile") }} />
       <Heading>Mis facturas</Heading>
       <Caption>
         Las emites tú como autónomo. Cada una lleva tu NIF y su número correlativo; el cliente

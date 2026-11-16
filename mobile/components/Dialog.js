@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useState } from "react";
 import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import { Button } from "./ui";
+import { useSheetBottomPadding } from "../lib/layout";
 import { colors, radius, spacing } from "../theme";
 
 /**
@@ -17,7 +18,9 @@ import { colors, radius, spacing } from "../theme";
  *     actions: [{ text, onPress, style: "cancel" | "destructive" | undefined }],
  *     onDismiss,   // opcional: cerrado por el fondo o por el botón atrás
  *   });
- * Si no se pasa ninguna acción de estilo "cancel", se añade «Volver».
+ * Si no se pasa ninguna acción de estilo "cancel", se añade «Volver» (salvo con
+ * `hideBack: true`: el aviso de ubicación de iPhone no puede ofrecer saltarse
+ * el permiso, ver lib/locationDisclosure.js).
  *
  * `onDismiss` existe porque cerrar por el fondo NO llama a ninguna acción: quien
  * espera una respuesta sí/no (la divulgación de ubicación de
@@ -27,6 +30,7 @@ const DialogContext = createContext({ show: () => {} });
 
 export function DialogProvider({ children }) {
   const [dialog, setDialog] = useState(null);
+  const sheetPad = useSheetBottomPadding(spacing.xl);
   const show = useCallback(options => setDialog(options), []);
   const close = useCallback(() => setDialog(null), []);
   // Cierre SIN pulsar ninguna acción: fondo, botón atrás o el «Volver» que se
@@ -54,7 +58,7 @@ export function DialogProvider({ children }) {
         onRequestClose={dismiss}
       >
         <Pressable style={styles.backdrop} onPress={dismiss} />
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, sheetPad]}>
           <View style={styles.handle} />
           {dialog?.title ? <Text style={styles.title}>{dialog.title}</Text> : null}
           {dialog?.message ? <Text style={styles.message}>{dialog.message}</Text> : null}
@@ -71,7 +75,7 @@ export function DialogProvider({ children }) {
                 }}
               />
             ))}
-            {!hasCancel ? <Button title="Volver" variant="plain" onPress={dismiss} /> : null}
+            {!hasCancel && !dialog?.hideBack ? <Button title="Volver" variant="plain" onPress={dismiss} /> : null}
           </View>
         </View>
       </Modal>

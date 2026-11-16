@@ -24,6 +24,7 @@ import { uploadProofPhoto, uploadSignature } from "../../../lib/deliveryProof";
 import { countUnread } from "../../../lib/unread";
 import { takePhoto } from "../../../lib/photos";
 import SignaturePad from "../../../components/SignaturePad";
+import DateTimeSheet from "../../../components/DateTimeSheet";
 import { Body, Button, Caption, Card, ErrorText, Field, Loading, Title } from "../../../components/ui";
 import { useBottomPadding } from "../../../lib/layout";
 import { colors, radius, spacing } from "../../../theme";
@@ -154,6 +155,8 @@ export default function TrabajoActivo() {
   // Foto de la carga ampliada: en miniatura no se distingue un sofá de dos plazas.
   const [zoomPhoto, setZoomPhoto] = useState(null);
   const [saving, setSaving] = useState(false);
+  // iPhone: hoja propia para proponer día y hora (ver components/DateTimeSheet).
+  const [iosStartOpen, setIosStartOpen] = useState(false);
   const [feedbackTags, setFeedbackTags] = useState([]);
   const [feedbackText, setFeedbackText] = useState("");
   const [showProof, setShowProof] = useState(false);
@@ -432,6 +435,12 @@ export default function TrabajoActivo() {
   };
 
   const pickAgreedStart = () => {
+    if (Platform.OS === "ios") {
+      // Puede llegar desde un diálogo que aún se está cerrando: iOS no abre
+      // una ventana modal mientras otra se cierra, así que se espera un poco.
+      setTimeout(() => setIosStartOpen(true), 350);
+      return;
+    }
     const now = new Date();
     const current = order.agreed_start_at ? new Date(order.agreed_start_at) : now;
     DateTimePickerAndroid.open({
@@ -662,7 +671,12 @@ export default function TrabajoActivo() {
           contenido en el mismo scroll — al subir, el mapa se va hacia arriba
           con todo lo demás, en vez de quedarse fijo con la lista colándose por
           debajo. */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: bottomPad }}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: bottomPad }}
+        // Solo iPhone (Android lo ignora): sitio para el teclado.
+        automaticallyAdjustKeyboardInsets
+      >
       <View style={styles.statusBand}>
         {/* Sin cabecera nativa: el atrás vive en la propia banda */}
         <Pressable onPress={() => router.back()} hitSlop={10} style={{ marginBottom: 6 }}>
@@ -1195,6 +1209,20 @@ export default function TrabajoActivo() {
         )}
       </View>
       </ScrollView>
+
+      <DateTimeSheet
+        visible={iosStartOpen}
+        title="¿Cuándo empiezas el servicio?"
+        value={order.agreed_start_at ? new Date(order.agreed_start_at) : new Date()}
+        minimumDate={new Date()}
+        onConfirm={chosen => {
+          setIosStartOpen(false);
+          const picked = new Date(chosen);
+          picked.setSeconds(0, 0);
+          proposeStart(picked);
+        }}
+        onCancel={() => setIosStartOpen(false)}
+      />
 
       {/* Chat flotante con el cliente */}
       <Modal visible={!!zoomPhoto} transparent animationType="fade" onRequestClose={() => setZoomPhoto(null)}>

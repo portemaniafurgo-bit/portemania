@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Platform } from "react-native";
 import { useStripe } from "@stripe/stripe-react-native";
 import { confirmPayment, createPaymentIntent } from "../lib/payments";
 import { supabase } from "../lib/supabase";
@@ -82,7 +83,7 @@ export default function PayButton({ order, onPaid }) {
     <Card>
       <Body>Pago con tarjeta</Body>
       <Caption>
-        {order.estimated_price != null ? `${order.estimated_price} €` : ""} · tarjeta o Google Pay
+        {order.estimated_price != null ? `${order.estimated_price} €` : ""} · {Platform.OS === "ios" ? "tarjeta" : "tarjeta o Google Pay"}
       </Caption>
       <ErrorText>{error}</ErrorText>
       <Button title="Pagar ahora" onPress={pay} loading={loading} />

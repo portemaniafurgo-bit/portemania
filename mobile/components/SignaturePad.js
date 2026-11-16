@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { PanResponder, StyleSheet, View } from "react-native";
+import { PanResponder, Platform, StyleSheet, View } from "react-native";
 import Svg, { Path } from "react-native-svg";
 import ViewShot from "react-native-view-shot";
 import { Button, Caption } from "./ui";
@@ -20,6 +20,9 @@ export default function SignaturePad({ onCapture, capturing }) {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      // iPhone: la pantalla del servicio rueda, y sin esto el desplazamiento
+      // se queda el gesto a mitad de firma. En Android, lo de siempre.
+      onPanResponderTerminationRequest: () => Platform.OS !== "ios",
       onPanResponderGrant: e => {
         const { locationX, locationY } = e.nativeEvent;
         currentPath.current = `M ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
@@ -47,7 +50,9 @@ export default function SignaturePad({ onCapture, capturing }) {
         style={styles.canvasWrap}
       >
         <View style={styles.canvas} {...pan.panHandlers}>
-          <Svg style={StyleSheet.absoluteFill}>
+          {/* En iPhone el dibujo no recibe toques: así las coordenadas son
+              siempre las del recuadro, no las del trazo tocado. */}
+          <Svg style={StyleSheet.absoluteFill} pointerEvents={Platform.OS === "ios" ? "none" : "auto"}>
             {paths.map((d, i) => (
               <Path key={i} d={d} stroke="#111111" strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
             ))}

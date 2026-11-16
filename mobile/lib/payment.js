@@ -1,3 +1,4 @@
+import { Platform } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
 /**
@@ -7,8 +8,15 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
  */
 const KEY = "default_payment_v1";
 
+/**
+ * Nombre del pago con tarjeta. En iPhone no se ofrece Google Pay (PaymentSheet
+ * solo lo enseña en Android) y Apple Pay está apagado, así que allí es
+ * «Tarjeta»: además, Apple rechaza apps que nombran otra plataforma.
+ */
+export const CARD_LABEL = Platform.OS === "ios" ? "Tarjeta" : "Tarjeta o Google Pay";
+
 export const PAYMENT_LABELS = {
-  card: "Tarjeta o Google Pay",
+  card: CARD_LABEL,
   bizum: "Bizum al conductor",
   cash: "Efectivo al conductor",
 };
