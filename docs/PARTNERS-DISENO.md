@@ -229,4 +229,5 @@ Pendiente fuera de este trabajo:
   baja el precio ni se autoentrega; conductor ajeno no altera el pedido;
   aceptar, fases, entregar (precio final 80, sello puesto) y valorar funcionan;
   no se sale de entregado. Sin restos tras la prueba.
-- `0028_partners.sql`: SIN aplicar.
+- **17-nov-2026: `0028_partners.sql` APLICADA en producción** (autorizada por Luis: "publicarlo", sin tocar la app Android). Programa activo y cerrado al público (`enabled: true, public: false`). Verificado por lectura (4 tablas, RLS, 2 triggers, anon solo `partner_public`) y con prueba de humo en transacción con rollback: alta bloqueada en privado, alta y reclamo en abierto, 5 % primer servicio y 2 % el siguiente, sin comisión para cliente sin comercial, el comercial no lee datos ajenos, funciones de admin bloqueadas. Sin restos.
+- Web publicada desde esta rama el mismo día. App Android SIN actualizar (prueba cerrada de Google Play en curso).
