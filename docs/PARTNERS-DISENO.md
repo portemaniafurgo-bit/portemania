@@ -218,3 +218,15 @@ Pendiente fuera de este trabajo:
   cancelación sin cobrarlas (el `set_request_price` actual ya no añade la línea).
 - Un cliente todavía puede poner su pedido en `cancelled` por la API saltándose
   la penalización, y un conductor saltarse fases (`accepted → picked_up`).
+
+## Registro de aplicación
+
+- **17-nov-2026: `0029_proteger_campos_pedido.sql` APLICADA en producción**
+  (autorizada por Luis). Verificado por lectura: trigger
+  `trg_protect_order_core_fields` activo y en su orden (tras `set_updated_date`,
+  antes de `trg_protect_order_payment_fields`). Prueba de humo sobre la base
+  real dentro de una transacción con rollback (sin datos ni avisos): cliente no
+  baja el precio ni se autoentrega; conductor ajeno no altera el pedido;
+  aceptar, fases, entregar (precio final 80, sello puesto) y valorar funcionan;
+  no se sale de entregado. Sin restos tras la prueba.
+- `0028_partners.sql`: SIN aplicar.
