@@ -9,8 +9,10 @@ import {
   clearPendingReferral,
   parseInviteCode,
   reasonMessage,
+  isStaffRole,
   savePendingReferral,
   useProgramEnabled,
+  useProgramPublic,
 } from "../lib/partners";
 import { Button, Caption, ErrorText, Field, Heading, Screen } from "../components/ui";
 import { spacing } from "../theme";
@@ -27,7 +29,8 @@ const WARN_REASONS = new Set(["not_new", "has_orders", "already_referred", "own_
  * es un extra: es cómo se resuelven los «no encuentro el portal».
  *
  * Opcional: el código de invitación de un comercial (ClicyVoy Partners), solo
- * si el programa está instalado y encendido. Se envía ANTES de guardar el
+ * si el programa está instalado, encendido y abierto al público (o, mientras
+ * es privado, para el personal). Se envía ANTES de guardar el
  * teléfono: en cuanto el teléfono se guarda, el guardia de `_layout.js` saca a
  * la persona de esta pantalla y ya no se podría avisar de un código que no
  * existe o no vale. El aviso no bloquea: un segundo toque sigue sin el código.
@@ -36,9 +39,13 @@ const WARN_REASONS = new Set(["not_new", "has_orders", "already_referred", "own_
  */
 export default function CompletarPerfil() {
   const router = useRouter();
-  const { user, isDriver } = useAuth();
-  // El campo del código solo sale con el programa instalado Y encendido.
+  const { user, isDriver, role } = useAuth();
+  // El campo del código solo sale con el programa instalado y encendido, y
+  // además abierto a todo el mundo; en el lanzamiento privado, solo al
+  // personal (admin/staff), que es quien prueba la atribución.
   const programEnabled = useProgramEnabled();
+  const programPublic = useProgramPublic();
+  const showInvite = programEnabled && (programPublic || isStaffRole(role, user?.email));
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
   const [phone, setPhone] = useState("");
   const [inviteText, setInviteText] = useState("");
@@ -67,7 +74,7 @@ export default function CompletarPerfil() {
   /** Envía el código si lo hay. true = seguir guardando; false = parar y avisar. */
   const handleInvite = async () => {
     const text = inviteText.trim();
-    if (!programEnabled || !text) return true;
+    if (!showInvite || !text) return true;
     if (warnedRef.current === text) return true;
     const code = parseInviteCode(text);
     if (!code) return warnOnce(text, CODE_NOT_FOUND);
@@ -166,7 +173,7 @@ export default function CompletarPerfil() {
           keyboardType="phone-pad"
           inputMode="tel"
         />
-        {programEnabled ? (
+        {showInvite ? (
           <Field
             label="¿Te ha invitado alguien? Código de invitación"
             value={inviteText}

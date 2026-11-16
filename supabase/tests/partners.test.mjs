@@ -1330,6 +1330,29 @@ let payout1;
   check('saneado: sin la fila, apagado y no público', none.enabled === false && none.public === false, none);
   await su(`insert into public.app_settings (key, value) values ('partner_program', $1::jsonb)`, [JSON.stringify(backup)]);
 
+  // Mismo saneado que normalizeProgram (web y app): textos sin espacios
+  // alrededor, null = ausente en hold_same_driver, días truncados.
+  await setSetting({ enabled: ' true ' });
+  check('saneado: enabled = " true " (texto con espacios) se lee como encendido', (await settings()).enabled === true);
+  await setSetting({ enabled: ' FALSE ' });
+  check('saneado: enabled = " FALSE " se lee como apagado', (await settings()).enabled === false);
+  await setSetting({ enabled: null });
+  check('saneado: enabled = null cuenta como apagado', (await settings()).enabled === false);
+  await setSetting({ enabled: true, hold_same_driver: ' false ' });
+  check('saneado: hold_same_driver = " false " se lee como no retener', (await settings()).hold_same_driver === false);
+  await setSetting({ hold_same_driver: null, hold_same_driver_cash: false });
+  check('saneado: hold_same_driver = null mira el nombre antiguo (false)', (await settings()).hold_same_driver === false);
+  await setSetting({ hold_same_driver_cash: null });
+  check('saneado: los dos a null = retener', (await settings()).hold_same_driver === true);
+  await setSetting({ hold_same_driver: 'quizás', hold_same_driver_cash: false });
+  check('saneado: hold_same_driver ilegible = retener (no mira el antiguo)', (await settings()).hold_same_driver === true);
+  await dropSettingKeys(['hold_same_driver_cash']);
+  await setSetting({ hold_same_driver: true, hold_days: 15.9, payout_interval_days: '30.5', claim_window_days: 365.99 });
+  const tr = await settings();
+  check('saneado: los días se truncan (15.9 → 15, "30.5" → 30, 365.99 → 365)',
+    num(tr.hold_days) === 15 && num(tr.payout_interval_days) === 30 && num(tr.claim_window_days) === 365, tr);
+  await setSetting({ hold_days: 15, payout_interval_days: 30, claim_window_days: 30 });
+
   // Se deja como estaba para el resto de la prueba (abierto).
   await setSetting({ enabled: true, public: true });
   check('privado: sin advertencias', newWarnings().length === 0, newWarnings().map((w) => w.message));

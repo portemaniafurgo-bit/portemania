@@ -1,29 +1,51 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchProgramSettings, formatEuro, formatPct } from "@/lib/partners";
+import { useAuth } from "@/lib/AuthContext";
+import { fetchProgramSettings, formatEuro, formatPct, isStaffUser } from "@/lib/partners";
 
 /**
  * Apartado del programa de comerciales en los Términos (con su título). Lee
  * los valores vivos de app_settings.partner_program para que el texto legal no
  * quede desactualizado al cambiarlos.
  *
- * Solo se pinta cuando el programa está encendido Y abierto al público;
- * mientras se carga, si la lectura falla, sin la fila o en el lanzamiento
- * privado, no se pinta nada. Por eso va el último de la página: así ocultarlo
- * no deja un hueco en la numeración.
+ * El contenedor <section id="comerciales"> va SIEMPRE en el HTML (la página
+ * sigue siendo estática y el enlace /terminos#comerciales tiene destino). Su
+ * contenido solo se pinta con el programa encendido Y abierto al público, o
+ * para el personal (admin/staff), que en el lanzamiento privado tiene que
+ * poder leer las condiciones que acepta al darse de alta. Si no, el contenedor
+ * queda vacío y sin márgenes: no ocupa sitio ni se ve el «13.». Por eso va el
+ * último de la página: ocultarlo no deja un hueco en la numeración.
  */
 export default function ProgramaComerciales({ number }) {
+  const { user } = useAuth();
   const { data: s } = useQuery({ queryKey: ["partner-program"], queryFn: fetchProgramSettings });
-  if (!s || typeof s !== "object" || s.enabled !== true || s.public !== true) return null;
+  const visible =
+    !!s && typeof s === "object" && ((s.enabled === true && s.public === true) || isStaffUser(user));
+  const ref = useRef(null);
 
+  // El contenido llega después de cargar la página: si se entró por
+  // #comerciales, el navegador ya intentó ir ahí con el apartado vacío.
+  useEffect(() => {
+    if (visible && window.location.hash === "#comerciales") ref.current?.scrollIntoView();
+  }, [visible]);
+
+  return (
+    <section id="comerciales" ref={ref} className={visible ? "mt-8 space-y-3 scroll-mt-6" : undefined}>
+      {visible ? <Condiciones s={s} number={number} /> : null}
+    </section>
+  );
+}
+
+function Condiciones({ s, number }) {
   const pct = `el ${formatPct(s.first_pct)} del precio del primer servicio entregado de cada cliente y el ${formatPct(s.repeat_pct)} de cada servicio entregado posterior`;
   const hold = `${s.hold_days} días`;
   const min = formatEuro(s.min_payout);
   const interval = `una vez cada ${s.payout_interval_days} días`;
 
   return (
-    <section id="comerciales" className="space-y-3 scroll-mt-6">
+    <>
       <h2 className="text-xl font-heading font-semibold text-foreground">
         {number}. Programa de comerciales (ClicyVoy Partners)
       </h2>
@@ -69,6 +91,6 @@ export default function ProgramaComerciales({ number }) {
           terminado; los cambios no afectan a las comisiones ya generadas.
         </li>
       </ul>
-    </section>
+    </>
   );
 }

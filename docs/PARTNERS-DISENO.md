@@ -39,8 +39,11 @@ Functions, RPC security definer y staff pasan libres. Para el resto:
   'delivered' prohibido. Ambos con error claro, igual que un cambio de
   conductor rechazado que venga junto con un cambio de estado; lo demás se
   deshace en silencio.
-- Aplicar con `set lock_timeout = '3s';` antes. Marcha atrás y aviso (no
-  deshacerla con la 0028 en producción) en la cabecera del fichero.
+- El límite de espera (`set local lock_timeout = '3s'`) ya va dentro del
+  fichero, junto al trigger (que se crea con `create or replace trigger`, sin
+  borrarlo antes): no hay que lanzarlo aparte. Si la tabla está ocupada falla
+  a los 3 s sin dejar nada a medias y se vuelve a lanzar. Marcha atrás y aviso
+  (no deshacerla con la 0028 en producción) en la cabecera del fichero.
 
 ### 0028 — tablas
 RLS activado, **solo lectura** por políticas; toda escritura por RPC security
@@ -150,12 +153,15 @@ definer o trigger; anon sin ningún permiso.
 - `(app)/admin/partners`: comerciales, cartera y totales, solicitudes de cobro
   (aprobar/rechazar, CSV), porcentajes y reglas, bloquear comercial.
 - Términos y privacidad: apartado del programa (borrador para revisar). En los
-  Términos va el último (13) y solo aparece con el programa encendido y público.
+  Términos va el último (13); su contenedor `#comerciales` siempre está, pero
+  el texto solo aparece con el programa encendido y público, o para el
+  personal (que lo prueba en el lanzamiento privado).
 - robots: `/partner` privado; `/comercial/` no indexable.
 
 ## Móvil (parte 2)
-Campo "código de invitación" en completar-perfil, fila "Gana con ClicyVoy" en
-los perfiles y pantallas del comercial.
+Campo "código de invitación" en completar-perfil (solo con el programa
+encendido y público, o para el personal), fila "Gana con ClicyVoy" en los
+perfiles y pantallas del comercial.
 
 ## Fuera de esta parte
 Pago automático por Stripe; iOS; pedidos de invitado (hoy cerrados a anónimos).
@@ -167,9 +173,12 @@ real de producción; web: 1 ronda; móvil: 1 ronda). **Nada aplicado ni publicad
 No probado contra una base de datos real ni en un móvil.**
 
 Orden para lanzar (cada paso con el OK explícito de Luis):
-1. `0029_proteger_campos_pedido.sql` en producción (`set lock_timeout = '3s';`
-   antes). Se puede aplicar sola y ya: cierra un agujero que existe hoy.
-   Rollback en su cabecera. No deshacerla con la 0028 viva.
+1. `0029_proteger_campos_pedido.sql` en producción. Las dos migraciones (0029
+   y 0028) llevan dentro su `set local lock_timeout = '3s'`: si la tabla de
+   pedidos está ocupada fallan a los 3 s, sin dejar nada a medias ni hacer
+   esperar a los accesos y pedidos, y basta con volver a lanzarlas. Se puede
+   aplicar sola y ya: cierra un agujero que existe hoy. Rollback en su
+   cabecera. No deshacerla con la 0028 viva.
 2. `0028_partners.sql` en producción, en tres tiempos:
    - aplicarla: crea la fila `partner_program` con `enabled: true` y
      `public: false` (lanzamiento privado). Nadie salvo el personal (admin y

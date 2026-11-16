@@ -122,6 +122,9 @@ function readProgramBool(value, fallback) {
   return fallback;
 }
 
+// Claves de días: se truncan a entero antes de comprobar el rango.
+const PROGRAM_INT_KEYS = new Set(["hold_days", "payout_interval_days", "claim_window_days"]);
+
 /**
  * Ajustes saneados igual que partner_program_settings(): fila ausente o que no
  * es un objeto = null (programa apagado). "enabled" ausente = encendido;
@@ -133,12 +136,15 @@ export function normalizeProgram(value) {
   const out = { ...PROGRAM_DEFAULTS };
   if ("enabled" in value) out.enabled = readProgramBool(value.enabled, false);
   if ("public" in value) out.public = readProgramBool(value.public, false);
+  // hold_same_driver: un null cuenta como ausente (se mira el nombre antiguo);
+  // ilegible = retener. Igual que el servidor.
   const hold = value.hold_same_driver ?? value.hold_same_driver_cash;
   if (hold !== undefined && hold !== null) out.hold_same_driver = readProgramBool(hold, true);
   for (const [key, [min, max]] of Object.entries(PROGRAM_RANGES)) {
     const text = String(value[key] ?? "").trim();
     if (/^-?[0-9]+(\.[0-9]+)?$/.test(text)) {
-      const n = Number(text);
+      // Los días son enteros: 15.5 se queda en 15 (como el trunc del servidor).
+      const n = PROGRAM_INT_KEYS.has(key) ? Math.trunc(Number(text)) : Number(text);
       if (n >= min && n <= max) out[key] = n;
     }
   }
@@ -397,12 +403,18 @@ export function useProgramPublic() {
   return open;
 }
 
+// Correo del administrador: el mismo valor que usan la web (isStaffUser) y
+// is_staff() en el servidor.
+const ADMIN_EMAIL = "renato.0550.calero@gmail.com";
+
 /**
- * Personal de ClicyVoy (rol 'admin' o 'staff' en profiles): en el lanzamiento
- * privado son los únicos que ven el programa sin ser ya comerciales.
+ * Personal de ClicyVoy: rol 'admin' o 'staff' en profiles, o el correo del
+ * administrador (mismo criterio que la web y que is_staff() del servidor). En
+ * el lanzamiento privado son los únicos que ven el programa sin ser ya
+ * comerciales.
  */
-export function isStaffRole(role) {
-  return role === "admin" || role === "staff";
+export function isStaffRole(role, email) {
+  return role === "admin" || role === "staff" || email === ADMIN_EMAIL;
 }
 
 // ¿Es ya comercial? Por usuario (en un móvil pueden entrar varias cuentas) y

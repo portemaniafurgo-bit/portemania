@@ -223,8 +223,9 @@ revoke all on function public.protect_order_core_fields() from public, anon, aut
 -- (sin dejar nada a medias) y se reintenta.
 begin;
 set local lock_timeout = '3s';
-drop trigger if exists trg_protect_order_core_fields on public.transport_requests;
-create trigger trg_protect_order_core_fields
+-- «create or replace» (Postgres 14+): no hace falta borrar antes, así que no
+-- toma el bloqueo exclusivo de un «drop trigger» y nunca hay un momento sin él.
+create or replace trigger trg_protect_order_core_fields
   before update on public.transport_requests
   for each row execute function public.protect_order_core_fields();
 commit;

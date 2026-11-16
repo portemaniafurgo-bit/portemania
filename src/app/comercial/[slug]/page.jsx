@@ -11,7 +11,8 @@ import StoreReferral from "./StoreReferral";
  * Si el comercial está activo, da la bienvenida ("Te invita …"), guarda el
  * código en el navegador y ofrece pedir o crear cuenta con ?ref=<código> en
  * los enlaces. Si el código no existe o no está activo, a la portada.
- * No se indexa (también está fuera en robots.txt).
+ * No se indexa: lo garantiza la etiqueta noindex de abajo (robots: index
+ * false), no robots.txt.
  */
 export const metadata = {
   title: "Te han invitado a ClicyVoy",

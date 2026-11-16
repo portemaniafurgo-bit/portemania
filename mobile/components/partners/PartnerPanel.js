@@ -122,7 +122,11 @@ export default function PartnerPanel({ d, userId, reloadKey, onRefresh }) {
       </View>
 
       <MonthlyBars monthly={d.monthly} />
-      <LinkCard slug={d.partner?.slug} name={d.partner?.display_name} />
+      <LinkCard
+        slug={d.partner?.slug}
+        name={d.partner?.display_name}
+        programPublic={d.program_public === true}
+      />
       <RequestPayoutCard d={d} onDone={onRefresh} />
       <PayoutDataCard payoutData={d.payout_data} onSaved={onRefresh} />
 
@@ -180,7 +184,9 @@ function MonthlyBars({ monthly }) {
   );
 }
 
-function LinkCard({ slug, name }) {
+// programPublic: el campo del código en el alta de la app solo lo ve todo el
+// mundo con el programa abierto; mientras es privado no se invita a usarlo.
+function LinkCard({ slug, name, programPublic }) {
   const [copied, setCopied] = useState(false);
   const busy = useRef(false); // guarda contra el doble toque (copiar y compartir)
   if (!slug) return null;
@@ -189,7 +195,7 @@ function LinkCard({ slug, name }) {
   const message =
     `${firstName ? `Soy ${firstName}. ` : ""}Si necesitas un porte, una mini mudanza o enviar ` +
     `un paquete en Albacete, pídelo en ClicyVoy con mi enlace: ${link}` +
-    ` (si te registras desde la app, escribe mi código: ${slug})`;
+    (programPublic ? ` (si te registras desde la app, escribe mi código: ${slug})` : "");
 
   const share = async text => {
     if (busy.current) return;
@@ -230,10 +236,12 @@ function LinkCard({ slug, name }) {
           {link}
         </Text>
       </View>
-      <Caption>
-        Tu código: <Text style={{ color: colors.foreground, fontFamily: "DMSans_500Medium" }}>{slug}</Text>
-        . Quien se registre desde la app puede escribirlo al completar su perfil.
-      </Caption>
+      {programPublic ? (
+        <Caption>
+          Tu código: <Text style={{ color: colors.foreground, fontFamily: "DMSans_500Medium" }}>{slug}</Text>
+          . Quien se registre desde la app puede escribirlo al completar su perfil.
+        </Caption>
+      ) : null}
       <Button title={copied ? "Enlace copiado" : "Copiar enlace"} icon={copied ? "checkmark" : "copy-outline"} variant="plain" onPress={copy} />
       <Button title="Compartir" icon="share-social-outline" onPress={() => share(message)} />
       <Caption>

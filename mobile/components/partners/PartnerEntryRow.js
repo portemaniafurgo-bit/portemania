@@ -13,7 +13,7 @@ import {
  * Fila «Gana con ClicyVoy» del perfil (cliente y conductor). Aparece si:
  *  - el programa está instalado, encendido y abierto a todo el mundo;
  *  - o la persona ya es comercial (nunca pierde su panel);
- *  - o es del personal (admin/staff) y el programa está instalado
+ *  - o es del personal (admin/staff o el correo del admin) y el programa está instalado
  *    (lanzamiento privado: el equipo lo prueba antes de abrirlo).
  * Mientras no se sabe, o si falla la lectura, no sale nada.
  */
@@ -26,7 +26,7 @@ export default function PartnerEntryRow() {
   // Guarda contra el doble toque: dos toques seguidos abrirían dos pantallas.
   const opening = useRef(false);
 
-  const visible = isPartner || (installed && (isPublic || isStaffRole(role)));
+  const visible = isPartner || (installed && (isPublic || isStaffRole(role, user?.email)));
   if (!visible) return null;
 
   const open = () => {

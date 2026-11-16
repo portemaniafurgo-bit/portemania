@@ -69,6 +69,9 @@ export function readProgramBool(value, fallback) {
   return fallback;
 }
 
+// Claves de días: se truncan a entero antes de comprobar el rango.
+const PROGRAM_INT_KEYS = new Set(["hold_days", "payout_interval_days", "claim_window_days"]);
+
 /**
  * Ajustes saneados igual que partner_program_settings(): fila ausente o que no
  * es un objeto = null (programa apagado). "enabled" ausente = encendido;
@@ -80,12 +83,15 @@ export function normalizeProgram(value) {
   const out = { ...PROGRAM_DEFAULTS };
   if ("enabled" in value) out.enabled = readProgramBool(value.enabled, false);
   if ("public" in value) out.public = readProgramBool(value.public, false);
+  // hold_same_driver: un null cuenta como ausente (se mira el nombre antiguo);
+  // ilegible = retener. Igual que el servidor.
   const hold = value.hold_same_driver ?? value.hold_same_driver_cash;
   if (hold !== undefined && hold !== null) out.hold_same_driver = readProgramBool(hold, true);
   for (const [key, [min, max]] of Object.entries(PROGRAM_RANGES)) {
     const text = String(value[key] ?? "").trim();
     if (/^-?[0-9]+(\.[0-9]+)?$/.test(text)) {
-      const n = Number(text);
+      // Los días son enteros: 15.5 se queda en 15 (como el trunc del servidor).
+      const n = PROGRAM_INT_KEYS.has(key) ? Math.trunc(Number(text)) : Number(text);
       if (n >= min && n <= max) out[key] = n;
     }
   }
@@ -298,8 +304,12 @@ export function useProgramSettings() {
   const { data } = useQuery({
     queryKey: ["partner-program"],
     queryFn: fetchProgramSettings,
-    staleTime: 30 * 60_000,
-    retry: false,
+    // Un fallo de red suelto no debe esconder las entradas del menú hasta
+    // recargar la página: un reintento enseguida y, si sigue fallando, la
+    // lectura cuenta como caducada y se repite cada minuto hasta que salga.
+    retry: 1,
+    staleTime: (query) => (query.state.status === "error" ? 0 : 30 * 60_000),
+    refetchInterval: (query) => (query.state.status === "error" ? 60_000 : false),
   });
   return data;
 }

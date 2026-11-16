@@ -137,7 +137,7 @@ export default function PartnerScreen() {
 
   // Lanzamiento privado: sin ser comercial ni del personal, no se enseña el alta.
   const privateLaunch =
-    state.status === "activate" && state.program?.public !== true && !isStaffRole(role);
+    state.status === "activate" && state.program?.public !== true && !isStaffRole(role, user?.email);
 
   let content = null;
   if (state.status === "loading") {

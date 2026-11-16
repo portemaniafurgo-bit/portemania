@@ -30,7 +30,16 @@
 -- función, trigger ni política de la 0001–0027 (producción tiene versiones más
 -- nuevas de algunas, p. ej. protect_order_payment_fields). Solo objetos nuevos
 -- con nombre nuevo. Se puede aplicar dos veces sin romper nada.
+--
+-- APLICAR: todo el fichero va en UNA transacción con su propio
+-- «set local lock_timeout = '3s'» dentro (los triggers nuevos toman un bloqueo
+-- sobre transport_requests). Si la tabla está ocupada, falla a los 3 s en vez
+-- de dejar en cola los accesos y los pedidos; el fallo deshace TODO (no queda
+-- nada a medias) y basta con volver a lanzarlo.
 -- ============================================================
+
+begin;
+set local lock_timeout = '3s';
 
 -- ------------------------------------------------------------
 -- 1. Tablas
@@ -254,11 +263,12 @@ begin
     v_bool := v_value->'enabled';
     v_out := v_out || jsonb_build_object('enabled',
       case when jsonb_typeof(v_bool) = 'boolean' then v_bool
-           when lower(v_value->>'enabled') in ('true', 'false') then to_jsonb(lower(v_value->>'enabled')::boolean)
+           when lower(btrim(v_value->>'enabled')) in ('true', 'false') then to_jsonb(lower(btrim(v_value->>'enabled'))::boolean)
            else 'false'::jsonb end);
   end if;
 
-  -- public: ausente o ilegible = no público (lo prudente).
+  -- public: ausente o ilegible = no público (lo prudente). Los textos se leen
+  -- sin espacios alrededor (" true " = sí), como en la web y la app.
   if v_value ? 'public' then
     v_bool := v_value->'public';
     v_out := v_out || jsonb_build_object('public',
@@ -267,12 +277,15 @@ begin
            else 'false'::jsonb end);
   end if;
 
-  -- hold_same_driver (o el nombre antiguo): ilegible = retener (lo prudente).
-  v_bool := coalesce(v_value->'hold_same_driver', v_value->'hold_same_driver_cash');
+  -- hold_same_driver (o el nombre antiguo): un null cuenta como ausente (se
+  -- mira el nombre antiguo); ilegible = retener (lo prudente). Igual que el
+  -- `??` de normalizeProgram en la web y la app.
+  v_bool := coalesce(nullif(v_value->'hold_same_driver', 'null'::jsonb),
+                     nullif(v_value->'hold_same_driver_cash', 'null'::jsonb));
   if v_bool is not null then
     v_out := v_out || jsonb_build_object('hold_same_driver',
       case when jsonb_typeof(v_bool) = 'boolean' then v_bool
-           when lower(v_bool #>> '{}') in ('true', 'false') then to_jsonb(lower(v_bool #>> '{}')::boolean)
+           when lower(btrim(v_bool #>> '{}')) in ('true', 'false') then to_jsonb(lower(btrim(v_bool #>> '{}'))::boolean)
            else 'true'::jsonb end);
   end if;
 
@@ -1417,5 +1430,8 @@ $$;
 revoke all on function public.partner_admin_commissions(uuid) from public, anon;
 grant execute on function public.partner_admin_commissions(uuid) to authenticated;
 
--- Refresca el caché de esquema de PostgREST
+-- Refresca el caché de esquema de PostgREST (dentro de la transacción: el
+-- aviso sale al confirmar, y solo si todo lo anterior se ha aplicado).
 notify pgrst, 'reload schema';
+
+commit;
