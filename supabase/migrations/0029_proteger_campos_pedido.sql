@@ -47,10 +47,10 @@
 -- conductor, confirmar cobro…) corren como postgres y no pasan por aquí; las
 -- Edge Functions usan service_role y tampoco.
 --
--- APLICAR: en la misma sesión, antes del fichero:
---     set lock_timeout = '3s';
---   (crear el trigger toma un bloqueo sobre transport_requests: si hay
---   actividad, mejor fallar a los 3 s y reintentar que dejar la app esperando).
+-- APLICAR: el fichero ya lleva su «set local lock_timeout = '3s'» junto al
+--   cambio del trigger (crear el trigger toma un bloqueo sobre
+--   transport_requests: si hay actividad, mejor fallar a los 3 s y reintentar
+--   que dejar la app esperando).
 --
 -- MARCHA ATRÁS (solo si hiciera falta):
 --     drop trigger if exists trg_protect_order_core_fields on public.transport_requests;
@@ -217,7 +217,14 @@ $$;
 
 revoke all on function public.protect_order_core_fields() from public, anon, authenticated;
 
+-- El cambio del trigger va en su propia transacción y con el límite de espera
+-- DENTRO del fichero: scripts/apply-sql.mjs lo manda tal cual, y un «set» en
+-- otra llamada sería otra sesión. Si la tabla está ocupada, falla a los 3 s
+-- (sin dejar nada a medias) y se reintenta.
+begin;
+set local lock_timeout = '3s';
 drop trigger if exists trg_protect_order_core_fields on public.transport_requests;
 create trigger trg_protect_order_core_fields
   before update on public.transport_requests
   for each row execute function public.protect_order_core_fields();
+commit;

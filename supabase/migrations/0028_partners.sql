@@ -184,8 +184,17 @@ grant select on table public.partners, public.partner_referrals,
 -- ------------------------------------------------------------
 -- Clave PROPIA (no dentro de 'tariffs': su formulario pisa las claves que no
 -- conoce). app_settings se lee en público; estos valores pueden verse.
+--
+-- Lanzamiento PRIVADO: nace encendido ("enabled") pero NO abierto al público
+-- ("public": false). Mientras no sea público solo el personal (is_staff) puede
+-- darse de alta como comercial y la web y la app no enseñan el programa a
+-- nadie más; la atribución de clientes, las comisiones y los cobros funcionan
+-- igual, para poder probarlo de punta a punta con cuentas del equipo. El admin
+-- lo abre a todo el mundo desde sus ajustes cuando el gestor y los textos
+-- legales estén listos.
 insert into public.app_settings (key, value) values ('partner_program', '{
   "enabled": true,
+  "public": false,
   "first_pct": 5,
   "repeat_pct": 2,
   "hold_days": 15,
@@ -204,7 +213,8 @@ on conflict (key) do nothing;
  * rango (o un sí/no) se sustituye por el de por defecto, así un ajuste mal
  * escrito en el panel nunca rompe una entrega ni regala porcentajes absurdos.
  * Si la fila falta o no es un objeto, el programa cuenta como APAGADO; un
- * "enabled" ilegible, también.
+ * "enabled" ilegible, también. "public" (abierto a todo el mundo) ausente o
+ * ilegible = NO público (solo el personal puede darse de alta).
  * hold_same_driver acepta el nombre antiguo hold_same_driver_cash.
  */
 create or replace function public.partner_program_settings()
@@ -215,7 +225,7 @@ security invoker
 set search_path = public
 as $$
 declare
-  v_defaults jsonb := '{"enabled": true, "first_pct": 5, "repeat_pct": 2, "hold_days": 15,
+  v_defaults jsonb := '{"enabled": true, "public": false, "first_pct": 5, "repeat_pct": 2, "hold_days": 15,
     "min_payout": 20, "payout_interval_days": 30, "claim_window_days": 30,
     "hold_same_driver": true, "max_price_quote_ratio": 2,
     "max_auto_base": 300, "max_auto_cash_base": 150}'::jsonb;
@@ -245,6 +255,15 @@ begin
     v_out := v_out || jsonb_build_object('enabled',
       case when jsonb_typeof(v_bool) = 'boolean' then v_bool
            when lower(v_value->>'enabled') in ('true', 'false') then to_jsonb(lower(v_value->>'enabled')::boolean)
+           else 'false'::jsonb end);
+  end if;
+
+  -- public: ausente o ilegible = no público (lo prudente).
+  if v_value ? 'public' then
+    v_bool := v_value->'public';
+    v_out := v_out || jsonb_build_object('public',
+      case when jsonb_typeof(v_bool) = 'boolean' then v_bool
+           when lower(btrim(v_value->>'public')) in ('true', 'false') then to_jsonb(lower(btrim(v_value->>'public'))::boolean)
            else 'false'::jsonb end);
   end if;
 
@@ -608,7 +627,12 @@ create trigger zz_partner_commission_on_delete
 -- 5. RPC del comercial
 -- ------------------------------------------------------------
 
-/** Alta como comercial: uno por usuario, slug único y no reservado. */
+/**
+ * Alta como comercial: uno por usuario, slug único y no reservado. Con el
+ * programa encendido pero NO público (lanzamiento privado), solo el personal
+ * (is_staff) puede darse de alta; el resto recibe 'disabled', igual que con el
+ * programa apagado.
+ */
 create or replace function public.partner_activate(p_display_name text, p_slug text)
 returns jsonb
 language plpgsql
@@ -620,6 +644,7 @@ declare
   v_name text := btrim(coalesce(p_display_name, ''));
   v_slug text := lower(btrim(coalesce(p_slug, '')));
   v_existing public.partners%rowtype;
+  v_settings jsonb := public.partner_program_settings();
   v_id uuid;
 begin
   if v_uid is null then return jsonb_build_object('ok', false, 'reason', 'not_authenticated'); end if;
@@ -629,7 +654,12 @@ begin
     return jsonb_build_object('ok', false, 'reason', 'already_partner', 'slug', v_existing.slug);
   end if;
 
-  if not coalesce((public.partner_program_settings()->>'enabled')::boolean, false) then
+  if not coalesce((v_settings->>'enabled')::boolean, false) then
+    return jsonb_build_object('ok', false, 'reason', 'disabled');
+  end if;
+  -- Lanzamiento privado: encendido pero no público = solo el personal.
+  if not coalesce((v_settings->>'public')::boolean, false)
+     and not coalesce(public.is_staff(), false) then
     return jsonb_build_object('ok', false, 'reason', 'disabled');
   end if;
   if char_length(v_name) < 2 or char_length(v_name) > 60 then
@@ -882,6 +912,7 @@ begin
       'status', case when v_partner.status = 'active' then 'active' else 'blocked' end,
       'created_date', v_partner.created_date),
     'program_enabled', coalesce((v_settings->>'enabled')::boolean, false),
+    'program_public', coalesce((v_settings->>'public')::boolean, false),
     'totals', v_totals,
     'clients', v_clients,
     'services', (v_totals->>'services')::int,

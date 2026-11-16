@@ -43,6 +43,7 @@ const NUMBER_FIELDS = [
 // dos (normalizeProgram) y se guarda solo el nombre nuevo.
 const BOOL_FIELDS = [
   { key: "enabled", label: "Programa activo", hint: "Apagado: no se captan clientes nuevos y las comisiones de nuevos servicios quedan retenidas para tu revisión. Lo ya disponible se puede cobrar." },
+  { key: "public", label: "Abierto a todo el mundo", hint: "Desactivado: solo tu equipo ve el programa y puede hacerse comercial (para probarlo); los que ya son comerciales siguen con su panel." },
   { key: "hold_same_driver", legacy: "hold_same_driver_cash", label: "Retener si el conductor es el propio comercial", hint: "La comisión queda retenida hasta que la liberes tú." },
 ];
 
@@ -64,7 +65,8 @@ export default function AdminProgramSettings() {
 function SettingsForm({ current }) {
   const queryClient = useQueryClient();
   // Se siembra con lo que de verdad usa el servidor: sin "enabled" = activo,
-  // "true"/"false" en texto se leen como sí/no y lo ilegible, su valor por defecto.
+  // sin "public" = solo el equipo, "true"/"false" en texto se leen como sí/no y
+  // lo ilegible, su valor por defecto.
   const [form, setForm] = useState(() => {
     const eff = normalizeProgram(current) || {};
     const out = {};

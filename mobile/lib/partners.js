@@ -83,6 +83,9 @@ export function parseInviteCode(input) {
  */
 export const PROGRAM_DEFAULTS = {
   enabled: true,
+  // Abierto a todo el mundo. Mientras sea false (lanzamiento privado) solo el
+  // personal ve el programa y puede darse de alta.
+  public: false,
   first_pct: 5,
   repeat_pct: 2,
   hold_days: 15,
@@ -122,12 +125,14 @@ function readProgramBool(value, fallback) {
 /**
  * Ajustes saneados igual que partner_program_settings(): fila ausente o que no
  * es un objeto = null (programa apagado). "enabled" ausente = encendido;
- * ilegible = apagado. Números fuera de rango o ilegibles = valor por defecto.
+ * ilegible = apagado. "public" ausente o ilegible = no público. Números fuera
+ * de rango o ilegibles = valor por defecto.
  */
 export function normalizeProgram(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const out = { ...PROGRAM_DEFAULTS };
   if ("enabled" in value) out.enabled = readProgramBool(value.enabled, false);
+  if ("public" in value) out.public = readProgramBool(value.public, false);
   const hold = value.hold_same_driver ?? value.hold_same_driver_cash;
   if (hold !== undefined && hold !== null) out.hold_same_driver = readProgramBool(hold, true);
   for (const [key, [min, max]] of Object.entries(PROGRAM_RANGES)) {
@@ -370,6 +375,75 @@ export function useProgramInstalled() {
   return installed;
 }
 
+function isPublicNow() {
+  return isEnabledNow() && settingsCache?.public === true;
+}
+
+/**
+ * true cuando el programa está instalado, encendido Y abierto a todo el mundo.
+ * Mientras no se sabe, o si la lectura falla, false.
+ */
+export function useProgramPublic() {
+  const [open, setOpen] = useState(isPublicNow());
+  useEffect(() => {
+    let active = true;
+    checkProgramInstalled().then(() => {
+      if (active) setOpen(isPublicNow());
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
+  return open;
+}
+
+/**
+ * Personal de ClicyVoy (rol 'admin' o 'staff' en profiles): en el lanzamiento
+ * privado son los únicos que ven el programa sin ser ya comerciales.
+ */
+export function isStaffRole(role) {
+  return role === "admin" || role === "staff";
+}
+
+// ¿Es ya comercial? Por usuario (en un móvil pueden entrar varias cuentas) y
+// solo tras una lectura correcta: un fallo no se guarda.
+const partnerCache = new Map();
+
+/** true si el usuario ya tiene perfil de comercial. Nunca lanza. */
+export async function checkIsPartner(userId) {
+  if (!userId) return false;
+  if (partnerCache.has(userId)) return partnerCache.get(userId);
+  try {
+    const value = await fetchIsPartner(userId);
+    partnerCache.set(userId, value);
+    return value;
+  } catch {
+    return false;
+  }
+}
+
+/** Tras darse de alta: el usuario ya es comercial (sin volver a leer). */
+export function markIsPartner(userId) {
+  if (userId) partnerCache.set(userId, true);
+}
+
+/** Hook de checkIsPartner: false mientras no se sabe o si falla. */
+export function useIsPartner(userId) {
+  const [isPartner, setIsPartner] = useState(
+    userId ? partnerCache.get(userId) === true : false,
+  );
+  useEffect(() => {
+    let active = true;
+    checkIsPartner(userId).then(value => {
+      if (active) setIsPartner(value === true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [userId]);
+  return isPartner;
+}
+
 // ------------------------------------------------------------
 // Panel del comercial
 // ------------------------------------------------------------
@@ -582,6 +656,26 @@ export async function fetchProgramSettings() {
     await supabase.from("app_settings").select("value").eq("key", PROGRAM_KEY).maybeSingle(),
   );
   return normalizeProgram(data?.value);
+}
+
+/**
+ * true si el usuario ya tiene perfil de comercial: su propia fila en
+ * `partners` (la RLS deja leer la propia; el admin las lee todas, por eso se
+ * filtra por user_id). Sin la tabla (migración sin aplicar): false. Otro fallo
+ * lanza (checkIsPartner lo trata como «no» sin guardarlo).
+ */
+export async function fetchIsPartner(userId) {
+  if (!userId) return false;
+  let partner;
+  try {
+    partner = unwrap(
+      await supabase.from("partners").select("id").eq("user_id", userId).maybeSingle(),
+    );
+  } catch (err) {
+    if (err?.missing) return false;
+    throw err;
+  }
+  return !!partner;
 }
 
 /**

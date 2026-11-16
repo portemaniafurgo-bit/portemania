@@ -13,7 +13,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "../lib/auth";
 import { useBottomPadding } from "../lib/layout";
-import { fetchDashboard, fetchProgramSettings, reasonMessage } from "../lib/partners";
+import {
+  fetchDashboard,
+  fetchProgramSettings,
+  isStaffRole,
+  markIsPartner,
+  reasonMessage,
+} from "../lib/partners";
 import EmptyState from "../components/EmptyState";
 import PartnerActivate from "../components/partners/PartnerActivate";
 import PartnerPanel from "../components/partners/PartnerPanel";
@@ -30,6 +36,10 @@ const CONNECTION_ERROR = "No se ha podido cargar. Revisa tu conexión e inténta
  *
  * Según lo que responda la base de datos:
  *  - programa sin instalar o apagado → pantalla neutra «no disponible»;
+ *  - aún no es comercial y el programa no está abierto al público
+ *    (lanzamiento privado) → también «no disponible», salvo el personal
+ *    (admin/staff). Se decide al pintar, con el rol del momento: el rol puede
+ *    llegar después de la primera lectura;
  *  - aún no es comercial → explicación con los porcentajes reales y el alta;
  *  - comercial → su panel (cifras, enlace, cobro, cartera y comisiones).
  * El admin del programa sigue siendo web: aquí no hay pantallas de admin.
@@ -58,7 +68,7 @@ async function loadState() {
 
 export default function PartnerScreen() {
   const router = useRouter();
-  const { user, mode } = useAuth();
+  const { user, mode, role } = useAuth();
   const bottomPad = useBottomPadding();
   const [state, setState] = useState({ status: "loading" });
   const [refreshing, setRefreshing] = useState(false);
@@ -125,12 +135,16 @@ export default function PartnerScreen() {
     else router.replace(mode === "driver" ? "/(conductor)/ofertas" : "/(cliente)/pedir");
   };
 
+  // Lanzamiento privado: sin ser comercial ni del personal, no se enseña el alta.
+  const privateLaunch =
+    state.status === "activate" && state.program?.public !== true && !isStaffRole(role);
+
   let content = null;
   if (state.status === "loading") {
     content = <LoadingBox />;
   } else if (state.status === "error") {
     content = <ErrorBox text={state.message} onRetry={() => reload()} />;
-  } else if (state.status === "unavailable") {
+  } else if (state.status === "unavailable" || privateLaunch) {
     content = (
       <EmptyState
         title="No disponible ahora mismo"
@@ -142,7 +156,10 @@ export default function PartnerScreen() {
       <PartnerActivate
         program={state.program}
         defaultName={user?.user_metadata?.full_name || ""}
-        onActivated={() => reload()}
+        onActivated={() => {
+          markIsPartner(user?.id);
+          reload();
+        }}
       />
     );
   } else if (state.status === "partner") {

@@ -427,7 +427,7 @@ const dropSettingKeys = (keys) =>
 {
   const s = (await su(`select value from public.app_settings where key = 'partner_program'`)).rows[0]?.value;
   check('ajustes partner_program creados con los valores del brief',
-    s && s.enabled === true && s.first_pct === 5 && s.repeat_pct === 2 && s.hold_days === 15 &&
+    s && s.enabled === true && s.public === false && s.first_pct === 5 && s.repeat_pct === 2 && s.hold_days === 15 &&
     s.min_payout === 20 && s.payout_interval_days === 30 && s.claim_window_days === 30 &&
     s.hold_same_driver === true && s.max_price_quote_ratio === 2 && s.max_auto_base === 300 &&
     s.max_auto_cash_base === 150 && !('hold_same_driver_cash' in s), s);
@@ -589,6 +589,18 @@ markWarnings();
 // ============================================================
 // 0028 — Partners
 // ============================================================
+
+// ---------- lanzamiento privado: con la fila recién creada (no pública) ----------
+{
+  const r = await rpc(U.p1, 'partner_activate', ['Ana López', 'ana-lopez']);
+  check('privado: con la fila recién sembrada (no pública) un usuario normal no puede darse de alta (disabled)',
+    r.ok === false && r.reason === 'disabled', r);
+  const n = (await su(`select count(*)::int as n from public.partners`)).rows[0].n;
+  check('privado: el intento rechazado no crea nada', n === 0, n);
+  // El resto de escenarios prueba el programa ABIERTO; el privado tiene su
+  // bloque propio al final (con usuarios que no se usan en ningún otro sitio).
+  await setSetting({ public: true });
+}
 
 // ---------- alta de comercial ----------
 {
@@ -1238,6 +1250,89 @@ let payout1;
   check('admin: la solicitud muestra 33,3 % en efectivo y 1 same_driver',
     pays.length === 1 && num(pays[0].cash_share_pct) === 33.3 && num(pays[0].cash_amount) === 1 && pays[0].same_driver === 1, pays[0]);
   await setSetting({ min_payout: 20 });
+}
+
+// ---------- lanzamiento privado: encendido pero NO público ----------
+// Usuarios propios de este bloque (no aparecen en ningún otro escenario).
+{
+  markWarnings();
+  const P = {
+    staff: '00000000-0000-0000-0000-0000000000a3', // empleada que prueba el programa
+    user: '00000000-0000-0000-0000-0000000000e1', // usuario normal
+    user2: '00000000-0000-0000-0000-0000000000e2', // otro usuario normal
+    client: '00000000-0000-0000-0000-0000000000c9', // cliente de prueba, cuenta nueva
+  };
+  await addUser(P.staff, 'sara@x.test', 'Sara Staff', 'staff');
+  await addUser(P.user, 'nora@x.test', 'Nora Normal');
+  await addUser(P.user2, 'olga@x.test', 'Olga Otra', 'driver');
+  await addUser(P.client, 'tina@x.test', 'Tina Test');
+
+  await setSetting({ enabled: true, public: false });
+  let r = await rpc(P.user, 'partner_activate', ['Nora Normal', 'nora']);
+  check('privado: un usuario normal no puede darse de alta (disabled)', r.ok === false && r.reason === 'disabled', r);
+  r = await rpc(P.user2, 'partner_activate', ['Olga Otra', 'olga']);
+  check('privado: un conductor tampoco (disabled)', r.ok === false && r.reason === 'disabled', r);
+  r = await rpc(P.staff, 'partner_activate', ['Sara Staff', 'sara-staff']);
+  check('privado: el personal (staff) sí puede darse de alta', r.ok === true && r.slug === 'sara-staff', r);
+  const pubSara = await rpc(null, 'partner_public', ['sara-staff']);
+  check('privado: partner_public no cambia (el enlace de prueba funciona)', pubSara.active === true && pubSara.first_name === 'Sara', pubSara);
+
+  r = await rpc(P.client, 'partner_claim_referral', ['sara-staff']);
+  check('privado: la atribución funciona aunque no sea público', r.ok === true, r);
+  const SARA = (await su(`select id from public.partners where slug = 'sara-staff'`)).rows[0].id;
+  const ref = (await su(`select partner_id from public.partner_referrals where client_user_id = $1`, [P.client])).rows[0];
+  check('privado: el cliente de prueba queda en la cartera de la empleada', ref && ref.partner_id === SARA, ref);
+
+  const o = await newOrder(P.client, { estimated: 100 });
+  await setStatus(o, 'delivered');
+  const c = await commissionOf(o);
+  check('privado: la comisión nace normal (5 %, pendiente, sin avisos de programa)',
+    c && c.kind === 'first' && num(c.amount) === 5 && c.status === 'pending' && !c.flags.includes('program_disabled'), c);
+
+  let d = await rpc(P.staff, 'partner_dashboard');
+  check('privado: el panel dice programa encendido y no público',
+    d.ok === true && d.program_enabled === true && d.program_public === false, { e: d.program_enabled, p: d.program_public });
+
+  // Abrirlo a todo el mundo devuelve el comportamiento abierto.
+  await setSetting({ public: true });
+  r = await rpc(P.user, 'partner_activate', ['Nora Normal', 'nora']);
+  check('público: con public = true un usuario normal ya puede darse de alta', r.ok === true && r.slug === 'nora', r);
+  d = await rpc(P.staff, 'partner_dashboard');
+  check('público: el panel dice program_public = true', d.program_public === true, d.program_public);
+
+  // Con el programa apagado, ni el personal puede darse de alta.
+  await setSetting({ enabled: false, public: false });
+  r = await rpc(P.user2, 'partner_activate', ['Olga Otra', 'olga']);
+  check('apagado: un usuario normal no puede darse de alta', r.reason === 'disabled', r);
+  await su(`update public.profiles set role = 'staff' where id = $1`, [P.user2]);
+  r = await rpc(P.user2, 'partner_activate', ['Olga Otra', 'olga']);
+  check('apagado: el personal tampoco (disabled)', r.reason === 'disabled', r);
+  await su(`update public.profiles set role = 'driver' where id = $1`, [P.user2]);
+
+  // Saneado de "public": ausente o ilegible = no público.
+  const settings = async () => (await su(`select public.partner_program_settings() as s`)).rows[0].s;
+  await setSetting({ enabled: true, public: true });
+  check('saneado: public = true se lee como público', (await settings()).public === true);
+  await setSetting({ public: ' TRUE ' });
+  check('saneado: public = " TRUE " (texto) se lee como público', (await settings()).public === true);
+  await setSetting({ public: 'false' });
+  check('saneado: public = "false" (texto) se lee como no público', (await settings()).public === false);
+  await setSetting({ public: 'quizás' });
+  check('saneado: un public ilegible cuenta como no público', (await settings()).public === false);
+  await setSetting({ public: 1 });
+  check('saneado: public = 1 (número) cuenta como no público', (await settings()).public === false);
+  await dropSettingKeys(['public']);
+  check('saneado: sin la clave public, no público', (await settings()).public === false);
+  check('saneado: sin la clave public, el programa sigue encendido', (await settings()).enabled === true);
+  const backup = (await su(`select value from public.app_settings where key = 'partner_program'`)).rows[0].value;
+  await su(`delete from public.app_settings where key = 'partner_program'`);
+  const none = await settings();
+  check('saneado: sin la fila, apagado y no público', none.enabled === false && none.public === false, none);
+  await su(`insert into public.app_settings (key, value) values ('partner_program', $1::jsonb)`, [JSON.stringify(backup)]);
+
+  // Se deja como estaba para el resto de la prueba (abierto).
+  await setSetting({ enabled: true, public: true });
+  check('privado: sin advertencias', newWarnings().length === 0, newWarnings().map((w) => w.message));
 }
 
 // ---------- permisos de todas las funciones nuevas (catálogo) ----------

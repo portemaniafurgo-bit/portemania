@@ -30,6 +30,9 @@ export function isValidSlug(slug) {
  */
 export const PROGRAM_DEFAULTS = {
   enabled: true,
+  // Abierto a todo el mundo. Mientras sea false (lanzamiento privado) solo el
+  // personal ve el programa y puede darse de alta.
+  public: false,
   first_pct: 5,
   repeat_pct: 2,
   hold_days: 15,
@@ -69,12 +72,14 @@ export function readProgramBool(value, fallback) {
 /**
  * Ajustes saneados igual que partner_program_settings(): fila ausente o que no
  * es un objeto = null (programa apagado). "enabled" ausente = encendido;
- * ilegible = apagado. Números fuera de rango o ilegibles = valor por defecto.
+ * ilegible = apagado. "public" ausente o ilegible = no público. Números fuera
+ * de rango o ilegibles = valor por defecto.
  */
 export function normalizeProgram(value) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const out = { ...PROGRAM_DEFAULTS };
   if ("enabled" in value) out.enabled = readProgramBool(value.enabled, false);
+  if ("public" in value) out.public = readProgramBool(value.public, false);
   const hold = value.hold_same_driver ?? value.hold_same_driver_cash;
   if (hold !== undefined && hold !== null) out.hold_same_driver = readProgramBool(hold, true);
   for (const [key, [min, max]] of Object.entries(PROGRAM_RANGES)) {
@@ -285,17 +290,74 @@ export async function fetchProgramSettings() {
 }
 
 /**
- * true cuando existe la fila partner_program (el programa está instalado):
- * los menús solo enseñan "Gana con ClicyVoy" / "Comerciales" entonces.
+ * Ajustes saneados del programa: null si no está instalado (falta la fila
+ * partner_program); undefined mientras se cargan o si la lectura falla. Con
+ * ellos decide el menú si enseña «Comerciales» y «Gana con ClicyVoy».
  */
-export function useProgramInstalled() {
+export function useProgramSettings() {
   const { data } = useQuery({
     queryKey: ["partner-program"],
     queryFn: fetchProgramSettings,
     staleTime: 30 * 60_000,
     retry: false,
   });
-  return !!data;
+  return data;
+}
+
+// Mismo criterio que is_staff() en el servidor: rol admin o staff, o el correo
+// del administrador.
+const ADMIN_EMAIL = "renato.0550.calero@gmail.com";
+
+/** true para el administrador y los empleados (rol 'admin' o 'staff'). */
+export function isStaffUser(user) {
+  if (!user) return false;
+  return user.role === "admin" || user.role === "staff" || user.email === ADMIN_EMAIL;
+}
+
+/**
+ * true si el usuario YA tiene perfil de comercial: lectura directa de su
+ * propia fila en `partners` (la RLS deja leer la propia; el admin las lee
+ * todas, por eso se filtra por user_id). Sin la tabla (migración sin aplicar)
+ * o con cualquier fallo: false, en silencio.
+ */
+export async function fetchIsPartner(userId) {
+  if (!userId) return false;
+  try {
+    const { data, error } = await supabase
+      .from("partners")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) return false;
+    return !!data;
+  } catch {
+    return false;
+  }
+}
+
+/** Hook de fetchIsPartner, guardado por react-query (clave por usuario). */
+export function useIsPartner(userId) {
+  const { data } = useQuery({
+    queryKey: ["partner-is-partner", userId],
+    queryFn: () => fetchIsPartner(userId),
+    enabled: !!userId,
+    staleTime: 30 * 60_000,
+    retry: false,
+  });
+  return data === true;
+}
+
+/**
+ * ¿Se enseña «Gana con ClicyVoy» a este usuario? Sí si el programa está
+ * instalado, encendido y abierto al público; si ya es comercial (para que
+ * nunca pierda su panel); o si es del personal y el programa está instalado
+ * (lanzamiento privado: el equipo lo prueba antes de abrirlo).
+ */
+export function canSeePartnerProgram(settings, user, isPartner) {
+  if (isPartner) return true;
+  if (!settings) return false;
+  if (isStaffUser(user)) return true;
+  return settings.enabled === true && settings.public === true;
 }
 
 /** Por qué no se puede pedir el cobro ahora (null si se puede). */

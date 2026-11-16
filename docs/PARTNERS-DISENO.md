@@ -68,13 +68,19 @@ definer o trigger; anon sin ningún permiso.
   'rejected'), requested_at, resolved_at, resolved_by (on delete set null),
   note, holder, iban (copia). Select: el propio comercial o **admin**. Índice
   único parcial: como mucho una 'requested' por comercial.
-- `app_settings.partner_program` (solo si falta): `{enabled: true, first_pct: 5,
+- `app_settings.partner_program` (solo si falta): `{enabled: true, public: false, first_pct: 5,
   repeat_pct: 2, hold_days: 15, min_payout: 20, payout_interval_days: 30,
   claim_window_days: 30, hold_same_driver: true, max_price_quote_ratio: 2,
   max_auto_base: 300, max_auto_cash_base: 150}`. El admin lo edita
   directamente. Cada valor ilegible o fuera de rango cae al de por defecto; los
   días con decimales se truncan (15,5 → 15); un `enabled` ilegible o la fila ausente = programa apagado;
+  un `public` ausente o ilegible = no público (solo el personal);
   `hold_same_driver_cash` se acepta como nombre antiguo.
+  **Dos interruptores**: `enabled` (programa encendido) y `public` (abierto a
+  todo el mundo). Encendido y no público = lanzamiento privado: solo
+  `is_staff()` puede darse de alta y la web/app solo enseñan el programa al
+  personal y a quien ya es comercial; atribución, comisiones, panel y cobros
+  funcionan igual.
 
 ### 0028 — reglas
 - Comisión (trigger `zz_partner_commission`, AFTER UPDATE OF status), al pasar a
@@ -102,7 +108,8 @@ definer o trigger; anon sin ningún permiso.
 - Borrado de un pedido por el admin (trigger `zz_partner_commission_on_delete`,
   BEFORE DELETE): pending/held → 'reversed'; requested/paid → flag
   order_deleted. La comisión se conserva sin pedido.
-- RPC del comercial: `partner_activate(nombre, slug)`,
+- RPC del comercial: `partner_activate(nombre, slug)` (programa apagado, o
+  encendido pero no público y quien llama no es `is_staff()` → disabled),
   `partner_update_payout_data(titular, iban)`, `partner_claim_referral(slug)`
   (la antigüedad se mide con la cuenta, `auth.users.created_at`; motivos:
   disabled, unknown_code —también comercial bloqueado o sin usuario—,
@@ -136,10 +143,14 @@ definer o trigger; anon sin ningún permiso.
   `partner_claim_referral` una vez y borrar el código.
 - `(app)/partner`: activar perfil; panel (ganancias, disponible, pendiente,
   gráfica, cartera, comisiones, enlace + QR + WhatsApp, datos de cobro,
-  solicitar cobro, historial). Entrada en los menús de cliente y conductor.
+  solicitar cobro, historial). Entrada en los menús de cliente y conductor
+  (y en la app, fila del perfil) solo si el programa está encendido y es
+  público, si el usuario ya es comercial o si es del personal; si no, `/partner`
+  enseña "no disponible" a quien no es comercial ni del personal.
 - `(app)/admin/partners`: comerciales, cartera y totales, solicitudes de cobro
   (aprobar/rechazar, CSV), porcentajes y reglas, bloquear comercial.
-- Términos y privacidad: apartado del programa (borrador para revisar).
+- Términos y privacidad: apartado del programa (borrador para revisar). En los
+  Términos va el último (13) y solo aparece con el programa encendido y público.
 - robots: `/partner` privado; `/comercial/` no indexable.
 
 ## Móvil (parte 2)
@@ -159,22 +170,38 @@ Orden para lanzar (cada paso con el OK explícito de Luis):
 1. `0029_proteger_campos_pedido.sql` en producción (`set lock_timeout = '3s';`
    antes). Se puede aplicar sola y ya: cierra un agujero que existe hoy.
    Rollback en su cabecera. No deshacerla con la 0028 viva.
-2. `0028_partners.sql` en producción. Crea la fila `partner_program` con
-   `enabled: true`: desde ese momento la web y la app enseñan "Gana con
-   ClicyVoy". Si se quiere aplicar sin abrir todavía el programa, poner
-   `enabled: false` nada más aplicarla (los menús siguen saliendo, pero el alta
-   dice "no disponible"; ver nota abajo).
+2. `0028_partners.sql` en producción, en tres tiempos:
+   - aplicarla: crea la fila `partner_program` con `enabled: true` y
+     `public: false` (lanzamiento privado). Nadie salvo el personal (admin y
+     staff) ve "Gana con ClicyVoy" ni puede darse de alta; los enlaces y la
+     atribución sí funcionan, para que un cliente de prueba quede en la
+     cartera de una cuenta del equipo;
+   - prueba privada de punta a punta con cuentas del equipo (paso 5);
+   - cuando el gestor y los textos legales estén listos (ver "Antes de
+     abrirlo al público"), activar "Abierto a todo el mundo" en Admin →
+     Comerciales → "Ajustes del programa". Desde ese momento la web y la app lo enseñan a
+     todos los clientes y conductores, y el apartado del programa aparece en
+     los Términos.
+   `enabled: false` sigue siendo el interruptor de apagado total (nadie se da
+   de alta, nadie capta clientes y las comisiones nuevas quedan retenidas).
 3. Web: publicar esta rama (incluye los arreglos del mapa y del rol).
 4. Móvil: OTA desde este árbol + `cd mobile && npm run check` con SUPABASE_PAT
    (verifica que las tablas y funciones existen: hacerlo DESPUÉS del paso 2).
-5. Prueba real mínima: alta de comercial, enlace en un navegador limpio con una
+5. Prueba real mínima (con el programa aún privado): alta de comercial con una
+   cuenta del equipo (staff o admin), enlace en un navegador limpio con una
    cuenta de Google nueva, pedido, entrega y pago, ver la comisión, datos
    bancarios, solicitar cobro (bajar `min_payout` y `hold_days` para la prueba y
    restaurarlos), aprobar en el panel de admin. Y repasar los flujos normales:
    aceptar, entregar, cancelar, valorar, subir oferta.
 
-Antes de abrirlo al público: revisión del gestor (retenciones/facturas de los
-comerciales) y de los textos de `terminos` y `privacidad`, que son borradores.
+Antes de abrirlo al público (activar `public`):
+- revisión del gestor (retenciones/facturas de los comerciales);
+- revisión de los textos de `terminos` y `privacidad`, que son borradores (el
+  apartado de los Términos solo se publica con el programa abierto; el de
+  Privacidad se ve siempre);
+- actualizar en Google Play el formulario de Seguridad de los datos: la app
+  recogerá el número de cuenta bancaria (IBAN) de los comerciales. Hacerlo
+  antes de que las pantallas del comercial sean públicas.
 
 Pendiente fuera de este trabajo:
 - Pago automático por Stripe e iOS.

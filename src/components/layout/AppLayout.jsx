@@ -11,14 +11,14 @@ import {
   Truck, BarChart3, AlertTriangle, Menu, X, LogOut, ChevronRight, LayoutDashboard, Handshake,
 } from "lucide-react";
 import { useState } from "react";
-import { useProgramInstalled } from "@/lib/partners";
+import { canSeePartnerProgram, useIsPartner, useProgramSettings } from "@/lib/partners";
 
 const clientNav = [
   { label: "Inicio", icon: Home, path: "/dashboard" },
   { label: "Nuevo transporte", icon: Package, path: "/new-request" },
   { label: "Mis pedidos", icon: Clock, path: "/my-orders" },
   { label: "Perfil", icon: User, path: "/profile" },
-  { label: "Gana con ClicyVoy", icon: Handshake, path: "/partner", partners: true },
+  { label: "Gana con ClicyVoy", icon: Handshake, path: "/partner", partnerEntry: true },
   { label: "Página principal", icon: ChevronRight, path: "/" },
 ];
 
@@ -28,12 +28,15 @@ const driverNav = [
   { label: "Historial", icon: Clock, path: "/driver/history" },
   { label: "Ganancias", icon: BarChart3, path: "/driver/earnings" },
   { label: "Perfil", icon: User, path: "/driver/profile" },
-  { label: "Gana con ClicyVoy", icon: Handshake, path: "/partner", partners: true },
+  { label: "Gana con ClicyVoy", icon: Handshake, path: "/partner", partnerEntry: true },
   { label: "Administración", icon: Settings, path: "/admin" },
 ];
 
-// partners: entradas del programa de comerciales; solo se enseñan cuando la
-// base de datos lo tiene instalado (se puede leer app_settings.partner_program).
+// partners: «Comerciales» del admin; solo sale cuando la base de datos tiene
+// el programa instalado (se puede leer app_settings.partner_program).
+// partnerEntry: «Gana con ClicyVoy»; sale si el programa está encendido y
+// abierto al público, si el usuario ya es comercial o si es del personal
+// (con el programa instalado). Ver canSeePartnerProgram.
 // staffOk: visible también para empleados (rol 'staff'); el resto solo admin.
 const adminNav = [
   { label: "Operación", icon: LayoutDashboard, path: "/admin", staffOk: true },
@@ -46,7 +49,7 @@ const adminNav = [
   { label: "Comerciales", icon: Handshake, path: "/admin/partners", partners: true },
   { label: "Estadísticas", icon: BarChart3, path: "/admin/stats" },
   { label: "Ajustes", icon: Settings, path: "/admin/settings" },
-  { label: "Gana con ClicyVoy", icon: Handshake, path: "/partner", staffOk: true, partners: true },
+  { label: "Gana con ClicyVoy", icon: Handshake, path: "/partner", staffOk: true, partnerEntry: true },
   { label: "Página principal", icon: ChevronRight, path: "/", staffOk: true },
 ];
 
@@ -67,7 +70,10 @@ export default function AppLayout({ children }) {
   const staffNav = isAdmin ? adminNav : adminNav.filter((item) => item.staffOk);
   // /partner es de todos los roles: ahí el menú sale del rol (un conductor
   // conserva el suyo y puede volver a su panel; admin y empleados, el suyo).
-  const programInstalled = useProgramInstalled();
+  const programSettings = useProgramSettings();
+  const programInstalled = !!programSettings;
+  const isPartner = useIsPartner(user?.id);
+  const showPartnerEntry = canSeePartnerProgram(programSettings, user, isPartner);
   const roleNav = pathname.startsWith("/admin")
     ? staffNav
     : pathname.startsWith("/driver")
@@ -79,7 +85,9 @@ export default function AppLayout({ children }) {
       ? staffNav
       : clientNav
     : clientNav;
-  const navItems = programInstalled ? roleNav : roleNav.filter((item) => !item.partners);
+  const navItems = roleNav.filter(
+    (item) => (!item.partners || programInstalled) && (!item.partnerEntry || showPartnerEntry),
+  );
 
   return (
     <div className="min-h-screen bg-background flex">

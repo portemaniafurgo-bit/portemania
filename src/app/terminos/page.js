@@ -98,20 +98,17 @@ export default function TerminosPage() {
         </p>
       </section>
 
-      <section id="comerciales" className="space-y-3 scroll-mt-6">
-        <h2 className="text-xl font-heading font-semibold text-foreground">12. Programa de comerciales (ClicyVoy Partners)</h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          ClicyVoy ofrece un programa voluntario de recomendación, sin relación laboral ni de agencia, con estas condiciones:
-        </p>
-        <ProgramaComerciales />
-      </section>
-
       <section className="space-y-3">
-        <h2 className="text-xl font-heading font-semibold text-foreground">13. Contacto</h2>
+        <h2 className="text-xl font-heading font-semibold text-foreground">12. Contacto</h2>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Para cualquier consulta sobre estas condiciones puede escribir a <a href={`mailto:${CONTACT_EMAIL}`} className="text-primary hover:underline">{CONTACT_EMAIL}</a>.
         </p>
       </section>
+
+      {/* Apartado 13, el último: solo aparece cuando el programa de comerciales
+          está encendido y abierto al público (si no, no se pinta nada y la
+          numeración de arriba sigue siendo correlativa). */}
+      <ProgramaComerciales number={13} />
     </div>
   );
 }
