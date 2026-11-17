@@ -33,6 +33,8 @@ const OPTIONS_VERSION = "3";
 // memoria: Android recrea a menudo el contexto JS sin interfaz y el límite de
 // una cada 2 min se reiniciaría con él.
 const FORCED_REFRESH_KEY = "driver_last_forced_refresh";
+// iPhone: separación mínima entre dos escrituras de posición (ver handleLocations).
+const IOS_MIN_WRITE_GAP_MS = 3500;
 
 /**
  * Opciones de captura.
@@ -250,6 +252,12 @@ async function handleLocations(locations) {
   // Parado: dentro del ruido del GPS y hace menos de 20 s de lo escrito. No se
   // escribe ni se toca lo guardado, para que la cuenta de 20 s siga corriendo.
   if (isStillRepeat(last, fix)) return;
+  // iPhone: con la app delante iOS entrega una posición por segundo sin
+  // agruparlas (el lote de 4 s solo vale en segundo plano). Como mucho una
+  // escritura cada ~3,5 s, como en Android; lo saltado no se pierde, el
+  // siguiente fix trae la posición más nueva. Va después de isStillRepeat
+  // para no tocar el latido del conductor parado (cada 20 s).
+  if (Platform.OS === "ios" && last && fix.ts - last.ts < IOS_MIN_WRITE_GAP_MS) return;
   // El GPS puede ir unos segundos por delante del reloj del móvil: nunca se
   // escribe una hora futura, y siempre posterior a la anterior.
   const ts = Math.max(Math.min(fix.ts, Date.now()), (last?.ts || 0) + 1);

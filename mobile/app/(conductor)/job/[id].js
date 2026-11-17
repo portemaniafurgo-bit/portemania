@@ -157,6 +157,9 @@ export default function TrabajoActivo() {
   const [saving, setSaving] = useState(false);
   // iPhone: hoja propia para proponer día y hora (ver components/DateTimeSheet).
   const [iosStartOpen, setIosStartOpen] = useState(false);
+  // iPhone: firmando, la pantalla no rueda (SignaturePad solo lo avisa en iOS,
+  // así que en Android vale siempre false y nada cambia).
+  const [signingOnIos, setSigningOnIos] = useState(false);
   const [feedbackTags, setFeedbackTags] = useState([]);
   const [feedbackText, setFeedbackText] = useState("");
   const [showProof, setShowProof] = useState(false);
@@ -676,6 +679,7 @@ export default function TrabajoActivo() {
         contentContainerStyle={{ paddingBottom: bottomPad }}
         // Solo iPhone (Android lo ignora): sitio para el teclado.
         automaticallyAdjustKeyboardInsets
+        scrollEnabled={!signingOnIos}
       >
       <View style={styles.statusBand}>
         {/* Sin cabecera nativa: el atrás vive en la propia banda */}
@@ -1082,6 +1086,7 @@ export default function TrabajoActivo() {
 
             <SignaturePad
               capturing={saving}
+              onSigningChange={setSigningOnIos}
               onCapture={base64 => {
                 // En envíos de paquete la foto es obligatoria (propuesta §2.3):
                 // el remitente no suele estar en la entrega y la foto es la

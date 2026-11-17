@@ -66,8 +66,21 @@ Rama `feat/ios` (copia de trabajo `pontemania-partners`). Escrita el 16-nov-2026
 ## 3. «Iniciar sesión con Apple» (Apple + Supabase, ~30 min)
 
 La app usa el **flujo web** de Supabase (como Google), no el módulo nativo de
-Apple. Por eso hace falta un *Services ID* y una clave, y **no** hace falta
-activar nada en la app.
+Apple. Por eso hace falta un *Services ID* y una clave.
+
+**Por qué la app declara igualmente «Sign In with Apple»**: en cada build, EAS
+sincroniza las capacidades del App ID con los permisos que declara la app y
+**apaga** las que no aparecen. Si la app no declarara Sign In with Apple, la
+primera build lo desactivaría en `com.clicyvoy.app`, el Services ID se quedaría
+sin App ID principal y el botón de Apple dejaría de funcionar. Por eso
+`app.json` lleva `ios.usesAppleSignIn: true` y, además, el permiso explícito
+`ios.entitlements["com.apple.developer.applesignin"] = ["Default"]`: en este SDK
+`usesAppleSignIn` solo añade el permiso si está instalado el módulo nativo
+`expo-apple-authentication` (que no se usa), así que por sí solo no bastaría;
+comprobado con `npx expo config --type introspect`. La alternativa es
+construir con la variable `EXPO_NO_CAPABILITY_SYNC=1` (EAS no toca las
+capacidades y se gestionan a mano en el portal de Apple), pero entonces hay que
+activar también a mano Push Notifications y Apple Pay.
 
 ### 3.1 En Apple Developer → Certificates, IDs & Profiles
 
@@ -186,6 +199,13 @@ Desde `mobile/` con la sesión de EAS del equipo (`eas login`):
 4. **Build `preview`** (instalación directa sin TestFlight): solo sirve con
    iPhones registrados (`eas device:create`, se abre un enlace en el iPhone).
    Sin iPhone a mano, saltarse este paso y usar TestFlight.
+
+**Comprobar en local antes de construir** ⚠️: en este equipo `mobile/node_modules`
+es un enlace a la carpeta de otra copia del proyecto y la caché de Metro es
+compartida, así que `npx expo export` puede empaquetar las pantallas de OTRA
+copia sin avisar (pasó el 17-nov: salió el código de `pontemania-ota`). Usar
+siempre `npx expo export --platform ios --clear --output-dir <carpeta fuera del
+repo>` y mirar en el registro que los ficheros de `assets` salen de esta copia.
 
 **Actualizaciones por OTA**: iPhone y Android comparten versión 1.0.0 y el canal
 `production`. Desde que exista la app de iPhone, cada `eas update --channel
@@ -327,7 +347,10 @@ Probar con la build de TestFlight, en este orden, y apuntar lo que falle:
 - Los textos exactos de los botones del permiso de ubicación en iOS en español.
 - Que el entorno de notificaciones quede en `production` al exportar (§4).
 - Que EAS cree solo el Merchant ID de Apple Pay (§5).
-- Que la firma no se corte al desplazar la pantalla.
+- Que la firma no se corte: mientras se dibuja un trazo, la pantalla del
+  servicio deja de desplazarse (solo en iPhone).
+- Que la hoja de fecha nunca devuelva una hora pasada: si lo elegido es
+  anterior a «ahora», se sube al minuto siguiente.
 - El comportamiento de 3DS sin dirección de vuelta (§8.10).
 - Que Apple no pida revocar el acceso de Apple al borrar la cuenta (§7.2).
 - Que los diálogos del sistema (permisos, hoja de Apple, selector de fotos, hoja
@@ -340,6 +363,7 @@ Probar con la build de TestFlight, en este orden, y apuntar lo que falle:
   del asistente de pedido queda bajo el teclado hasta cerrarlo.
 - Frecuencia de envío de la posición con la app delante: iOS da una posición
   por segundo y con la app abierta no se agrupan (en segundo plano sí, cada
-  4 s). Más escrituras que en Android mientras el conductor mira la app.
+  4 s). La app escribe como mucho una cada ~3,5 s en iPhone; comprobar que el
+  cliente ve avanzar la furgoneta con fluidez.
 - Que el botón de créditos del mapa (OpenStreetMap) se vea en iOS: la app no
   lo desactiva y MapLibre lo muestra por defecto.

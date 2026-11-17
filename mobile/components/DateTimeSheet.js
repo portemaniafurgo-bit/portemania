@@ -17,13 +17,32 @@ import { colors, radius, spacing } from "../theme";
  *
  * En Android no se pinta nada.
  */
+/**
+ * La más tardía entre la fecha elegida y la mínima: nunca se devuelve una hora
+ * pasada (p. ej. la hoja se abrió hace un rato y «ahora» ya es más tarde).
+ * Si hay que subirla a la mínima, se redondea al minuto SIGUIENTE: quien la
+ * recibe quita los segundos y, sin esto, quedaría unos segundos en el pasado.
+ */
+function notBefore(date, minimumDate) {
+  const base = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
+  const wholeMinute = new Date(base.getTime());
+  wholeMinute.setSeconds(0, 0);
+  if (!minimumDate || wholeMinute.getTime() >= minimumDate.getTime()) return base;
+  const floor = new Date(minimumDate.getTime());
+  if (floor.getSeconds() || floor.getMilliseconds()) {
+    floor.setSeconds(0, 0);
+    floor.setMinutes(floor.getMinutes() + 1);
+  }
+  return floor;
+}
+
 export default function DateTimeSheet({ visible, value, minimumDate, title, onConfirm, onCancel }) {
-  const [draft, setDraft] = useState(value || new Date());
+  const [draft, setDraft] = useState(() => notBefore(value, minimumDate));
   const sheetPad = useSheetBottomPadding(spacing.xl);
 
   // Cada vez que se abre, parte del valor actual (no del último borrador).
   useEffect(() => {
-    if (visible) setDraft(value || new Date());
+    if (visible) setDraft(notBefore(value, minimumDate));
     // `value` cambia de identidad en cada render del padre: solo al abrir.
   }, [visible]);
 
@@ -47,7 +66,15 @@ export default function DateTimeSheet({ visible, value, minimumDate, title, onCo
             if (date) setDraft(date);
           }}
         />
-        <Button title="Confirmar" onPress={() => onConfirm(draft)} />
+        <Button
+          title="Confirmar"
+          // `minimumDate` del padre es «ahora» en el momento de pintar; se
+          // vuelve a comparar con el reloj al confirmar.
+          onPress={() => {
+            const floor = minimumDate ? new Date(Math.max(minimumDate.getTime(), Date.now())) : null;
+            onConfirm(notBefore(draft, floor));
+          }}
+        />
         <Button title="Cancelar" variant="plain" onPress={onCancel} />
       </View>
     </Modal>

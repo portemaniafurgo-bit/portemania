@@ -111,7 +111,7 @@ function showIosExplanation(dialog) {
     dialog.show({
       title: "Tu ubicación durante el servicio",
       message:
-        "ClicyVoy recoge tu ubicación para que el cliente pueda seguirte en el mapa y saber cuándo llegas, también con la pantalla bloqueada o mientras usas otra app para navegar. Solo se comparte mientras tienes un servicio activo y se detiene al terminarlo o al cancelarlo.\n\nEl iPhone te lo preguntará ahora: permite la ubicación al usar la app y, si te ofrece cambiarla a «Siempre», acéptalo.",
+        "ClicyVoy recoge tu ubicación para que el cliente pueda seguirte en el mapa y saber cuándo llegas, también con la pantalla bloqueada o mientras usas otra app para navegar. Solo se comparte mientras tienes un servicio activo y se detiene al terminarlo o al cancelarlo.\n\nCon el permiso «Al usar la app» tu posición se envía mientras ClicyVoy está abierta o en segundo plano. Para que el seguimiento siga con la pantalla bloqueada aunque el iPhone cierre la app, cámbialo a «Siempre» en Ajustes → ClicyVoy → Ubicación.",
       actions: [{ text: "Continuar", onPress: go }],
       hideBack: true,
       onDismiss: go,

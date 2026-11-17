@@ -13,6 +13,10 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.clicyvoy.app",
       "buildNumber": "1",
+      "usesAppleSignIn": true,
+      "entitlements": {
+        "com.apple.developer.applesignin": ["Default"]
+      },
       "config": {
         "usesNonExemptEncryption": false
       },

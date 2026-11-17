@@ -10,11 +10,23 @@ import { colors, radius, spacing } from "../theme";
  * devuelve un PNG (base64) del lienzo, que sube deliveryProof al bucket
  * privado — una firma manuscrita es un dato personal y no puede vivir en una
  * URL pública, igual que decidió la web.
+ *
+ * `onSigningChange(activo)` (solo iPhone): avisa al empezar y al acabar cada
+ * trazo para que la pantalla que lo contiene bloquee su desplazamiento mientras
+ * se firma; en iOS el desplazamiento nativo puede quedarse el gesto a mitad de
+ * trazo aunque el lienzo no lo ceda. En Android no se llama nunca.
  */
-export default function SignaturePad({ onCapture, capturing }) {
+export default function SignaturePad({ onCapture, capturing, onSigningChange }) {
   const shotRef = useRef(null);
   const [paths, setPaths] = useState([]);
   const currentPath = useRef("");
+  // El PanResponder se crea una sola vez: la función del padre se lee de aquí
+  // para usar siempre la última.
+  const signingChangeRef = useRef(onSigningChange);
+  signingChangeRef.current = onSigningChange;
+  const notifySigning = active => {
+    if (Platform.OS === "ios") signingChangeRef.current?.(active);
+  };
 
   const pan = useRef(
     PanResponder.create({
@@ -24,6 +36,7 @@ export default function SignaturePad({ onCapture, capturing }) {
       // se queda el gesto a mitad de firma. En Android, lo de siempre.
       onPanResponderTerminationRequest: () => Platform.OS !== "ios",
       onPanResponderGrant: e => {
+        notifySigning(true);
         const { locationX, locationY } = e.nativeEvent;
         currentPath.current = `M ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
         setPaths(prev => [...prev, currentPath.current]);
@@ -33,6 +46,8 @@ export default function SignaturePad({ onCapture, capturing }) {
         currentPath.current += ` L ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
         setPaths(prev => [...prev.slice(0, -1), currentPath.current]);
       },
+      onPanResponderRelease: () => notifySigning(false),
+      onPanResponderTerminate: () => notifySigning(false),
     }),
   ).current;
 
