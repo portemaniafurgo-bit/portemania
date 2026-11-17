@@ -32,7 +32,7 @@ import PayButton from "../../../components/PayButton";
 import TipCard from "../../../components/TipCard";
 import DeliveryProof from "../../../components/DeliveryProof";
 import ChatBubbleButton from "../../../components/ChatBubbleButton";
-import { downloadReceipt } from "../../../lib/receipt";
+import { downloadReceipt, shareReceipt } from "../../../lib/receipt";
 import { useBottomPadding } from "../../../lib/layout";
 import { colors, radius, spacing } from "../../../theme";
 import { iosBackHeader } from "../../../components/HeaderBack";
@@ -75,7 +75,7 @@ export default function OrderDetail() {
   const bottomPad = useBottomPadding();
   const { id } = useLocalSearchParams();
   const dialog = useDialog();
-  const { user } = useAuth();
+  const { user, mode } = useAuth();
   const { order, driver, loading, patchOrder } = useOrder(id);
   // Sondeo de rescate solo con el pedido en curso; el historial no sondea.
   const driverLocation = useDriverLocation(driver, {
@@ -347,6 +347,13 @@ export default function OrderDetail() {
   const service = serviceOf(order);
   const active = ["accepted", "in_transit", "picked_up"].includes(order.status);
   const delivered = order.status === "delivered";
+  // Propina: solo quien pidió el servicio, en su cara de cliente, y nunca si
+  // es él mismo quien lo hizo (conductor que se pide a sí mismo).
+  const isTipper =
+    !!user?.id &&
+    mode !== "driver" &&
+    order.created_by_id === user.id &&
+    order.driver_id !== user.id;
   // Hasta recoger la carga el conductor va a la recogida; después, a la entrega.
   const goingToPickup = ["accepted", "in_transit"].includes(order.status);
   const target = goingToPickup
@@ -739,7 +746,10 @@ export default function OrderDetail() {
         {delivered && <DeliveryProof order={order} />}
 
         {/* Propina: cargo Stripe aparte, 100 % para el conductor */}
-        {delivered && <TipCard order={order} driverName={driverFirst} />}
+        {/* SOLO el cliente dueño del pedido, y nunca su propio conductor: un
+            conductor podía abrir aquí uno de sus servicios y ver la tarjeta
+            para «dejarse propina a sí mismo». */}
+        {delivered && isTipper && <TipCard order={order} driverName={driverFirst} />}
 
         {/* Recibo (canvas 1i): dos filas, PDF y email */}
         {delivered && (
@@ -757,6 +767,24 @@ export default function OrderDetail() {
             >
               <Ionicons name="download-outline" size={20} color={colors.primary} />
               <Body style={{ flex: 1 }}>Descargar recibo en PDF</Body>
+              <Ionicons name="chevron-forward" size={16} color={colors.subtle} />
+            </Pressable>
+            <View style={styles.receiptDivider} />
+            {/* Compartir va aparte: «Descargar» abre el PDF (Android), y quien
+                quiera mandarlo por WhatsApp o guardarlo en Drive lo hace aquí. */}
+            <Pressable
+              style={styles.receiptRow}
+              onPress={async () => {
+                setActionError("");
+                try {
+                  await shareReceipt(order, service);
+                } catch {
+                  setActionError("No se pudo generar el recibo. Inténtalo de nuevo.");
+                }
+              }}
+            >
+              <Ionicons name="share-outline" size={20} color={colors.primary} />
+              <Body style={{ flex: 1 }}>Compartir recibo</Body>
               <Ionicons name="chevron-forward" size={16} color={colors.subtle} />
             </Pressable>
             <View style={styles.receiptDivider} />
@@ -796,7 +824,7 @@ export default function OrderDetail() {
         )}
 
         {/* Quién va a venir: foto, valoración, servicios y la furgoneta */}
-        {driver && !delivered && <DriverCard driver={driver} driverId={order.driver_id} />}
+        {driver && !delivered && <DriverCard driver={driver} />}
 
         {/* Direcciones y precio */}
         <Card>

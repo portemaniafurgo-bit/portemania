@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Location from "expo-location";
 import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
@@ -79,6 +79,7 @@ export default function Pedir() {
     findRecentDuplicate,
     submit,
     clearDraft,
+    loadDraft,
     weightOptions,
     destinationZoneKey,
   } = wizard;
@@ -103,6 +104,19 @@ export default function Pedir() {
   useEffect(() => {
     supabase.rpc("pending_cancellation_fee").then(({ data }) => setPendingFee(Number(data) || 0));
   }, []);
+
+  // «Repetir pedido» (Mis pedidos) deja el borrador en disco y viene aquí con
+  // una marca nueva: esta pestaña ya estaba montada, así que hay que leerlo
+  // AHORA y empezar desde el primer paso, sin restos de la pantalla anterior.
+  const { repeat } = useLocalSearchParams();
+  useEffect(() => {
+    if (!repeat) return;
+    setStep(0);
+    setError("");
+    setWantSchedule(false);
+    setIosScheduleOpen(false);
+    loadDraft();
+  }, [repeat, loadDraft]);
 
   // Suelo de la oferta: nunca por debajo de 30 €, ni del 60 % de la tarifa.
   const floor = offerFloor(quote.total);
@@ -255,7 +269,13 @@ export default function Pedir() {
     setSending(true);
     try {
       await submit();
+      // `submit` ya vació el formulario; aquí se vacía lo que vive en esta
+      // pantalla («Programar» marcado, avisos), o el siguiente pedido
+      // arrancaba con restos del anterior.
       setStep(0);
+      setError("");
+      setWantSchedule(false);
+      setIosScheduleOpen(false);
       router.push("/(cliente)/orders");
     } catch (err) {
       setError("No se pudo crear el pedido: " + (err.message || "error de conexión"));

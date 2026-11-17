@@ -101,9 +101,22 @@ export default function AdminSettings() {
       const clean = {};
       for (const k of Object.keys(DEFAULT_TARIFFS)) clean[k] = Number(form[k]);
 
+      // FUSIÓN sobre lo guardado, leído JUSTO antes de escribir: `tariffs`
+      // lleva claves que esta pantalla no conoce (phase_gap_minutes,
+      // cancel_fee, vat_rate…, que usan el servidor y la app) y antes se
+      // perdían en silencio al sobrescribir el JSON entero. Si no se puede
+      // leer, NO se guarda: mejor un error que machacar esas claves.
+      const { data: current, error: readError } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", "tariffs")
+        .maybeSingle();
+      if (readError) throw readError;
+      const stored = current?.value && typeof current.value === "object" ? current.value : {};
+
       const { error } = await supabase
         .from("app_settings")
-        .update({ value: clean })
+        .update({ value: { ...stored, ...clean } })
         .eq("key", "tariffs");
       if (error) throw error;
 

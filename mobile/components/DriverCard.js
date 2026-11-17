@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { supabase } from "../lib/supabase";
 import { rating1 } from "../lib/money";
 import { Body, Caption, Card, Title } from "./ui";
 import { colors, radius, spacing } from "../theme";
@@ -14,23 +13,17 @@ import { colors, radius, spacing } from "../theme";
  * nombre y una matrícula; las fotos de la furgoneta ya estaban subidas (son
  * obligatorias para verificarse) pero no se enseñaban en ningún sitio.
  */
-export default function DriverCard({ driver, driverId, onCall }) {
-  const [jobs, setJobs] = useState(null);
+export default function DriverCard({ driver, onCall }) {
   const [zoom, setZoom] = useState(null);
 
-  useEffect(() => {
-    if (!driverId) return;
-    // Servicios entregados: el número sale de sus entregas, no de una columna
-    // que alguien pueda inflar.
-    supabase
-      .from("transport_requests")
-      .select("id", { count: "exact", head: true })
-      .eq("driver_id", driverId)
-      .eq("status", "delivered")
-      .then(({ count }) => setJobs(count ?? 0));
-  }, [driverId]);
-
   if (!driver) return null;
+
+  // Servicios entregados: `total_trips` del perfil, que mantiene la BD
+  // (trigger sync_driver_rating al entregar) y nadie puede escribir a mano.
+  // Antes se contaban los pedidos entregados con la sesión del CLIENTE, pero
+  // la RLS de transport_requests solo le deja ver los suyos: salía siempre
+  // «0 servicios» aunque el conductor llevara docenas.
+  const jobs = Number.isFinite(Number(driver.total_trips)) ? Number(driver.total_trips) : null;
 
   const photos = [
     driver.vehicle_photo_front_url,

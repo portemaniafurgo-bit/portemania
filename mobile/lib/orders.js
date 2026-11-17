@@ -297,9 +297,10 @@ export function useChat(orderId, { user, role }) {
           setMessages(prev => (prev.some(m => m.id === data.id) ? prev : [...prev, data]));
         }
 
-        supabase.functions
-          .invoke("send-push", { body: { mode: "chat_message", order_id: orderId, message_id: data.id } })
-          .catch(() => {});
+        // El aviso push a la otra parte NO se pide desde aquí: lo dispara el
+        // trigger zz_notify_chat_message de la BD (0015) en cada mensaje, venga
+        // de la web o de la app. Pedirlo también aquí hacía que el otro móvil
+        // recibiera cada mensaje DOS veces.
       } finally {
         setSending(false);
       }

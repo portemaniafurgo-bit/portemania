@@ -59,6 +59,14 @@ async function tokensFor(admin: Admin, userIds: string[]): Promise<string[]> {
   return (data || []).map((r: { token: string }) => r.token);
 }
 
+/**
+ * Opciones extra del mensaje de Expo. `tag` (Android) y `collapseId` (iOS)
+ * hacen que un aviso nuevo SUSTITUYA al anterior con la misma clave en vez de
+ * apilarse: lo lee el propio sistema, así que vale también para la app que ya
+ * está instalada en los móviles.
+ */
+type PushOptions = { tag?: string; collapseId?: string };
+
 /** Envía en lotes de 100 (límite de Expo) y limpia los tokens muertos. */
 async function push(
   admin: Admin,
@@ -67,6 +75,7 @@ async function push(
   body: string,
   data: Record<string, unknown>,
   channelId: string,
+  options: PushOptions = {},
 ) {
   if (!tokens.length) return { sent: 0, total: 0 };
 
@@ -75,7 +84,7 @@ async function push(
 
   for (let i = 0; i < tokens.length; i += 100) {
     const batch = tokens.slice(i, i + 100);
-    const messages = batch.map((to) => ({ to, title, body, data, channelId, sound: "default" }));
+    const messages = batch.map((to) => ({ to, title, body, data, channelId, sound: "default", ...options }));
 
     const res = await fetch(EXPO_PUSH_URL, {
       method: "POST",
@@ -380,13 +389,20 @@ Deno.serve(async (req: Request) => {
 
     // ---------- Conductor llegando (<100 m) → cliente ----------
     case "driver_arriving": {
+      // La fase la dice el estado REAL del pedido (la app no manda cuál es):
+      // con la carga ya recogida va hacia la ENTREGA, donde el cliente no
+      // prepara nada sino que la recibe. Misma regla que la pantalla del
+      // conductor (accepted/in_transit = recogida, picked_up = entrega).
+      const atDestination = order.status === "picked_up";
       const tokens = await tokensFor(admin, clientUserId(order));
       return json(
         await push(
           admin,
           tokens,
           "Tu conductor está llegando",
-          "Está a menos de 100 metros. Prepara la carga.",
+          atDestination
+            ? "Está a menos de 100 metros. Prepárate para recibir la carga."
+            : "Está a menos de 100 metros. Prepara la carga.",
           data,
           CHANNEL_STATUS,
         ),
@@ -421,20 +437,53 @@ Deno.serve(async (req: Request) => {
       // al móvil es el que de verdad está en la BD.
       if (!msg || msg.request_id !== order.id) return json({ error: "Mensaje no encontrado" }, 404);
 
-      const targets = [order.created_by_id, order.driver_id].filter(
-        (uid) => uid && uid !== msg.sender_id,
-      ) as string[];
-      const tokens = await tokensFor(admin, targets);
-      return json(
-        await push(
+      // UN aviso por mensaje. Lo piden dos sitios a la vez — el trigger de la
+      // BD (0015) y la app instalada al enviar — y el otro móvil recibía el
+      // mismo mensaje dos veces. Se «reclama» el mensaje de forma atómica: solo
+      // la primera llamada lo marca y envía; la segunda no encuentra nada que
+      // marcar y se calla. Si la columna aún no existe (0030 sin aplicar), se
+      // envía como antes: mejor un aviso repetido que ninguno.
+      const { data: claimed, error: claimError } = await admin
+        .from("chat_messages")
+        .update({ push_sent_at: new Date().toISOString() })
+        .eq("id", msg.id)
+        .is("push_sent_at", null)
+        .select("id");
+      if (!claimError && (!claimed || claimed.length === 0)) {
+        return json({ sent: 0, skipped: "aviso de este mensaje ya enviado" });
+      }
+
+      // Si el envío falla DESPUÉS de reclamar (Expo caído, error de red…), se
+      // libera la marca para que la otra llamada (o un reintento) pueda avisar:
+      // sin esto el mensaje se quedaría sin aviso para siempre.
+      const release = async () => {
+        if (claimError) return;
+        await admin.from("chat_messages").update({ push_sent_at: null }).eq("id", msg.id);
+      };
+      try {
+        const targets = [order.created_by_id, order.driver_id].filter(
+          (uid) => uid && uid !== msg.sender_id,
+        ) as string[];
+        const tokens = await tokensFor(admin, targets);
+        // Misma clave para todo el chat de un pedido: cada mensaje nuevo
+        // SUSTITUYE en la bandeja al aviso anterior en vez de apilarse (10
+        // mensajes eran 10 avisos que Android agrupaba y enseñaba juntos).
+        const thread = `chat-${order.id}`;
+        const result = await push(
           admin,
           tokens,
           msg.sender_name || "Mensaje nuevo",
           String(msg.message || "").slice(0, 140),
           { ...data, message_id: msg.id },
           CHANNEL_STATUS,
-        ),
-      );
+          { tag: thread, collapseId: thread },
+        );
+        if (result.total > 0 && result.sent === 0) await release();
+        return json(result);
+      } catch (err) {
+        await release();
+        throw err;
+      }
     }
 
     // ---------- Negociación: contraoferta nueva → cliente ----------

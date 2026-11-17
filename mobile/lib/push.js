@@ -16,6 +16,18 @@ import { getNotificationPrefs } from "../components/NotificationPrefs";
  * del dispositivo y se reacciona a lo que llega.
  */
 
+/**
+ * Pedido cuyo chat está ABIERTO en pantalla ahora mismo (lo marca
+ * components/ChatThread). Con el chat delante, el mensaje ya aparece en la
+ * conversación: sacar además el aviso arriba lo enseñaba dos veces, y tocarlo
+ * apilaba otra pantalla del mismo chat encima.
+ */
+let openChatOrderId = null;
+
+export function setOpenChat(orderId) {
+  openChatOrderId = orderId ? String(orderId) : null;
+}
+
 // Con la app en primer plano, Android no muestra nada por defecto: hay que
 // decirlo explícitamente o el conductor no ve la oferta que acaba de entrar.
 Notifications.setNotificationHandler({
@@ -23,8 +35,12 @@ Notifications.setNotificationHandler({
     // Preferencias del dispositivo (perfil → Notificaciones): el modo del
     // aviso decide qué toggle lo gobierna.
     const prefs = await getNotificationPrefs();
-    const mode = notification?.request?.content?.data?.mode || "";
+    const data = notification?.request?.content?.data || {};
+    const mode = data.mode || "";
+    const inOpenChat =
+      mode === "chat_message" && !!openChatOrderId && String(data.order_id) === openChatOrderId;
     const muted =
+      inOpenChat ||
       (["price_offer", "offer_accepted", "new_request"].includes(mode) && !prefs.offers) ||
       (["news", "promo"].includes(mode) && !prefs.news) ||
       // El chat va con el estado del pedido: los dos son el servicio en curso.
@@ -188,6 +204,8 @@ export function usePushNotifications({ userId, role }) {
       }
       if (!orderId) return;
       if (mode === "chat_message") {
+        // Ya está en ese chat: no se apila otra copia de la misma pantalla.
+        if (openChatOrderId === String(orderId)) return;
         router.push(`/chat/${orderId}`);
         return;
       }

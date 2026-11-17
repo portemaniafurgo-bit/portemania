@@ -52,7 +52,16 @@ export default function ActiveJob() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState("");
-  const chatEndRef = useRef(null);
+  // Caja de mensajes del chat: se baja al último DENTRO de la caja. Antes se
+  // hacía scrollIntoView del final del chat, que arrastraba la PÁGINA entera
+  // hasta el chat (abajo del todo) con cada mensaje y cada carga, alejando al
+  // conductor de la firma.
+  const chatBoxRef = useRef(null);
+  // La firma aparece donde estaba el botón de la fase, a media página: al
+  // montarse se trae a la vista para que el conductor no la pase por alto.
+  const revealSignature = useCallback((node) => {
+    node?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
   const [showCancel, setShowCancel] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
   const [cancelNote, setCancelNote] = useState("");
@@ -148,7 +157,8 @@ export default function ActiveJob() {
   });
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const box = chatBoxRef.current;
+    if (box) box.scrollTop = box.scrollHeight;
   }, [messages]);
 
   const advanceMutation = useMutation({
@@ -521,11 +531,13 @@ export default function ActiveJob() {
           tiendas no hay botón de "finalizado": se cierra con la firma. */}
       {nextStep && !isFinished && (
         nextStep.phase === "finish" && job.signature_required ? (
-          <SignaturePad
-            defaultName={job.recipient_name || ""}
-            submitting={deliverWithSignatureMutation.isPending}
-            onConfirm={(payload) => deliverWithSignatureMutation.mutate(payload)}
-          />
+          <div ref={revealSignature} className="scroll-mt-20">
+            <SignaturePad
+              defaultName={job.recipient_name || ""}
+              submitting={deliverWithSignatureMutation.isPending}
+              onConfirm={(payload) => deliverWithSignatureMutation.mutate(payload)}
+            />
+          </div>
         ) : (
           <Button
             className={`w-full h-14 rounded-2xl text-base font-semibold gap-2 text-white ${nextStep.color}`}
@@ -651,7 +663,7 @@ export default function ActiveJob() {
           <MessageCircle className="w-4 h-4 text-primary" />
           <span className="font-semibold text-sm text-foreground">Chat con el cliente</span>
         </div>
-        <div className="h-52 overflow-y-auto p-4 space-y-3">
+        <div ref={chatBoxRef} className="h-52 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && (
             <p className="text-center text-xs text-muted-foreground pt-8">Aún no hay mensajes</p>
           )}
@@ -673,7 +685,6 @@ export default function ActiveJob() {
               </div>
             </div>
           ))}
-          <div ref={chatEndRef} />
         </div>
         <div className="p-3 border-t border-border flex gap-2">
           <Input

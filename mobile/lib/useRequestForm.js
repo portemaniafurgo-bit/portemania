@@ -96,27 +96,38 @@ export function useRequestForm({ user } = {}) {
   }, []);
 
   // --- Borrador local ------------------------------------------------------
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(DRAFT_KEY);
-        // Sin borrador, el método de pago arranca en el preferido del perfil
-        // (canvas 2i → Métodos de pago); con borrador manda lo que dejó a medias.
-        const preferred = await getDefaultPayment();
-        if (raw) {
-          const saved = JSON.parse(raw);
-          setForm(emptyForm(saved.form || {}));
-          setPhotos(saved.photos || []);
-        } else {
-          setForm(prev => ({ ...prev, payment_method: preferred }));
-        }
-      } catch {
-        /* borrador ilegible: se empieza en limpio, no se rompe el asistente */
-      } finally {
-        setDraftLoaded(true);
+  /**
+   * Lee el borrador guardado y lo pone en el asistente. Se llama al montar y,
+   * además, cuando «Repetir pedido» deja uno nuevo: la pestaña Pedir está
+   * SIEMPRE montada (es la de entrada), así que leerlo solo al montar dejaba
+   * en pantalla lo que hubiera de antes en vez del pedido a repetir.
+   */
+  const loadDraft = useCallback(async () => {
+    try {
+      const raw = await AsyncStorage.getItem(DRAFT_KEY);
+      // Sin borrador, el método de pago arranca en el preferido del perfil
+      // (canvas 2i → Métodos de pago); con borrador manda lo que dejó a medias.
+      const preferred = await getDefaultPayment();
+      if (raw) {
+        const saved = JSON.parse(raw);
+        setForm(emptyForm(saved.form || {}));
+        setPhotos(saved.photos || []);
+      } else {
+        setForm(emptyForm({ payment_method: preferred }));
+        setPhotos([]);
       }
-    })();
+      setAcceptPortal(false);
+      setAcceptTerms(false);
+    } catch {
+      /* borrador ilegible: se empieza en limpio, no se rompe el asistente */
+    } finally {
+      setDraftLoaded(true);
+    }
   }, []);
+
+  useEffect(() => {
+    loadDraft();
+  }, [loadDraft]);
 
   useEffect(() => {
     // No guardar antes de haber leído: machacaría el borrador con el vacío
@@ -125,9 +136,16 @@ export function useRequestForm({ user } = {}) {
     AsyncStorage.setItem(DRAFT_KEY, JSON.stringify({ form, photos })).catch(() => {});
   }, [form, photos, draftLoaded]);
 
+  /**
+   * Asistente en blanco, como recién abierto. Tras crear un pedido se vacía
+   * TODO (direcciones, carga, fotos, oferta, fecha, receptor y casillas) para
+   * que el siguiente no salga con los datos del anterior; el método de pago
+   * vuelve al preferido del perfil, como en un asistente nuevo.
+   */
   const clearDraft = useCallback(async () => {
     await AsyncStorage.removeItem(DRAFT_KEY).catch(() => {});
-    setForm(emptyForm());
+    const preferred = await getDefaultPayment().catch(() => null);
+    setForm(emptyForm(preferred ? { payment_method: preferred } : {}));
     setPhotos([]);
     setAcceptPortal(false);
     setAcceptTerms(false);
@@ -459,6 +477,7 @@ export function useRequestForm({ user } = {}) {
     findRecentDuplicate,
     submit,
     clearDraft,
+    loadDraft,
     draftLoaded,
     weightOptions: weightsForZone(intercity ? "villarrobledo" : "albacete"),
     destinationZoneKey,

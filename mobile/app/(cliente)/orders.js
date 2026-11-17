@@ -63,11 +63,17 @@ export default function MisPedidos() {
   const [unread, setUnread] = useState({});
 
   const load = useCallback(async () => {
+    if (!user?.id) return;
     // `select("*")` a propósito: "repetir pedido" necesita todos los campos del
     // original para rellenar el asistente, no solo los que se pintan aquí.
+    // Solo los pedidos QUE HE HECHO YO: la RLS también deja ver a un conductor
+    // los servicios que hace (y los pendientes de otros clientes), y con la
+    // cara de cliente le salían aquí mezclados con los suyos — desde donde
+    // podía abrir uno de sus servicios y ver la propina «para sí mismo».
     const { data } = await supabase
       .from("transport_requests")
       .select("*")
+      .eq("created_by_id", user.id)
       .order("created_date", { ascending: false })
       .limit(50);
     setOrders(data || []);
@@ -103,7 +109,9 @@ export default function MisPedidos() {
       payment_method: order.payment_method,
     };
     await AsyncStorage.setItem("request_draft_v1", JSON.stringify({ form: draft, photos: [] }));
-    router.push("/(cliente)/pedir");
+    // La marca `repeat` (siempre distinta) avisa a la pestaña Pedir, que ya
+    // está montada, de que tiene que leer este borrador ahora.
+    router.push({ pathname: "/(cliente)/pedir", params: { repeat: String(Date.now()) } });
   };
 
   useEffect(() => {

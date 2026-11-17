@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Image,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -12,7 +11,7 @@ import {
 } from "react-native";
 import { useDialog } from "./Dialog";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { format, isToday, isYesterday } from "date-fns";
 import { es } from "date-fns/locale";
 import { Ionicons } from "@expo/vector-icons";
@@ -20,6 +19,7 @@ import { useAuth } from "../lib/auth";
 import { useChat, useOrder } from "../lib/orders";
 import { useTyping } from "../lib/typing";
 import { markChatRead } from "../lib/unread";
+import { setOpenChat } from "../lib/push";
 import { pickPhotos, takePhoto } from "../lib/photos";
 import { Caption, Loading } from "./ui";
 import { colors, radius, spacing } from "../theme";
@@ -63,6 +63,15 @@ export default function ChatThread({ orderId, partnerRole }) {
   // Texto del último mensaje que no se pudo enviar, para reintentarlo.
   const [failed, setFailed] = useState(null);
   const scrollRef = useRef(null);
+
+  // Mientras este chat está delante, el aviso push de un mensaje suyo no se
+  // enseña (el mensaje ya sale aquí) ni abre otra copia de la pantalla.
+  useFocusEffect(
+    useCallback(() => {
+      setOpenChat(orderId);
+      return () => setOpenChat(null);
+    }, [orderId]),
+  );
 
   useEffect(() => {
     // Pantalla dedicada al chat: aquí SÍ se baja siempre al último mensaje.
@@ -146,10 +155,12 @@ export default function ChatThread({ orderId, partnerRole }) {
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
+      {/* «padding» en LOS DOS sistemas: con la app de borde a borde (Expo 57)
+          Android ya no encoge la ventana al abrir el teclado, y sin
+          `behavior` la barra de escritura quedaba debajo del teclado. Se
+          calcula por solape con el teclado: si algún móvil sí encogiera la
+          ventana, el solape es 0 y no se añade nada. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         {/* Mensajes llenando la pantalla */}
         <ScrollView
           ref={scrollRef}

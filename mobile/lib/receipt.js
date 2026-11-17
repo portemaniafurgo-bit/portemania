@@ -1,3 +1,6 @@
+import { Platform } from "react-native";
+import { requireOptionalNativeModule } from "expo";
+import * as IntentLauncher from "expo-intent-launcher";
 import * as Print from "expo-print";
 import * as Sharing from "expo-sharing";
 import { format } from "date-fns";
@@ -161,20 +164,78 @@ async function gatherInvoiceData(order) {
   return { issuer, billing, vatRate: Number(tariffs.vat_rate ?? 21), number };
 }
 
-/** Genera el PDF y abre el diálogo de compartir/guardar del sistema. */
-export async function downloadReceipt(order, service) {
+/** Genera el PDF en el móvil y devuelve su ruta y el título para el sistema. */
+async function buildReceiptFile(order, service) {
   const extra = await gatherInvoiceData(order);
   const { uri } = await Print.printToFileAsync({
     html: documentHtml({ order, service, ...extra }),
   });
-  if (await Sharing.isAvailableAsync()) {
-    await Sharing.shareAsync(uri, {
-      mimeType: "application/pdf",
-      // iPhone: el tipo de fichero va por UTI (con él la hoja ofrece «Guardar
-      // en Archivos» y abrir con lectores de PDF). Android lo ignora.
-      UTI: "com.adobe.pdf",
-      dialogTitle: `ClicyVoy ${extra.number || String(order.id).slice(0, 8)}`,
+  return { uri, title: `ClicyVoy ${extra.number || String(order.id).slice(0, 8)}` };
+}
+
+/** Hoja de compartir del sistema (WhatsApp, email, Drive, «Guardar en Archivos»…). */
+async function shareFile(uri, title) {
+  if (!(await Sharing.isAvailableAsync())) return false;
+  await Sharing.shareAsync(uri, {
+    mimeType: "application/pdf",
+    // iPhone: el tipo de fichero va por UTI (con él la hoja ofrece «Guardar
+    // en Archivos» y abrir con lectores de PDF). Android lo ignora.
+    UTI: "com.adobe.pdf",
+    dialogTitle: title,
+  });
+  return true;
+}
+
+/**
+ * Android: abre el PDF en el visor del móvil (el de Google Drive, Archivos, el
+ * del fabricante…), desde el que se ve, se descarga o se imprime.
+ *
+ * Sin dependencias nativas nuevas: el módulo nativo de ficheros de Expo YA va
+ * dentro de la app (lo trae el propio paquete `expo`) aunque no se pueda
+ * importar como paquete, y es el que convierte la ruta privada del PDF en un
+ * enlace `content://` que otra app puede leer; `expo-intent-launcher` ya está
+ * instalado. Si algo falta (ningún visor de PDF, módulo no disponible),
+ * devuelve false y se cae a la hoja de compartir: el cliente nunca se queda
+ * sin recibo.
+ *
+ * (Guardar directamente en «Descargas» con el selector de carpetas de Android
+ * no es viable con lo instalado: el módulo de ficheros solo sabe escribir en
+ * carpetas del almacenamiento interno, y Android 11+ no deja elegir la propia
+ * carpeta Descargas en ese selector.)
+ */
+async function openPdfOnAndroid(uri) {
+  try {
+    const FileSystem = requireOptionalNativeModule("ExponentFileSystem");
+    if (!FileSystem?.getContentUriAsync) return false;
+    const contentUri = await FileSystem.getContentUriAsync(uri);
+    await IntentLauncher.startActivityAsync("android.intent.action.VIEW", {
+      data: contentUri,
+      type: "application/pdf",
+      // FLAG_GRANT_READ_URI_PERMISSION: el visor puede leer el fichero.
+      flags: 1,
     });
+    return true;
+  } catch {
+    return false;
   }
+}
+
+/**
+ * «Descargar recibo»: en Android lo ABRE en el visor de PDF (antes sacaba la
+ * hoja de compartir, que no es lo que espera quien pulsa «descargar»). En
+ * iPhone la hoja del sistema ya es la forma de guardarlo («Guardar en
+ * Archivos»).
+ */
+export async function downloadReceipt(order, service) {
+  const { uri, title } = await buildReceiptFile(order, service);
+  if (Platform.OS === "android" && (await openPdfOnAndroid(uri))) return uri;
+  await shareFile(uri, title);
+  return uri;
+}
+
+/** «Compartir recibo»: la hoja de compartir de siempre, como acción aparte. */
+export async function shareReceipt(order, service) {
+  const { uri, title } = await buildReceiptFile(order, service);
+  await shareFile(uri, title);
   return uri;
 }

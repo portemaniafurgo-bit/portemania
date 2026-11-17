@@ -163,6 +163,12 @@ export default function TrabajoActivo() {
   const [feedbackTags, setFeedbackTags] = useState([]);
   const [feedbackText, setFeedbackText] = useState("");
   const [showProof, setShowProof] = useState(false);
+  // Al pulsar «Finalizar», la firma aparece MUY abajo en la página y el
+  // conductor no la veía: el pedido se quedaba pendiente de firma. Se baja
+  // sola hasta ella UNA vez cada vez que se abre (ver onLayout de la tarjeta).
+  const scrollRef = useRef(null);
+  const contentTopRef = useRef(0);
+  const scrollToProofRef = useRef(false);
   const [proofPhotoUri, setProofPhotoUri] = useState(null);
   const [recipientName, setRecipientName] = useState("");
   // Mi posición para el mapa EMBEBIDO (estilo Uber): sale del GPS del propio
@@ -490,6 +496,7 @@ export default function TrabajoActivo() {
     // servicios sin firma obligatoria se puede omitir, pero se ofrece: es lo
     // que protege al conductor y a la empresa ante una disputa.
     if (step.phase === "finish") {
+      scrollToProofRef.current = true;
       setShowProof(true);
       return;
     }
@@ -675,6 +682,7 @@ export default function TrabajoActivo() {
           con todo lo demás, en vez de quedarse fijo con la lista colándose por
           debajo. */}
       <ScrollView
+        ref={scrollRef}
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingBottom: bottomPad }}
         // Solo iPhone (Android lo ignora): sitio para el teclado.
@@ -725,7 +733,14 @@ export default function TrabajoActivo() {
         />
       )}
 
-      <View style={{ padding: spacing.screen, gap: spacing.lg }}>
+      <View
+        style={{ padding: spacing.screen, gap: spacing.lg }}
+        // Dónde empieza este bloque dentro del scroll: la tarjeta de la firma
+        // mide su posición respecto a él, no respecto a la página.
+        onLayout={e => {
+          contentTopRef.current = e.nativeEvent.layout.y;
+        }}
+      >
         {/* Tiempo restante y a dónde se va, debajo del mapa (antes flotaba) */}
         {!finished && (
           <View style={styles.etaRow}>
@@ -1060,6 +1075,17 @@ export default function TrabajoActivo() {
         {/* Prueba de entrega: foto de lo entregado + firma del receptor.
             Obligatoria en paquetes y compras en tienda; opcional en el resto. */}
         {showProof && !finished && (
+          <View
+            onLayout={e => {
+              // Solo la primera vez tras pulsar «Finalizar»: si después cambia
+              // de tamaño (foto hecha, un error encima) no se le mueve la
+              // pantalla al conductor mientras el receptor firma.
+              if (!scrollToProofRef.current) return;
+              scrollToProofRef.current = false;
+              const y = contentTopRef.current + e.nativeEvent.layout.y - spacing.md;
+              scrollRef.current?.scrollTo({ y: Math.max(0, y), animated: true });
+            }}
+          >
           <Card>
             <Title>Prueba de entrega</Title>
             <Caption>
@@ -1109,6 +1135,7 @@ export default function TrabajoActivo() {
             )}
             <Button title="Volver" variant="plain" onPress={() => setShowProof(false)} disabled={saving} />
           </Card>
+          </View>
         )}
 
         {finished && (
