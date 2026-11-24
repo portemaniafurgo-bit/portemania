@@ -15,7 +15,7 @@ import { serviceOf } from "../../../lib/services";
 import { euro } from "../../../lib/money";
 import { geocodeAlbacete } from "../../../lib/eta";
 import { setArrivalTarget, startTracking, stopTracking } from "../../../lib/tracking";
-import { ensureBackgroundLocationDisclosure } from "../../../lib/locationDisclosure";
+import { requestForegroundLocation, showIosTrackingDisclosure } from "../../../lib/locationDisclosure";
 import TrackingMap from "../../../components/TrackingMap";
 import { isStillRepeat, pickFix } from "../../../lib/geo";
 import ChatBubbleButton from "../../../components/ChatBubbleButton";
@@ -176,6 +176,7 @@ export default function TrabajoActivo() {
   const [myPos, setMyPos] = useState(null);
   const [fallbackTarget, setFallbackTarget] = useState(null);
   const trackingStarted = useRef(false);
+  const [trackingPermissionChecked, setTrackingPermissionChecked] = useState(false);
   // Último fix aceptado para el mapa propio (filtro de lib/geo.js).
   const lastFixRef = useRef(null);
 
@@ -184,8 +185,9 @@ export default function TrabajoActivo() {
     let subscription = null;
     (async () => {
       try {
-        let { granted } = await Location.getForegroundPermissionsAsync();
-        if (!granted) granted = (await Location.requestForegroundPermissionsAsync()).granted;
+        const { granted } = Platform.OS === "ios"
+          ? await requestForegroundLocation("driver")
+          : await Location.getForegroundPermissionsAsync();
         if (!granted || !active) return;
         // La última posición CONOCIDA llega al instante (el fix del GPS tarda
         // varios segundos): así el mapa encuadra la ruta entera desde el
@@ -216,6 +218,7 @@ export default function TrabajoActivo() {
             setMyPos({ lat: fix.lat, lng: fix.lng, updatedAt: new Date(ts).toISOString() });
           },
         );
+        if (!active) subscription.remove();
       } catch {
         // Sin permiso o sin GPS: el mapa se muestra sin mi posición, y los
         // botones de Maps/Waze siguen funcionando.
@@ -225,7 +228,7 @@ export default function TrabajoActivo() {
       active = false;
       subscription?.remove();
     };
-  }, []);
+  }, [trackingPermissionChecked]);
 
   const sendFeedback = async () => {
     setSaving(true);
@@ -345,24 +348,16 @@ export default function TrabajoActivo() {
     if (!active || !profile?.id || trackingStarted.current) return;
 
     trackingStarted.current = true;
-    // ANTES del permiso de segundo plano va la divulgación destacada que exige
-    // Google Play (lib/locationDisclosure.js). Si el conductor no acepta, no se
-    // pide el permiso y se explica qué se pierde.
-    // El callback del efecto NO puede ser async (devolvería una promesa donde
-    // React espera la función de limpieza), y `dialog` NO entra en las
-    // dependencias: el contexto del diálogo cambia de identidad al abrirse y
-    // cerrarse, y el efecto se reengancharía en bucle.
     (async () => {
-      const ok = await ensureBackgroundLocationDisclosure(dialog);
-      if (!ok) {
-        setError(
-          "Sin el permiso de ubicación «todo el tiempo» el cliente no podrá seguirte. Puedes activarlo desde Ayuda.",
-        );
-        trackingStarted.current = false;
-        return;
+      try {
+        await showIosTrackingDisclosure(dialog);
+        const result = await startTracking(profile.id);
+        if (!result.ok) setError(result.reason);
+      } catch {
+        setError("No se pudo iniciar el seguimiento de ubicación.");
+      } finally {
+        if (Platform.OS === "android") setTrackingPermissionChecked(true);
       }
-      const result = await startTracking(profile.id);
-      if (!result.ok) setError(result.reason);
     })();
   }, [order?.status, profile?.id]);
 

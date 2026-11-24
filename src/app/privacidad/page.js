@@ -11,7 +11,7 @@ export default function PrivacidadPage() {
     <div className="max-w-3xl mx-auto px-4 py-12 space-y-8">
       <div>
         <h1 className="text-3xl font-display font-bold text-foreground">Política de Privacidad</h1>
-        <p className="text-sm text-muted-foreground mt-2">Última actualización: septiembre de 2026</p>
+        <p className="text-sm text-muted-foreground mt-2">Última actualización: noviembre de 2026</p>
       </div>
 
       <section className="space-y-3">
@@ -49,6 +49,47 @@ export default function PrivacidadPage() {
         </ul>
         <p className="text-sm text-muted-foreground leading-relaxed">
           Si crea su cuenta a través del enlace de un comercial, guardamos qué comercial le invitó. Ese comercial ve su nombre de pila, la fecha de alta y el número de servicios que ha hecho, y de cada comisión que le genera, la fecha, el porcentaje y el importe (con los que se puede deducir el precio de ese servicio); nunca su apellido, sus datos de contacto ni sus direcciones. Hasta que inicia sesión, el código de invitación se guarda en el almacenamiento local de su navegador (ver la Política de Cookies).
+        </p>
+      </section>
+
+      <section className="space-y-3" id="ubicacion">
+        <h2 className="text-xl font-heading font-semibold text-foreground">2.1. Ubicación del dispositivo</h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          La app móvil ClicyVoy accede a las coordenadas del dispositivo mediante los servicios de
+          ubicación del sistema, con su permiso. La precisión depende de lo que autorice en el
+          dispositivo. El inicio de sesión con Google no proporciona estos datos.
+        </p>
+        <ul className="text-sm text-muted-foreground space-y-2 list-disc list-inside">
+          <li>
+            <strong>Clientes.</strong> Si pulsa «Usar mi ubicación», la app usa una lectura de la
+            posición para sugerir una dirección. Según la pantalla, la app la convierte con el
+            servicio del sistema o envía las coordenadas al geocodificador Photon (alojado por Komoot).
+            Puede escribir la dirección a mano. Si confirma el pedido, guardamos las direcciones y
+            coordenadas asociadas al servicio cuando están disponibles.
+          </li>
+          <li>
+            <strong>Conductores en primer plano.</strong> La app utiliza la ubicación para mostrar
+            su posición en el mapa del servicio y ordenar las ofertas por cercanía.
+          </li>
+          <li>
+            <strong>Conductores en segundo plano.</strong> Con su permiso, ClicyVoy recoge y envía
+            periódicamente su posición durante un servicio activo, incluso cuando la app está
+            cerrada o no la está usando, por ejemplo, con la pantalla bloqueada o mientras navega
+            con otra app. La usamos para mostrar el trayecto en directo y avisar al cliente de
+            que el conductor se acerca al punto de recogida o entrega. El seguimiento deja de
+            recoger posiciones al finalizar o cancelar el servicio.
+          </li>
+          <li>
+            <strong>Almacenamiento y acceso.</strong> Guardamos en Supabase las últimas
+            coordenadas del conductor y su hora de actualización. Cada actualización sustituye
+            la anterior en su perfil. Durante el servicio, el cliente y quienes tengan su enlace
+            de seguimiento pueden ver la posición en el mapa. El mapa público de conductores
+            disponibles puede mostrar una posición aproximada.
+          </li>
+        </ul>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Puede denegar o revocar el permiso desde los ajustes del dispositivo. Sin el permiso
+          de segundo plano en Android, el cliente no podrá seguir al conductor en directo.
         </p>
       </section>
 
