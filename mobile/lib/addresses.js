@@ -1,4 +1,5 @@
 import * as Location from "expo-location";
+import { requestForegroundLocation } from "./locationDisclosure";
 import { ZONES } from "./zones";
 
 /**
@@ -93,7 +94,7 @@ export async function addressFromCoords({ lat, lng }, { zone = "albacete" } = {}
  * lo explique en vez de quedarse en silencio.
  */
 export async function currentAddress() {
-  const { granted } = await Location.requestForegroundPermissionsAsync();
+  const { granted } = await requestForegroundLocation("address");
   if (!granted) return { granted: false, address: null };
 
   const position = await Location.getCurrentPositionAsync({

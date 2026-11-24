@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { requestForegroundLocation, requestTrackingBackgroundLocation } from "./locationDisclosure";
 import { supabase } from "./supabase";
 import { isStillRepeat, metersBetween, pickFix } from "./geo";
 
@@ -313,7 +314,7 @@ TaskManager.defineTask(TASK, ({ data, error }) => {
 export async function startTracking(profileId) {
   if (!profileId) return { ok: false, reason: "Sin perfil de conductor." };
 
-  const foreground = await Location.requestForegroundPermissionsAsync();
+  const foreground = await requestForegroundLocation("driver");
   if (!foreground.granted) {
     return { ok: false, reason: "Necesitamos tu ubicación para que el cliente te siga." };
   }
@@ -328,10 +329,7 @@ export async function startTracking(profileId) {
   // Maps (expo-location en iOS solo exige el permiso de primer plano para
   // startLocationUpdatesAsync). Lo que sin «Siempre» no hay es relanzar la app
   // si el sistema la cierra. Por eso en iOS un «no» aquí no bloquea.
-  const background =
-    Platform.OS === "ios"
-      ? await Location.requestBackgroundPermissionsAsync().catch(() => ({ granted: false }))
-      : await Location.requestBackgroundPermissionsAsync();
+  const background = await requestTrackingBackgroundLocation();
   if (!background.granted && Platform.OS !== "ios") {
     return {
       ok: false,

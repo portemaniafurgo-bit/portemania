@@ -3,6 +3,7 @@ import { Image, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Location from "expo-location";
+import { requestForegroundLocation } from "../../lib/locationDisclosure";
 import { DateTimePickerAndroid } from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
 import { format } from "date-fns";
@@ -151,8 +152,7 @@ export default function Pedir() {
     setLocating(true);
     setError("");
     try {
-      let { granted } = await Location.getForegroundPermissionsAsync();
-      if (!granted) granted = (await Location.requestForegroundPermissionsAsync()).granted;
+      const { granted } = await requestForegroundLocation("address");
       if (!granted) {
         setError("Sin permiso de ubicación no puedo rellenar la dirección de recogida.");
         return;
